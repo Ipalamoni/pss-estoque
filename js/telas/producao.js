@@ -1,0 +1,578 @@
+// =====================================================================
+// Produção: PROGRAMAÇÃO (engenharia programa, pesagem dá baixa)
+//           e SAÍDAS DA PRODUÇÃO (o que a pesagem tirou do estoque)
+// =====================================================================
+import { html, useState, useMemo, useEffect, useApp, Campo, Numero, Escolher, QtdUnidade, Etiqueta, Cabecalho, Abas, Vazio, Tabela, Cartao,
+  Carregando, Modal, useAcao, confirmar, avisar, n } from '../ui.js';
+import { qtd, num, moeda, data, dataHora, hojeISO, somarDias, fator, qu, pl, nomeUsuario, mensagemErro, contem, diaLocal } from '../util.js';
+import { Exportar } from '../exportar.js';
+import { UltimaAlteracao, HistoricoAuditoria } from '../historico.js';
+import { Icone } from '../icones.js';
+
+const inicioDia = (iso) => new Date(iso + 'T00:00:00').toISOString();
+const virg = (v) => String(Math.round(Number(v) * 10000) / 10000).replace('.', ',');
+const rec = (v) => qu(v, 'receita');                        // "1 receita", "2 receitas", "0,5 receita"
+const DIAS_SEMANA = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
+const diaSemana = (iso) => DIAS_SEMANA[new Date(iso + 'T12:00:00').getDay()];
+const rotuloDia = (iso) => {
+  const h = hojeISO();
+  const extra = iso === h ? 'hoje' : iso === somarDias(h, 1) ? 'amanhã' : iso === somarDias(h, -1) ? 'ontem' : diaSemana(iso);
+  return `${data(iso)} (${extra})`;
+};
+
+// Situação de uma linha da programação
+function situacao(pg, feito) {
+  if (pg.situacao === 'cancelada') return { id: 'cancelada', rotulo: 'Cancelada', cor: 'cinza' };
+  const q = Number(pg.quantidade);
+  if (feito >= q - 0.0005) return feito > q + 0.0005 ? { id: 'excedida', rotulo: 'Feito a mais', cor: 'azul' } : { id: 'concluida', rotulo: 'Concluída', cor: 'verde' };
+  if (pg.data < hojeISO()) return { id: 'nao_concluida', rotulo: feito > 0 ? 'Ficou pendente' : 'Não feita', cor: 'vermelho' };
+  return feito > 0 ? { id: 'parcial', rotulo: 'Em andamento', cor: 'laranja' } : { id: 'pendente', rotulo: 'A fazer', cor: 'cinza' };
+}
+
+// Ingredientes POR 1 RECEITA de uma programação (a alteração programada ou a ficha)
+function ingredientes(pg, dados) {
+  const mp = dados.mapa.produto;
+  if (pg.itens_alterados) return pg.itens_alterados.map((i) => ({ produto_id: i.produto_id, base: Number(i.quantidade) * fator(mp.get(i.produto_id), i.unidade) }));
+  return dados.fichaItens.filter((i) => i.ficha_id === pg.ficha_id).map((i) => ({ produto_id: i.produto_id, base: Number(i.quantidade) }));
+}
+function textoAlteracao(pg, dados) {
+  if (!pg.itens_alterados) return '';
+  const mp = dados.mapa.produto;
+  const orig = new Map(dados.fichaItens.filter((i) => i.ficha_id === pg.ficha_id).map((i) => [i.produto_id, Number(i.quantidade)]));
+  const novo = new Map(); ingredientes(pg, dados).forEach((e) => novo.set(e.produto_id, (novo.get(e.produto_id) || 0) + e.base));
+  const out = [];
+  for (const [id, q] of orig) { const p = mp.get(id); if (!novo.has(id)) out.push(`retirou ${p?.descricao}`); else if (Math.abs(novo.get(id) - q) > 0.00005) out.push(`${p?.descricao}: ${qtd(q)} → ${qu(novo.get(id), p?.unidade_estoque)}`); }
+  for (const [id, q] of novo) if (!orig.has(id)) out.push(`incluiu ${mp.get(id)?.descricao} (${qu(q, mp.get(id)?.unidade_estoque)})`);
+  return out.join('; ');
+}
+
+// Produções (baixas) ligadas às programações + as do período (para "fora da programação")
+export function useProducoes(de, ate, progIds) {
+  const { api, dados } = useApp();
+  const [lista, setLista] = useState(null);
+  const chave = (progIds || []).join(',');
+  useEffect(() => {
+    let vivo = true;
+    setLista(null);
+    Promise.all([
+      api.listar('producoes', { desde: inicioDia(de), ate: inicioDia(somarDias(ate, 1)) }),
+      progIds && progIds.length ? api.listar('producoes', { em: { programacao_id: progIds } }) : Promise.resolve([]),
+    ]).then(([a, b]) => { if (!vivo) return; const m = new Map(); [...a, ...b].forEach((x) => m.set(x.id, x)); setLista([...m.values()]); })
+      .catch((e) => { avisar(mensagemErro(e), 'erro'); if (vivo) setLista([]); });
+    return () => { vivo = false; };
+  }, [de, ate, chave, dados.carregadoEm]);
+  return lista;
+}
+const somaFeito = (prods) => { const m = new Map(); (prods || []).forEach((p) => { if (p.programacao_id) m.set(p.programacao_id, (m.get(p.programacao_id) || 0) + Number(p.multiplicador)); }); return m; };
+
+// =====================================================================
+// PROGRAMAÇÃO DE PRODUÇÃO
+// =====================================================================
+export function TelaProgramacao() {
+  const { dados, podeFazer, estadoRota, setEstadoRota } = useApp();
+  const [aba, setAba] = useState('dia');
+  const [dia, setDia] = useState(estadoRota?.dia || hojeISO());
+  useEffect(() => { if (estadoRota) setEstadoRota(null); }, []);
+  const engenharia = podeFazer('programacao');
+  const pesagem = podeFazer('saida_receita');
+  return html`
+    <${Cabecalho} titulo="Programação de produção"
+      sub=${engenharia ? 'Programe quantas receitas fazer em cada dia; a pesagem dá baixa conforme pesa.' : 'O que a engenharia programou para produzir. Dê baixa a cada receita pesada.'} />
+    <${Abas} abas=${[{ id: 'dia', titulo: 'Programação do dia' }, { id: 'periodo', titulo: 'Programado × produzido (período)' }]} ativa=${aba} aoMudar=${setAba} />
+    ${aba === 'dia' ? html`<${ProgramacaoDia} dia=${dia} setDia=${setDia} engenharia=${engenharia} pesagem=${pesagem} />`
+      : html`<${ProgramacaoPeriodo} aoAbrirDia=${(d) => { setDia(d); setAba('dia'); }} />`}`;
+}
+
+function SeletorDia({ dia, setDia }) {
+  const h = hojeISO();
+  return html`<div class="seletor-dia">
+    <button class="btn btn-sec btn-peq" title="Dia anterior" onClick=${() => setDia(somarDias(dia, -1))}>‹</button>
+    <input class="entrada" type="date" value=${dia} onChange=${(e) => e.target.value && setDia(e.target.value)} />
+    <button class="btn btn-sec btn-peq" title="Próximo dia" onClick=${() => setDia(somarDias(dia, 1))}>›</button>
+    <span class="chips">
+      <button class=${'chip' + (dia === somarDias(h, -1) ? ' ativo' : '')} onClick=${() => setDia(somarDias(h, -1))}>Ontem</button>
+      <button class=${'chip' + (dia === h ? ' ativo' : '')} onClick=${() => setDia(h)}>Hoje</button>
+      <button class=${'chip' + (dia === somarDias(h, 1) ? ' ativo' : '')} onClick=${() => setDia(somarDias(h, 1))}>Amanhã</button>
+    </span>
+    <b class="dia-rotulo">${rotuloDia(dia)}</b>
+  </div>`;
+}
+
+function ProgramacaoDia({ dia, setDia, engenharia, pesagem }) {
+  const { dados } = useApp();
+  const progs = dados.programacoes.filter((p) => p.data === dia);
+  const prods = useProducoes(dia, dia, progs.map((p) => p.id));
+  const [editar, setEditar] = useState(null);      // {} = nova; pg = editar
+  const [baixa, setBaixa] = useState(null);
+  const [aberta, setAberta] = useState(null);
+  const [verCanceladas, setVerCanceladas] = useState(false);
+  if (!prods) return html`<${SeletorDia} dia=${dia} setDia=${setDia} /><${Carregando} />`;
+
+  const feitoMap = somaFeito(prods);
+  const feito = (pg) => feitoMap.get(pg.id) || 0;
+  const ficha = (id) => dados.mapa.ficha.get(id);
+  const perfil = (id) => dados.mapa.perfil.get(id);
+  const ativas = progs.filter((p) => p.situacao === 'ativa');
+  const visiveis = (verCanceladas ? progs : ativas).map((p) => ({ ...p, feito: feito(p), sit: situacao(p, feito(p)) }));
+  const tProg = ativas.reduce((s, p) => s + Number(p.quantidade), 0);
+  const tFeito = ativas.reduce((s, p) => s + Math.min(feito(p), Number(p.quantidade)), 0);
+  const fora = prods.filter((p) => !p.programacao_id && diaLocal(p.data_hora) === dia);
+  const atraso = engenharia ? dados.programacoes.filter((p) => p.situacao === 'ativa' && p.data < hojeISO() && p.data >= somarDias(hojeISO(), -7)) : [];
+  const pend = (p) => Math.max(Number(p.quantidade) - p.feito, 0);
+
+  const colExp = [
+    { titulo: 'Dia', valor: (p) => data(p.data) }, { titulo: 'Código', valor: (p) => ficha(p.ficha_id)?.codigo },
+    { titulo: 'Receita', valor: (p) => ficha(p.ficha_id)?.nome, largura: 30 },
+    { titulo: 'Programado', valor: (p) => Number(p.quantidade), num: true }, { titulo: 'Produzido', valor: (p) => p.feito, num: true },
+    { titulo: 'Pendente', valor: (p) => pend(p), num: true }, { titulo: 'Situação', valor: (p) => p.sit.rotulo },
+    { titulo: 'Alteração da receita', valor: (p) => textoAlteracao(p, dados), largura: 45 }, { titulo: 'Observação', valor: (p) => p.observacao, largura: 35 },
+    { titulo: 'Programado por', valor: (p) => nomeUsuario(perfil(p.criado_por)) },
+  ];
+  // Excel com a lista e os ingredientes a pesar (pendentes)
+  const abasExcel = () => [
+    { nome: 'Programação', colunas: colExp, linhas: visiveis },
+    { nome: 'Ingredientes a pesar', linhas: visiveis.filter((p) => p.situacao === 'ativa').flatMap((p) => ingredientes(p, dados).map((i) => ({ p, i, pr: dados.mapa.produto.get(i.produto_id) }))),
+      colunas: [{ titulo: 'Receita', valor: (x) => ficha(x.p.ficha_id)?.nome }, { titulo: 'Ingrediente', valor: (x) => x.pr?.descricao },
+        { titulo: 'Por receita', valor: (x) => Math.round(x.i.base * 10000) / 10000 }, { titulo: 'Pendente (receitas)', valor: (x) => pend(x.p) },
+        { titulo: 'Total pendente', valor: (x) => Math.round(x.i.base * pend(x.p) * 10000) / 10000 }, { titulo: 'Unid.', valor: (x) => x.pr?.unidade_estoque }] },
+  ];
+
+  return html`
+    <${SeletorDia} dia=${dia} setDia=${setDia} />
+    ${atraso.some((p) => feito(p) < Number(p.quantidade)) && dia === hojeISO() && html`<${AvisoAtraso} progs=${atraso} aoAbrir=${setDia} />`}
+    <div class="cartoes">
+      <${Cartao} titulo="Programado" valor=${rec(tProg)} sub=${pl(ativas.length, 'linha', 'linhas')} />
+      <${Cartao} titulo="Produzido" valor=${rec(tFeito)} sub=${tProg ? `${num((tFeito / tProg) * 100, 0)}% do programado` : '–'} cor=${tProg && tFeito >= tProg ? '' : ''} />
+      <${Cartao} titulo="Pendente" valor=${rec(Math.max(tProg - tFeito, 0))} cor=${tProg - tFeito > 0 && dia < hojeISO() ? 'c-vermelho' : tProg - tFeito > 0 ? 'c-laranja' : ''} />
+      <${Cartao} titulo="Fora da programação" valor=${rec(fora.reduce((s, p) => s + Number(p.multiplicador), 0))} sub=${pl(fora.length, 'lançamento', 'lançamentos')} />
+    </div>
+    ${engenharia && html`<${ProgramarRapido} dia=${dia} aoAlterar=${(f) => setEditar({ data: dia, ficha_id: f || null, alterar: true })} />`}
+    <div class="titulo-com-acao">
+      <h3>Receitas programadas</h3>
+      <div class="exportar">
+        <label class="check"><input type="checkbox" checked=${verCanceladas} onChange=${(e) => setVerCanceladas(e.target.checked)} /> mostrar canceladas</label>
+        <${Exportar} titulo="Programação de produção" filtros=${rotuloDia(dia)} arquivo=${`programacao-${dia}`} colunas=${colExp} linhas=${visiveis} abas=${abasExcel} />
+      </div>
+    </div>
+    <${Tabela} linhas=${visiveis} aoClicar=${setAberta} vazio=${engenharia ? 'Nada programado para este dia. Use o campo acima para programar.' : 'Nada programado para este dia.'}
+      classeLinha=${(p) => (p.situacao === 'cancelada' ? 'linha-apagada' : '')}
+      colunas=${[
+        { chave: 'r', titulo: 'Receita', valor: (p) => ficha(p.ficha_id)?.nome, render: (p) => html`<b>${ficha(p.ficha_id)?.codigo} · ${ficha(p.ficha_id)?.nome}</b>
+          ${p.itens_alterados && html` <${Etiqueta} cor="laranja" titulo=${textoAlteracao(p, dados)}>receita alterada</${Etiqueta}>`}
+          ${p.observacao && html`<br /><small>${p.observacao}</small>`}` },
+        { chave: 'quantidade', titulo: 'Programado', num: true, valor: (p) => Number(p.quantidade), render: (p) => num(p.quantidade, 3) },
+        { chave: 'feito', titulo: 'Produzido', num: true, render: (p) => html`<b>${num(p.feito, 3)}</b>` },
+        { chave: 'pend', titulo: 'Pendente', num: true, valor: pend, render: (p) => (p.situacao === 'cancelada' ? '–' : num(pend(p), 3)) },
+        { chave: 'sit', titulo: 'Situação', valor: (p) => p.sit.rotulo, render: (p) => html`<${Etiqueta} cor=${p.sit.cor}>${p.sit.rotulo}</${Etiqueta}>` },
+        { chave: 'acao', titulo: '', ordenar: false, render: (p) => p.situacao === 'ativa' && html`<span class="acoes-linha" onClick=${(e) => e.stopPropagation()}>
+          ${pesagem && html`<button class="btn btn-pri btn-peq" onClick=${() => setBaixa(p)}>Dar baixa</button>`}
+          ${engenharia && html`<button class="btn btn-sec btn-peq" onClick=${() => setEditar(p)}>Editar</button>`}</span>` },
+      ]} />
+    ${fora.length > 0 && html`<h3>Produções fora da programação</h3>
+      <${Tabela} linhas=${fora} colunas=${[
+        { chave: 'data_hora', titulo: 'Hora', render: (p) => dataHora(p.data_hora) },
+        { chave: 'r', titulo: 'Receita', valor: (p) => ficha(p.ficha_id)?.nome, render: (p) => html`<b>${ficha(p.ficha_id)?.nome}</b>${p.alterada ? html` <${Etiqueta} cor="laranja">alterada</${Etiqueta}>` : ''}` },
+        { chave: 'multiplicador', titulo: 'Quantas', num: true, render: (p) => num(p.multiplicador, 3) },
+        { chave: 'u', titulo: 'Pesado por', render: (p) => nomeUsuario(perfil(p.usuario_id)) },
+      ]} />`}
+    ${editar && html`<${ModalProgramar} pg=${editar.id ? editar : null} inicial=${editar} feito=${editar.id ? feito(editar) : 0} aoFechar=${() => setEditar(null)} />`}
+    ${baixa && html`<${ModalBaixa} pg=${baixa} feito=${feito(baixa)} aoFechar=${() => setBaixa(null)} />`}
+    ${aberta && html`<${DetalheProgramacao} pg=${aberta} prods=${prods.filter((x) => x.programacao_id === aberta.id)} feito=${feito(aberta)}
+      engenharia=${engenharia} pesagem=${pesagem} aoFechar=${() => setAberta(null)}
+      aoBaixa=${() => { setBaixa(aberta); setAberta(null); }} aoEditar=${() => { setEditar(aberta); setAberta(null); }} />`}`;
+}
+
+function AvisoAtraso({ progs, aoAbrir }) {
+  const { dados } = useApp();
+  const prods = useProducoes(hojeISO(), hojeISO(), progs.map((p) => p.id));
+  if (!prods) return null;
+  const f = somaFeito(prods);
+  const pend = progs.filter((p) => (f.get(p.id) || 0) < Number(p.quantidade) - 0.0005);
+  if (!pend.length) return null;
+  const dias = [...new Set(pend.map((p) => p.data))].sort();
+  const total = pend.reduce((s, p) => s + Number(p.quantidade) - (f.get(p.id) || 0), 0);
+  return html`<div class="aviso-faixa"><span>⚠ Ficaram <b>${rec(total)}</b> pendentes em dias anteriores (${dias.map(data).join(', ')}). Se precisar, programe a diferença para hoje ou amanhã.</span>
+    <button class="btn btn-destaque btn-peq" onClick=${() => aoAbrir(dias[dias.length - 1])}>Ver ${data(dias[dias.length - 1])}</button></div>`;
+}
+
+// Programar rápido: só o código (ou nome) da receita e a quantidade
+function ProgramarRapido({ dia, aoAlterar }) {
+  const { dados, recarregar, api } = useApp();
+  const [fichaId, setFichaId] = useState(null);
+  const [q, setQ] = useState('');
+  const [ocupado, executar] = useAcao();
+  const fichas = dados.fichas.filter((f) => f.ativo);
+  const [chave, setChave] = useState(0);
+  async function adicionar() {
+    if (!fichaId) return avisar('Escolha a receita (digite o código, ex.: R001).', 'erro');
+    if (!(n(q) > 0)) return avisar('Informe quantas receitas.', 'erro');
+    const f = dados.mapa.ficha.get(fichaId);
+    const r = await executar(() => api.rpc('salvar_programacao', { p: { data: dia, ficha_id: fichaId, quantidade: n(q) } }),
+      `Programado: ${rec(n(q))} de ${f.nome} para ${data(dia)}.`);
+    if (r) { setFichaId(null); setQ(''); setChave((k) => k + 1); await recarregar(); }
+  }
+  return html`<section class="painel programar">
+    <div class="programar-linha" onKeyDown=${(e) => { if (e.key === 'Enter' && fichaId && n(q) > 0) adicionar(); }}>
+      <b class="programar-rotulo">Programar para ${data(dia)}</b>
+      <div class="programar-ficha"><${Escolher} key=${chave} itens=${fichas} valor=${fichaId} aoMudar=${setFichaId} placeholder="Código ou nome da receita (ex.: R001)"
+        rotuloDe=${(f) => `${f.codigo} · ${f.nome}`} detalheDe=${(f) => f.produto_final || ''} /></div>
+      <div class="programar-qtd"><${Numero} valor=${q} aoMudar=${setQ} placeholder="Receitas" /></div>
+      <button class="btn btn-pri" disabled=${ocupado} onClick=${adicionar}><${Icone} nome="mais" tam=${16} /> Programar</button>
+      <button class="btn btn-sec" onClick=${() => aoAlterar(fichaId)} title="Programar com outra farinha, outro melhorador…">Com alteração da receita…</button>
+    </div>
+  </section>`;
+}
+
+// Criar / editar uma programação (com ou sem alteração de ingredientes)
+function ModalProgramar({ pg, inicial, feito, aoFechar }) {
+  const { dados, recarregar, api } = useApp();
+  const mp = dados.mapa.produto;
+  const [dia, setDia] = useState(inicial.data || hojeISO());
+  const [fichaId, setFichaId] = useState(inicial.ficha_id || null);
+  const [q, setQ] = useState(pg ? virg(pg.quantidade) : '');
+  const [obs, setObs] = useState(pg?.observacao || '');
+  const [alterar, setAlterar] = useState(!!(pg?.itens_alterados || inicial.alterar));
+  const daFicha = (id) => dados.fichaItens.filter((i) => i.ficha_id === id).map((i) => ({ k: Math.random(), produto_id: i.produto_id, quantidade: virg(i.quantidade), unidade: mp.get(i.produto_id)?.unidade_estoque }));
+  const [linhas, setLinhas] = useState(() => (pg?.itens_alterados ? pg.itens_alterados.map((i) => ({ k: Math.random(), produto_id: i.produto_id, quantidade: virg(i.quantidade), unidade: i.unidade }))
+    : inicial.ficha_id ? daFicha(inicial.ficha_id) : []));
+  const [ocupado, executar] = useAcao();
+  const mudar = (k, ch) => setLinhas((l) => l.map((x) => (x.k === k ? { ...x, ...ch } : x)));
+  const travado = feito > 0;
+  const prov = { ficha_id: fichaId, itens_alterados: alterar ? linhas.filter((l) => l.produto_id && n(l.quantidade) > 0).map((l) => ({ produto_id: l.produto_id, quantidade: n(l.quantidade), unidade: l.unidade })) : null };
+  const resumoAlt = alterar && fichaId ? textoAlteracao(prov, dados) : '';
+
+  async function salvar() {
+    if (!fichaId) return avisar('Escolha a receita.', 'erro');
+    if (!(n(q) > 0)) return avisar('Informe quantas receitas.', 'erro');
+    if (alterar && !resumoAlt) return avisar('Você marcou "alterar a receita" mas não mudou nenhum ingrediente.', 'aviso');
+    const r = await executar(() => api.rpc('salvar_programacao', { p: { id: pg?.id || null, data: dia, ficha_id: fichaId, quantidade: n(q), observacao: obs,
+      itens: alterar ? prov.itens_alterados : [] } }), pg ? 'Programação atualizada.' : 'Programação criada.');
+    if (r) { await recarregar(); aoFechar(); }
+  }
+  async function cancelar() {
+    let motivo = '';
+    const ok = await confirmar({ titulo: 'Cancelar programação', ok: 'Cancelar programação', perigo: true, cancelar: 'Voltar', mensagem: html`
+      <p>${feito > 0 ? `Já foram feitas ${rec(feito)}; o restante deixa de ser pendente.` : 'Nada foi produzido ainda.'} A linha continua no histórico como cancelada.</p>
+      <${Campo} rotulo="Motivo" obrigatorio><input class="entrada" onInput=${(e) => { motivo = e.target.value; }} placeholder="ex.: pedido do cliente foi cancelado" /></${Campo}>` });
+    if (!ok) return;
+    const r = await executar(() => api.rpc('cancelar_programacao', { p_id: pg.id, p_motivo: motivo }), 'Programação cancelada.');
+    if (r) { await recarregar(); aoFechar(); }
+  }
+  return html`<${Modal} titulo=${pg ? 'Editar programação' : 'Programar produção'} aoFechar=${aoFechar} largo
+    rodape=${html`${pg && html`<button class="btn btn-perigo-sec" onClick=${cancelar}>Cancelar programação</button>`}<span class="espaco"></span>
+      <button class="btn btn-sec" onClick=${aoFechar}>Voltar</button>
+      <button class="btn btn-pri" disabled=${ocupado} onClick=${salvar}>${ocupado ? 'Salvando…' : 'Salvar'}</button>`}>
+    ${travado && html`<div class="alerta">Já houve baixa de ${rec(feito)}: dá para aumentar a quantidade ou ajustar a observação. Para mudar o dia, programe o restante em outro dia.</div>`}
+    <div class="grade">
+      <${Campo} rotulo="Dia da produção" obrigatorio><input class="entrada" type="date" value=${dia} disabled=${travado} onChange=${(e) => setDia(e.target.value)} /></${Campo}>
+      <${Campo} rotulo="Receita" obrigatorio><${Escolher} itens=${dados.fichas.filter((f) => f.ativo)} valor=${fichaId} desabilitado=${travado}
+        aoMudar=${(id) => { setFichaId(id); setLinhas(daFicha(id)); }} rotuloDe=${(f) => `${f.codigo} · ${f.nome}`} detalheDe=${(f) => f.produto_final || ''} /></${Campo}>
+      <${Campo} rotulo="Quantas receitas" obrigatorio ajuda=${travado ? `mínimo ${num(feito, 3)} (já feitas)` : ''}><${Numero} valor=${q} aoMudar=${setQ} /></${Campo}>
+    </div>
+    <label class="check destaque"><input type="checkbox" checked=${alterar} disabled=${!fichaId} onChange=${(e) => { setAlterar(e.target.checked); if (e.target.checked && !linhas.length) setLinhas(daFicha(fichaId)); }} />
+      Alterar os ingredientes <b>só nesta programação</b> (ex.: só farinha tipo A hoje). A ficha técnica não muda.</label>
+    ${alterar && fichaId && html`<p class="nota">Quantidades <b>por 1 receita</b>. A pesagem vai dar baixa com estes ingredientes.</p>
+      <div class="linhas-itens">${linhas.map((l) => { const p = mp.get(l.produto_id); return html`<div class="linha-item" key=${l.k}>
+        <${Escolher} itens=${dados.produtos.filter((x) => x.ativo && x.categoria === 'materia_prima')} valor=${l.produto_id} rotuloDe=${(x) => `${x.codigo} · ${x.descricao}`}
+          detalheDe=${(x) => [x.grupo, x.classificacao && `classificação ${x.classificacao}`, x.marca, `saldo ${qu(dados.mapa.ind.get(x.id)?.saldo || 0, x.unidade_estoque)}`].filter(Boolean).join(' · ')}
+          aoMudar=${(id, pr) => mudar(l.k, { produto_id: id, unidade: pr.unidade_estoque })} />
+        <${QtdUnidade} produto=${p} valor=${l.quantidade} unidade=${l.unidade} desabilitado=${!p} aoMudar=${(v, u) => mudar(l.k, { quantidade: v, unidade: u })} />
+        <button class="btn-icone" title="Retirar" onClick=${() => setLinhas((x) => x.filter((y) => y.k !== l.k))}>✕</button></div>`; })}</div>
+      <button class="btn btn-sec btn-peq" onClick=${() => setLinhas((x) => [...x, { k: Math.random(), produto_id: null, quantidade: '', unidade: null }])}>+ Ingrediente</button>
+      ${resumoAlt && html`<div class="alerta"><b>Alteração:</b> ${resumoAlt}.</div>`}`}
+    <${Campo} rotulo="Observação para a pesagem"><input class="entrada" value=${obs} onInput=${(e) => setObs(e.target.value)} placeholder="ex.: pedido extra do atacado" /></${Campo}>
+    ${pg && html`<${UltimaAlteracao} reg=${pg} />`}
+  </${Modal}>`;
+}
+
+// Pesagem: dar baixa de N receitas de uma programação
+function ModalBaixa({ pg, feito, aoFechar }) {
+  const { dados, recarregar, api } = useApp();
+  const pend = Math.max(Number(pg.quantidade) - feito, 0);
+  const [mult, setMult] = useState(pend >= 1 || pend === 0 ? '1' : virg(pend));
+  const [obs, setObs] = useState('');
+  const [ocupado, executar] = useAcao();
+  const f = dados.mapa.ficha.get(pg.ficha_id);
+  const m = n(mult) || 0;
+  const its = ingredientes(pg, dados);
+  async function confirmarBaixa() {
+    if (!(m > 0)) return avisar('Informe quantas receitas foram pesadas.', 'erro');
+    if (m > pend + 0.0005 && !(await confirmar({ titulo: 'Mais que o programado', ok: 'Dar baixa mesmo assim', mensagem: `Faltavam ${rec(pend)} e você vai dar baixa de ${rec(m)}. Confirma?` }))) return;
+    const r = await executar(() => api.rpc('registrar_producao', { p: { programacao_id: pg.id, ficha_id: pg.ficha_id, multiplicador: m,
+      observacao: [pg.itens_alterados ? `Receita alterada (programação): ${textoAlteracao(pg, dados)}.` : '', obs].filter(Boolean).join(' ') } }),
+      `Baixa registrada: ${rec(m)} de ${f.nome}.`);
+    if (r) { await recarregar(); aoFechar(); }
+  }
+  return html`<${Modal} titulo=${`Dar baixa · ${f.codigo} ${f.nome}`} aoFechar=${aoFechar}
+    rodape=${html`<button class="btn btn-sec" onClick=${aoFechar}>Voltar</button>
+      <button class="btn btn-pri" disabled=${ocupado || !(m > 0)} onClick=${confirmarBaixa}>${ocupado ? 'Registrando…' : `Dar baixa de ${rec(m)}`}</button>`}>
+    <p>Programado <b>${rec(Number(pg.quantidade))}</b> · feito <b>${rec(feito)}</b> · falta <b>${rec(pend)}</b></p>
+    ${pg.itens_alterados && html`<div class="alerta"><b>Receita alterada nesta programação:</b> ${textoAlteracao(pg, dados)}.</div>`}
+    ${pg.observacao && html`<p class="nota">Engenharia: ${pg.observacao}</p>`}
+    <div class="multiplicador">
+      <span>Quantas receitas foram pesadas?</span>
+      <div class="mult-controles">
+        <button class="btn btn-sec btn-quadrado" onClick=${() => setMult(virg(Math.max(m - 1, 0)))}>−</button>
+        <${Numero} valor=${mult} aoMudar=${setMult} classe="mult" />
+        <button class="btn btn-sec btn-quadrado" onClick=${() => setMult(virg(m + 1))}>+</button>
+        ${pend > 0 && html`<button class="btn btn-sec btn-peq" onClick=${() => setMult(virg(pend))}>Tudo que falta (${num(pend, 3)})</button>`}
+      </div>
+    </div>
+    <div class="tabela-rolagem"><table class="tabela"><thead><tr><th>Ingrediente</th><th class="n">Por receita</th><th class="n">Total (× ${num(m, 3)})</th><th class="n">Saldo</th></tr></thead>
+      <tbody>${its.map((e) => { const p = dados.mapa.ind.get(e.produto_id); const total = e.base * m; const falta = p && total > p.saldo;
+        return html`<tr><td data-rotulo="Ingrediente"><b>${p?.descricao}</b></td><td class="n" data-rotulo="Por receita">${qu(e.base, p?.unidade_estoque)}</td>
+          <td class="n" data-rotulo="Total"><b>${qu(total, p?.unidade_estoque)}</b></td>
+          <td class=${'n' + (falta ? ' texto-vermelho' : '')} data-rotulo="Saldo">${qu(p?.saldo, p?.unidade_estoque)}${falta ? ' ⚠' : ''}</td></tr>`; })}</tbody></table></div>
+    <${Campo} rotulo="Observação (opcional)"><input class="entrada" value=${obs} onInput=${(e) => setObs(e.target.value)} /></${Campo}>
+  </${Modal}>`;
+}
+
+function DetalheProgramacao({ pg, prods, feito, engenharia, pesagem, aoFechar, aoBaixa, aoEditar }) {
+  const { dados } = useApp();
+  const f = dados.mapa.ficha.get(pg.ficha_id);
+  const perfil = (id) => dados.mapa.perfil.get(id);
+  const sit = situacao(pg, feito);
+  const pend = Math.max(Number(pg.quantidade) - feito, 0);
+  const its = ingredientes(pg, dados);
+  return html`<${Modal} titulo=${`${f?.codigo} · ${f?.nome} · ${data(pg.data)}`} aoFechar=${aoFechar} largo
+    rodape=${html`<span class="espaco"></span>${engenharia && pg.situacao === 'ativa' && html`<button class="btn btn-sec" onClick=${aoEditar}>Editar</button>`}
+      ${pesagem && pg.situacao === 'ativa' && html`<button class="btn btn-pri" onClick=${aoBaixa}>Dar baixa</button>`}`}>
+    <div class="info-grade">
+      <div><small>Programado</small><b>${rec(Number(pg.quantidade))}</b></div>
+      <div><small>Produzido</small><b>${rec(feito)}</b></div>
+      <div><small>Pendente</small><b>${rec(pend)}</b></div>
+      <div><small>Situação</small><span><${Etiqueta} cor=${sit.cor}>${sit.rotulo}</${Etiqueta}></span></div>
+      <div><small>Programado por</small><b>${nomeUsuario(perfil(pg.criado_por))}</b></div>
+    </div>
+    ${pg.situacao === 'cancelada' && html`<div class="alerta">Cancelada: ${pg.cancelado_motivo}</div>`}
+    ${pg.itens_alterados && html`<div class="alerta"><b>Receita alterada só nesta programação:</b> ${textoAlteracao(pg, dados)}.</div>`}
+    ${pg.observacao && html`<p class="nota">${pg.observacao}</p>`}
+    <h3>Ingredientes</h3>
+    <${Tabela} linhas=${its.map((e, i) => ({ ...e, id: i }))} colunas=${[
+      { chave: 'p', titulo: 'Ingrediente', render: (e) => dados.mapa.produto.get(e.produto_id)?.descricao },
+      { chave: 'base', titulo: 'Por receita', num: true, render: (e) => qu(e.base, dados.mapa.produto.get(e.produto_id)?.unidade_estoque) },
+      { chave: 't', titulo: 'Total programado', num: true, render: (e) => qu(e.base * Number(pg.quantidade), dados.mapa.produto.get(e.produto_id)?.unidade_estoque) },
+      { chave: 'f', titulo: 'Falta pesar', num: true, render: (e) => qu(e.base * pend, dados.mapa.produto.get(e.produto_id)?.unidade_estoque) },
+    ]} />
+    <h3>Baixas da pesagem</h3>
+    <${Tabela} linhas=${prods} vazio="Nenhuma baixa ainda." ordemInicial=${{ chave: 'id', dir: 1 }} colunas=${[
+      { chave: 'id', titulo: 'Data/hora', valor: (p) => p.id, render: (p) => dataHora(p.data_hora) },
+      { chave: 'multiplicador', titulo: 'Receitas', num: true, render: (p) => num(p.multiplicador, 3) },
+      { chave: 'u', titulo: 'Pesado por', render: (p) => nomeUsuario(perfil(p.usuario_id)) },
+      { chave: 'observacao', titulo: 'Observação', render: (p) => html`<small>${p.observacao || ''}</small>` },
+    ]} />
+    <${UltimaAlteracao} reg=${pg} />
+    <${HistoricoAuditoria} tabela="programacoes" id=${pg.id} />
+  </${Modal}>`;
+}
+
+// Programado × produzido em um período (com exportação)
+function ProgramacaoPeriodo({ aoAbrirDia }) {
+  const { dados } = useApp();
+  const h = hojeISO();
+  const [de, setDe] = useState(h);
+  const [ate, setAte] = useState(somarDias(h, 1));
+  const progs = dados.programacoes.filter((p) => p.data >= de && p.data <= ate && p.situacao === 'ativa');
+  const prods = useProducoes(de, ate, progs.map((p) => p.id));
+  const filtros = html`<div class="filtros">
+    <label class="campo-inline">De <input class="entrada" type="date" value=${de} onChange=${(e) => setDe(e.target.value)} /></label>
+    <label class="campo-inline">até <input class="entrada" type="date" value=${ate} onChange=${(e) => setAte(e.target.value)} /></label>
+    <span class="chips">
+      <button class="chip" onClick=${() => { setDe(h); setAte(somarDias(h, 1)); }}>Hoje e amanhã</button>
+      <button class="chip" onClick=${() => { setDe(somarDias(h, -6)); setAte(h); }}>Últimos 7 dias</button>
+      <button class="chip" onClick=${() => { setDe(h.slice(0, 8) + '01'); setAte(h); }}>Este mês</button>
+      <button class="chip" onClick=${() => { setDe(h); setAte(somarDias(h, 6)); }}>Próximos 7 dias</button>
+    </span></div>`;
+  if (!prods) return html`${filtros}<${Carregando} />`;
+  const fm = somaFeito(prods);
+  const ficha = (id) => dados.mapa.ficha.get(id);
+  const linhas = progs.map((p) => ({ ...p, feito: fm.get(p.id) || 0, sit: situacao(p, fm.get(p.id) || 0) })).sort((a, b) => a.data.localeCompare(b.data) || String(ficha(a.ficha_id)?.codigo).localeCompare(String(ficha(b.ficha_id)?.codigo)));
+  const pend = (p) => Math.max(Number(p.quantidade) - p.feito, 0);
+  const tP = linhas.reduce((s, p) => s + Number(p.quantidade), 0), tF = linhas.reduce((s, p) => s + Math.min(p.feito, Number(p.quantidade)), 0);
+  const cols = [
+    { titulo: 'Dia', valor: (p) => data(p.data) }, { titulo: 'Código', valor: (p) => ficha(p.ficha_id)?.codigo }, { titulo: 'Receita', valor: (p) => ficha(p.ficha_id)?.nome, largura: 30 },
+    { titulo: 'Programado', valor: (p) => Number(p.quantidade), num: true }, { titulo: 'Produzido', valor: (p) => p.feito, num: true },
+    { titulo: 'Pendente', valor: pend, num: true }, { titulo: 'Situação', valor: (p) => p.sit.rotulo },
+    { titulo: 'Alteração', valor: (p) => (p.itens_alterados ? 'sim' : '') }, { titulo: 'Observação', valor: (p) => p.observacao, largura: 35 },
+  ];
+  return html`${filtros}
+    <div class="cartoes">
+      <${Cartao} titulo="Programado" valor=${rec(tP)} /><${Cartao} titulo="Produzido" valor=${rec(tF)} sub=${tP ? `${num((tF / tP) * 100, 0)}% atendido` : '–'} />
+      <${Cartao} titulo="Pendente" valor=${rec(Math.max(tP - tF, 0))} cor=${tP - tF > 0 ? 'c-laranja' : ''} />
+    </div>
+    <div class="filtros"><${Exportar} titulo="Programação de produção" filtros=${`${data(de)} a ${data(ate)}`} arquivo=${`programacao-${de}-a-${ate}`} colunas=${cols} linhas=${linhas}
+      totais=${['TOTAL', '', '', num(tP, 3), num(tF, 3), num(Math.max(tP - tF, 0), 3), '', '', '']} /></div>
+    <${Tabela} linhas=${linhas} aoClicar=${(p) => aoAbrirDia(p.data)} vazio="Nada programado neste período." colunas=${[
+      { chave: 'data', titulo: 'Dia', render: (p) => rotuloDia(p.data) },
+      { chave: 'r', titulo: 'Receita', valor: (p) => ficha(p.ficha_id)?.nome, render: (p) => html`<b>${ficha(p.ficha_id)?.codigo} · ${ficha(p.ficha_id)?.nome}</b>${p.itens_alterados ? html` <${Etiqueta} cor="laranja">alterada</${Etiqueta}>` : ''}` },
+      { chave: 'quantidade', titulo: 'Programado', num: true, valor: (p) => Number(p.quantidade), render: (p) => num(p.quantidade, 3) },
+      { chave: 'feito', titulo: 'Produzido', num: true, render: (p) => num(p.feito, 3) },
+      { chave: 'pend', titulo: 'Pendente', num: true, valor: pend, render: (p) => num(pend(p), 3) },
+      { chave: 'sit', titulo: 'Situação', valor: (p) => p.sit.rotulo, render: (p) => html`<${Etiqueta} cor=${p.sit.cor}>${p.sit.rotulo}</${Etiqueta}>` },
+    ]} />`;
+}
+
+// =====================================================================
+// SAÍDAS DA PRODUÇÃO (só o que a pesagem tirou: receitas e avulsas)
+// =====================================================================
+export function TelaSaidasProducao() {
+  const { dados, api } = useApp();
+  const h = hojeISO();
+  const [de, setDe] = useState(h);
+  const [ate, setAte] = useState(h);
+  const [aba, setAba] = useState('resumo');
+  const [movs, setMovs] = useState(null);
+  const prods = useProducoes(de, ate, null);
+  useEffect(() => {
+    let vivo = true; setMovs(null);
+    api.listar('movimentos', { desde: inicioDia(de), ate: inicioDia(somarDias(ate, 1)), em: { tipo: ['saida_receita', 'saida_avulsa', 'correcao'] } })
+      .then((l) => vivo && setMovs(l)).catch((e) => { avisar(mensagemErro(e), 'erro'); if (vivo) setMovs([]); });
+    return () => { vivo = false; };
+  }, [de, ate, dados.carregadoEm]);
+
+  const filtros = html`<div class="filtros">
+    <label class="campo-inline">De <input class="entrada" type="date" value=${de} onChange=${(e) => setDe(e.target.value)} /></label>
+    <label class="campo-inline">até <input class="entrada" type="date" value=${ate} onChange=${(e) => setAte(e.target.value)} /></label>
+    <span class="chips">
+      <button class=${'chip' + (de === h && ate === h ? ' ativo' : '')} onClick=${() => { setDe(h); setAte(h); }}>Hoje</button>
+      <button class="chip" onClick=${() => { setDe(somarDias(h, -1)); setAte(somarDias(h, -1)); }}>Ontem</button>
+      <button class="chip" onClick=${() => { setDe(somarDias(h, -6)); setAte(h); }}>7 dias</button>
+      <button class="chip" onClick=${() => { setDe(h.slice(0, 8) + '01'); setAte(h); }}>Este mês</button>
+    </span></div>`;
+  const corpo = !prods || !movs ? html`<${Carregando} />` : html`<${SaidasProducaoConteudo} aba=${aba} de=${de} ate=${ate} prods=${prods.filter((p) => diaLocal(p.data_hora) >= de && diaLocal(p.data_hora) <= ate)} movs=${movs} />`;
+  return html`
+    <${Cabecalho} titulo="Saídas da produção" sub="Só o que saiu na pesagem para produzir: receitas feitas e saídas avulsas de matéria-prima" />
+    ${filtros}
+    <${Abas} abas=${[{ id: 'resumo', titulo: 'Resumo por receita' }, { id: 'lancamentos', titulo: 'Receitas pesadas' }, { id: 'avulsas', titulo: 'Saídas avulsas' }, { id: 'consumo', titulo: 'Matéria-prima consumida' }]}
+      ativa=${aba} aoMudar=${setAba} />
+    ${corpo}`;
+}
+
+function SaidasProducaoConteudo({ aba, de, ate, prods, movs }) {
+  const { dados } = useApp();
+  const [aberta, setAberta] = useState(null);
+  const ficha = (id) => dados.mapa.ficha.get(id);
+  const perfil = (id) => dados.mapa.perfil.get(id);
+  const prod = (id) => dados.mapa.produto.get(id);
+  const periodo = de === ate ? data(de) : `${data(de)} a ${data(ate)}`;
+  // correções valem junto com o lançamento original
+  const porId = new Map(movs.map((m) => [m.id, m]));
+  const origem = (m) => (m.tipo === 'correcao' ? porId.get(m.corrige_id) : m);
+  const validos = movs.filter((m) => origem(m) && ['saida_receita', 'saida_avulsa'].includes(origem(m).tipo));
+  const movsProd = (pid) => validos.filter((m) => origem(m).producao_id === pid);
+  const custo = (pid) => -movsProd(pid).reduce((s, m) => s + Number(m.valor), 0);
+
+  if (aba === 'resumo') {
+    const g = new Map();
+    for (const p of prods) {
+      const x = g.get(p.ficha_id) || { id: p.ficha_id, receitas: 0, lanc: 0, alt: 0, custo: 0, prog: 0, foraProg: 0 };
+      x.receitas += Number(p.multiplicador); x.lanc += 1; if (p.alterada) x.alt += 1; x.custo += custo(p.id); if (!p.programacao_id) x.foraProg += Number(p.multiplicador);
+      g.set(p.ficha_id, x);
+    }
+    for (const pg of dados.programacoes.filter((p) => p.situacao === 'ativa' && p.data >= de && p.data <= ate)) {
+      const x = g.get(pg.ficha_id) || { id: pg.ficha_id, receitas: 0, lanc: 0, alt: 0, custo: 0, prog: 0, foraProg: 0 };
+      x.prog += Number(pg.quantidade); g.set(pg.ficha_id, x);
+    }
+    const linhas = [...g.values()].sort((a, b) => b.receitas - a.receitas);
+    const tR = linhas.reduce((s, x) => s + x.receitas, 0), tC = linhas.reduce((s, x) => s + x.custo, 0), tP = linhas.reduce((s, x) => s + x.prog, 0);
+    const avulsas = validos.filter((m) => origem(m).tipo === 'saida_avulsa');
+    const cols = [{ titulo: 'Código', valor: (x) => ficha(x.id)?.codigo }, { titulo: 'Receita', valor: (x) => ficha(x.id)?.nome, largura: 30 },
+      { titulo: 'Receitas feitas', valor: (x) => x.receitas, num: true }, { titulo: 'Programado', valor: (x) => x.prog, num: true },
+      { titulo: 'Fora da programação', valor: (x) => x.foraProg, num: true }, { titulo: 'Lançamentos', valor: (x) => x.lanc, num: true },
+      { titulo: 'Com alteração', valor: (x) => x.alt, num: true }, { titulo: 'Custo', valor: (x) => Math.round(x.custo * 100) / 100, texto: (x) => moeda(x.custo), num: true }];
+    return html`
+      <div class="cartoes">
+        <${Cartao} titulo="Receitas feitas" valor=${rec(tR)} sub=${pl(prods.length, 'lançamento', 'lançamentos')} />
+        <${Cartao} titulo="Programado no período" valor=${rec(tP)} sub=${tP ? `${num((Math.min(tR, tP) / tP) * 100, 0)}% atendido` : '–'} />
+        <${Cartao} titulo="Custo da matéria-prima" valor=${moeda(tC)} sub="pelas receitas" />
+        <${Cartao} titulo="Saídas avulsas" valor=${avulsas.length} sub=${moeda(Math.abs(avulsas.reduce((s, m) => s + Number(m.valor), 0)))} cor=${avulsas.length ? 'c-laranja' : ''} />
+      </div>
+      <div class="filtros"><${Exportar} titulo="Saídas da produção — resumo por receita" filtros=${periodo} arquivo=${`saidas-producao-resumo-${de}-a-${ate}`} colunas=${cols} linhas=${linhas}
+        totais=${['TOTAL', '', num(tR, 3), num(tP, 3), '', '', '', moeda(tC)]} /></div>
+      <${Tabela} linhas=${linhas} vazio="Nenhuma receita pesada neste período." colunas=${[
+        { chave: 'r', titulo: 'Receita', valor: (x) => ficha(x.id)?.nome, render: (x) => html`<b>${ficha(x.id)?.codigo} · ${ficha(x.id)?.nome}</b>` },
+        { chave: 'receitas', titulo: 'Feitas', num: true, render: (x) => html`<b>${num(x.receitas, 3)}</b>` },
+        { chave: 'prog', titulo: 'Programado', num: true, render: (x) => (x.prog ? num(x.prog, 3) : '–') },
+        { chave: 'foraProg', titulo: 'Fora da prog.', num: true, render: (x) => (x.foraProg ? num(x.foraProg, 3) : '–') },
+        { chave: 'lanc', titulo: 'Lançamentos', num: true },
+        { chave: 'alt', titulo: 'Alteradas', num: true, render: (x) => (x.alt ? html`<${Etiqueta} cor="laranja">${x.alt}</${Etiqueta}>` : '–') },
+        { chave: 'custo', titulo: 'Custo', num: true, render: (x) => moeda(x.custo) },
+      ]} />`;
+  }
+
+  if (aba === 'lancamentos') {
+    const cols = [{ titulo: 'Data/hora', valor: (p) => dataHora(p.data_hora) }, { titulo: 'Código', valor: (p) => ficha(p.ficha_id)?.codigo }, { titulo: 'Receita', valor: (p) => ficha(p.ficha_id)?.nome, largura: 30 },
+      { titulo: 'Receitas', valor: (p) => Number(p.multiplicador), num: true }, { titulo: 'Alterada', valor: (p) => (p.alterada ? 'sim' : '') },
+      { titulo: 'Programação', valor: (p) => (p.programacao_id ? 'sim' : 'fora') }, { titulo: 'Pesado por', valor: (p) => nomeUsuario(perfil(p.usuario_id)), largura: 28 },
+      { titulo: 'Custo', valor: (p) => Math.round(custo(p.id) * 100) / 100, texto: (p) => moeda(custo(p.id)), num: true }, { titulo: 'Observação', valor: (p) => p.observacao, largura: 45 }];
+    const abas = () => [{ nome: 'Receitas pesadas', colunas: cols, linhas: prods },
+      { nome: 'Ingredientes', linhas: prods.flatMap((p) => movsProd(p.id).map((m) => ({ p, m }))), colunas: [
+        { titulo: 'Data/hora', valor: (x) => dataHora(x.p.data_hora) }, { titulo: 'Receita', valor: (x) => ficha(x.p.ficha_id)?.nome }, { titulo: 'Ingrediente', valor: (x) => prod(x.m.produto_id)?.descricao },
+        { titulo: 'Quantidade', valor: (x) => -Number(x.m.quantidade) }, { titulo: 'Unid.', valor: (x) => prod(x.m.produto_id)?.unidade_estoque },
+        { titulo: 'Custo', valor: (x) => -Number(x.m.valor) }, { titulo: 'Tipo', valor: (x) => (x.m.tipo === 'correcao' ? 'correção' : '') }] }];
+    return html`
+      <div class="filtros"><${Exportar} titulo="Receitas pesadas" filtros=${periodo} arquivo=${`receitas-pesadas-${de}-a-${ate}`} colunas=${cols} linhas=${prods} abas=${abas} /></div>
+      <${Tabela} linhas=${prods} aoClicar=${setAberta} ordemInicial=${{ chave: 'id', dir: -1 }} vazio="Nenhuma receita pesada neste período." colunas=${[
+        { chave: 'id', titulo: 'Data/hora', valor: (p) => p.id, render: (p) => dataHora(p.data_hora) },
+        { chave: 'r', titulo: 'Receita', valor: (p) => ficha(p.ficha_id)?.nome, render: (p) => html`<b>${ficha(p.ficha_id)?.codigo} · ${ficha(p.ficha_id)?.nome}</b>
+          ${p.alterada ? html` <${Etiqueta} cor="laranja">alterada</${Etiqueta}>` : ''}${!p.programacao_id ? html` <${Etiqueta} cor="cinza">fora da programação</${Etiqueta}>` : ''}` },
+        { chave: 'multiplicador', titulo: 'Receitas', num: true, render: (p) => num(p.multiplicador, 3) },
+        { chave: 'u', titulo: 'Pesado por', valor: (p) => perfil(p.usuario_id)?.nome, render: (p) => nomeUsuario(perfil(p.usuario_id)) },
+        { chave: 'c', titulo: 'Custo', num: true, valor: (p) => custo(p.id), render: (p) => moeda(custo(p.id)) },
+      ]} />
+      ${aberta && html`<${Modal} titulo=${`${ficha(aberta.ficha_id)?.nome} · ${rec(Number(aberta.multiplicador))} · ${dataHora(aberta.data_hora)}`} aoFechar=${() => setAberta(null)} largo>
+        <p>Pesado por <b>${nomeUsuario(perfil(aberta.usuario_id))}</b>${aberta.alterada ? html` · <${Etiqueta} cor="laranja">receita alterada</${Etiqueta}>` : ''}
+          ${!aberta.programacao_id ? html` · <${Etiqueta} cor="cinza">fora da programação</${Etiqueta}>` : ''}</p>
+        ${aberta.observacao && html`<p class="nota">${aberta.observacao}</p>`}
+        <${Tabela} linhas=${movsProd(aberta.id)} colunas=${[
+          { chave: 'p', titulo: 'Ingrediente usado', render: (m) => html`${prod(m.produto_id)?.descricao}${m.tipo === 'correcao' ? html` <${Etiqueta} cor="roxo">correção</${Etiqueta}>` : ''}` },
+          { chave: 'quantidade', titulo: 'Quantidade', num: true, render: (m) => qu(-m.quantidade, prod(m.produto_id)?.unidade_estoque) },
+          { chave: 'valor', titulo: 'Custo', num: true, render: (m) => moeda(-m.valor) },
+        ]} />
+      </${Modal}>`}`;
+  }
+
+  if (aba === 'avulsas') {
+    const lista = validos.filter((m) => origem(m).tipo === 'saida_avulsa');
+    const cols = [{ titulo: 'Data/hora', valor: (m) => dataHora(m.data_hora) }, { titulo: 'Código', valor: (m) => prod(m.produto_id)?.codigo }, { titulo: 'Produto', valor: (m) => prod(m.produto_id)?.descricao, largura: 32 },
+      { titulo: 'Quantidade', valor: (m) => -Number(m.quantidade), num: true }, { titulo: 'Unid.', valor: (m) => prod(m.produto_id)?.unidade_estoque },
+      { titulo: 'Custo', valor: (m) => -Number(m.valor), texto: (m) => moeda(-m.valor), num: true }, { titulo: 'Quem', valor: (m) => nomeUsuario(perfil(m.usuario_id)), largura: 28 },
+      { titulo: 'Justificativa', valor: (m) => (m.tipo === 'correcao' ? `Correção: ${m.motivo || ''}` : m.observacao), largura: 45 }];
+    return html`
+      <div class="filtros"><${Exportar} titulo="Saídas avulsas da pesagem" filtros=${periodo} arquivo=${`saidas-avulsas-${de}-a-${ate}`} colunas=${cols} linhas=${lista} /></div>
+      <${Tabela} linhas=${lista} ordemInicial=${{ chave: 'id', dir: -1 }} vazio="Nenhuma saída avulsa neste período." colunas=${[
+        { chave: 'id', titulo: 'Data/hora', valor: (m) => m.id, render: (m) => dataHora(m.data_hora) },
+        { chave: 'p', titulo: 'Produto', valor: (m) => prod(m.produto_id)?.descricao, render: (m) => html`<b>${prod(m.produto_id)?.descricao}</b>${m.tipo === 'correcao' ? html` <${Etiqueta} cor="roxo">correção</${Etiqueta}>` : ''}` },
+        { chave: 'quantidade', titulo: 'Quantidade', num: true, valor: (m) => -m.quantidade, render: (m) => qu(-m.quantidade, prod(m.produto_id)?.unidade_estoque) },
+        { chave: 'valor', titulo: 'Custo', num: true, valor: (m) => -m.valor, render: (m) => moeda(-m.valor) },
+        { chave: 'u', titulo: 'Quem', render: (m) => nomeUsuario(perfil(m.usuario_id)) },
+        { chave: 'observacao', titulo: 'Justificativa', render: (m) => html`<small class="quebra">${m.tipo === 'correcao' ? `Correção: ${m.motivo || ''}` : m.observacao}</small>` },
+      ]} />`;
+  }
+
+  // consumo de matéria-prima (receitas + avulsas, já com correções)
+  const g = new Map();
+  for (const m of validos) {
+    const t = origem(m).tipo;
+    const x = g.get(m.produto_id) || { id: m.produto_id, receita: 0, avulsa: 0, valor: 0 };
+    if (t === 'saida_receita') x.receita += -Number(m.quantidade); else x.avulsa += -Number(m.quantidade);
+    x.valor += -Number(m.valor); g.set(m.produto_id, x);
+  }
+  const linhas = [...g.values()].sort((a, b) => b.valor - a.valor);
+  const un = (x) => prod(x.id)?.unidade_estoque;
+  const cols = [{ titulo: 'Código', valor: (x) => prod(x.id)?.codigo }, { titulo: 'Matéria-prima', valor: (x) => prod(x.id)?.descricao, largura: 32 },
+    { titulo: 'Classificação', valor: (x) => prod(x.id)?.classificacao }, { titulo: 'Pelas receitas', valor: (x) => Math.round(x.receita * 1000) / 1000, num: true },
+    { titulo: 'Avulsas', valor: (x) => Math.round(x.avulsa * 1000) / 1000, num: true }, { titulo: 'Total', valor: (x) => Math.round((x.receita + x.avulsa) * 1000) / 1000, num: true },
+    { titulo: 'Unid.', valor: un }, { titulo: 'Custo', valor: (x) => Math.round(x.valor * 100) / 100, texto: (x) => moeda(x.valor), num: true }];
+  const tV = linhas.reduce((s, x) => s + x.valor, 0);
+  return html`
+    <div class="filtros"><${Exportar} titulo="Matéria-prima consumida na produção" filtros=${periodo} arquivo=${`consumo-producao-${de}-a-${ate}`} colunas=${cols} linhas=${linhas}
+      totais=${['TOTAL', '', '', '', '', '', '', moeda(tV)]} /></div>
+    <${Tabela} linhas=${linhas} vazio="Nenhum consumo neste período." colunas=${[
+      { chave: 'p', titulo: 'Matéria-prima', valor: (x) => prod(x.id)?.descricao, render: (x) => html`<b>${prod(x.id)?.descricao}</b><br /><small>${prod(x.id)?.codigo}${prod(x.id)?.classificacao ? ` · classificação ${prod(x.id).classificacao}` : ''}</small>` },
+      { chave: 'receita', titulo: 'Pelas receitas', num: true, render: (x) => qu(x.receita, un(x)) },
+      { chave: 'avulsa', titulo: 'Avulsas', num: true, render: (x) => (x.avulsa ? qu(x.avulsa, un(x)) : '–') },
+      { chave: 't', titulo: 'Total', num: true, valor: (x) => x.receita + x.avulsa, render: (x) => html`<b>${qu(x.receita + x.avulsa, un(x))}</b>` },
+      { chave: 'valor', titulo: 'Custo', num: true, render: (x) => moeda(x.valor) },
+    ]} />`;
+}
