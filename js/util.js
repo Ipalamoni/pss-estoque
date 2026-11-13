@@ -76,6 +76,7 @@ export const PERMISSOES = {
   financeiro: ['admin', 'financeiro'],
   data_pagamento: ['admin', 'comprador', 'financeiro'],
   previsao_producao: ['admin', 'engenharia', 'diretoria', 'financeiro', 'faturamento'],
+  custos: ['admin'],
 };
 // Papéis que NÃO enxergam estoque/produção (o banco também bloqueia a leitura)
 export const PAPEIS_RESTRITOS = ['financeiro', 'faturamento'];

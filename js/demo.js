@@ -9,7 +9,7 @@
 import { calcularEstatisticas } from './calc.js';
 import { plural } from './util.js';
 
-const CHAVE = 'pss-estoque-demo-v6';
+const CHAVE = 'pss-estoque-demo-v7';
 let db = null;
 let usuario = null;      // user_id logado
 let relogio = null;      // usado só para gerar o histórico de exemplo
@@ -36,6 +36,7 @@ const PERM = {
   usuarios: ['admin'], parametros: ['admin'], auditoria: ['admin', 'diretoria'], importacao: ['admin'], programacao: ['admin', 'engenharia'],
   financeiro: ['admin', 'financeiro'], data_pagamento: ['admin', 'comprador', 'financeiro'],
   previsao_producao: ['admin', 'engenharia', 'diretoria', 'financeiro', 'faturamento'],
+  custos: ['admin'],
 };
 // mesma regra de leitura do banco (02_seguranca.sql): financeiro e faturamento só leem o que precisam
 const AMPLOS = ['admin', 'comprador', 'almoxarifado', 'recebimento', 'pesagem', 'engenharia', 'diretoria'];
@@ -434,6 +435,23 @@ const RPC = {
     const linha = `${dd(q.getDate())}/${dd(q.getMonth() + 1)} ${dd(q.getHours())}:${dd(q.getMinutes())} data ${br(pe.previsao_pagamento)} → ${br(p_data)}: ${txt(p_motivo)}`;
     atualizar('pedidos', pe, { previsao_pagamento: p_data, fin_obs: [pe.fin_obs, linha].filter(Boolean).join(' | '), ...autoria() });
   },
+  custos_produtos() {
+    exigir('custos');
+    const ult = new Map();
+    for (const m of db.movimentos) {
+      if (!['entrada', 'implantacao'].includes(m.tipo) || !(Number(m.custo_unitario) > 0) || !(Number(m.quantidade) > 0)) continue;
+      const a = ult.get(m.produto_id);
+      if (a && (a.data_hora > m.data_hora || (a.data_hora === m.data_hora && a.id > m.id))) continue;
+      ult.set(m.produto_id, m);
+    }
+    return [...ult.values()].map((m) => {
+      const r = m.recebimento_id ? db.recebimentos.find((x) => x.id === m.recebimento_id) : null;
+      const pi = m.pedido_item_id ? db.pedido_itens.find((x) => x.id === m.pedido_item_id) : null;
+      const pe = pi ? db.pedidos.find((x) => x.id === pi.pedido_id) : null;
+      return { produto_id: m.produto_id, ultimo_custo: Number(m.custo_unitario), ultima_data: m.data_hora, ultimo_tipo: m.tipo, ultima_qtd: Number(m.quantidade),
+        fornecedor_id: r?.fornecedor_id || pe?.fornecedor_id || null, pedido_id: pi?.pedido_id || null };
+    });
+  },
   previsao_producao({ p_de, p_ate }) {
     exigir('previsao_producao');
     if (!p_de || !p_ate || p_ate < p_de) erro('Período inválido.');
@@ -612,7 +630,8 @@ function semente() {
   for (const t of ['perfis', 'parametros', 'fornecedores', 'produtos', 'fichas_tecnicas', 'fichas_historico', 'ficha_itens', 'pedidos', 'pedido_itens',
     'recebimentos', 'programacoes', 'producoes', 'inventarios', 'inventario_itens', 'movimentos', 'auditoria', 'acessos']) db[t] = [];
   db.versao_banco = [{ versao: '1.0.0', descricao: 'Instalação inicial', aplicada_em: agora().toISOString() },
-    { versao: '1.1.0', descricao: 'Financeiro, previsão de produção e perfil faturamento', aplicada_em: agora().toISOString() }];
+    { versao: '1.1.0', descricao: 'Financeiro, previsão de produção e perfil faturamento', aplicada_em: agora().toISOString() },
+    { versao: '1.2.0', descricao: 'Gestão de custos e últimas compras', aplicada_em: agora().toISOString() }];
 
   const P = [
     ['empresa_nome', 'Indústria e Comércio de Pães São Sebastião', 'Nome no cabeçalho do pedido de compra'],

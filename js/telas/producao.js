@@ -31,6 +31,16 @@ function situacao(pg, feito) {
   if (feito > 0) return { id: 'producao', rotulo: feito >= q - 0.0005 ? 'Pesada · em produção' : 'Em produção', cor: 'laranja' };
   return { id: 'pendente', rotulo: 'A fazer', cor: 'cinza' };
 }
+// Tabela/Exportar que escondem as colunas de custo de quem não pode ver custo
+const ehCusto = (c) => /^Custo/.test(c.titulo || '');
+const tirarCusto = (cols) => cols.filter((c) => !ehCusto(c));
+function TabelaC({ verCusto, ...p }) { return html`<${Tabela} ...${p} colunas=${verCusto ? p.colunas : tirarCusto(p.colunas)} />`; }
+function ExportarC({ verCusto, ...p }) {
+  if (verCusto) return html`<${Exportar} ...${p} />`;
+  const totais = p.totais ? p.totais.filter((_, i) => !(p.colunas[i] && ehCusto(p.colunas[i]))) : p.totais;
+  const abas = p.abas ? () => p.abas().map((a) => ({ ...a, colunas: tirarCusto(a.colunas) })) : undefined;
+  return html`<${Exportar} ...${p} colunas=${tirarCusto(p.colunas)} totais=${totais} abas=${abas} />`;
+}
 const aberta = (pg) => pg.situacao === 'ativa' && !pg.finalizada_em;
 
 // Ingredientes POR 1 RECEITA de uma programação (a alteração programada ou a ficha)
@@ -502,7 +512,8 @@ export function TelaSaidasProducao() {
 }
 
 function SaidasProducaoConteudo({ aba, de, ate, prods, movs }) {
-  const { dados } = useApp();
+  const { dados, podeFazer, papeis } = useApp();
+  const verCusto = podeFazer('custos') || papeis.includes('diretoria');   // custo não aparece para engenharia/pesagem
   const [aberta, setAberta] = useState(null);
   const ficha = (id) => dados.mapa.ficha.get(id);
   const perfil = (id) => dados.mapa.perfil.get(id);
@@ -537,12 +548,12 @@ function SaidasProducaoConteudo({ aba, de, ate, prods, movs }) {
       <div class="cartoes">
         <${Cartao} titulo="Receitas feitas" valor=${rec(tR)} sub=${pl(prods.length, 'lançamento', 'lançamentos')} />
         <${Cartao} titulo="Programado no período" valor=${rec(tP)} sub=${tP ? `${num((Math.min(tR, tP) / tP) * 100, 0)}% atendido` : '–'} />
-        <${Cartao} titulo="Custo da matéria-prima" valor=${moeda(tC)} sub="pelas receitas" />
-        <${Cartao} titulo="Saídas avulsas" valor=${avulsas.length} sub=${moeda(Math.abs(avulsas.reduce((s, m) => s + Number(m.valor), 0)))} cor=${avulsas.length ? 'c-laranja' : ''} />
+        ${verCusto && html`<${Cartao} titulo="Custo da matéria-prima" valor=${moeda(tC)} sub="pelas receitas" />`}
+        <${Cartao} titulo="Saídas avulsas" valor=${avulsas.length} sub=${verCusto ? moeda(Math.abs(avulsas.reduce((s, m) => s + Number(m.valor), 0))) : ''} cor=${avulsas.length ? 'c-laranja' : ''} />
       </div>
-      <div class="filtros"><${Exportar} titulo="Saídas da produção — resumo por receita" filtros=${periodo} arquivo=${`saidas-producao-resumo-${de}-a-${ate}`} colunas=${cols} linhas=${linhas}
+      <div class="filtros"><${ExportarC} verCusto=${verCusto} titulo="Saídas da produção — resumo por receita" filtros=${periodo} arquivo=${`saidas-producao-resumo-${de}-a-${ate}`} colunas=${cols} linhas=${linhas}
         totais=${['TOTAL', '', num(tR, 3), num(tP, 3), '', '', '', moeda(tC)]} /></div>
-      <${Tabela} linhas=${linhas} vazio="Nenhuma receita pesada neste período." colunas=${[
+      <${TabelaC} verCusto=${verCusto} linhas=${linhas} vazio="Nenhuma receita pesada neste período." colunas=${[
         { chave: 'r', titulo: 'Receita', valor: (x) => ficha(x.id)?.nome, render: (x) => html`<b>${ficha(x.id)?.codigo} · ${ficha(x.id)?.nome}</b>` },
         { chave: 'receitas', titulo: 'Feitas', num: true, render: (x) => html`<b>${num(x.receitas, 3)}</b>` },
         { chave: 'prog', titulo: 'Programado', num: true, render: (x) => (x.prog ? num(x.prog, 3) : '–') },
@@ -564,8 +575,8 @@ function SaidasProducaoConteudo({ aba, de, ate, prods, movs }) {
         { titulo: 'Quantidade', valor: (x) => -Number(x.m.quantidade) }, { titulo: 'Unid.', valor: (x) => prod(x.m.produto_id)?.unidade_estoque },
         { titulo: 'Custo', valor: (x) => -Number(x.m.valor) }, { titulo: 'Tipo', valor: (x) => (x.m.tipo === 'correcao' ? 'correção' : '') }] }];
     return html`
-      <div class="filtros"><${Exportar} titulo="Receitas pesadas" filtros=${periodo} arquivo=${`receitas-pesadas-${de}-a-${ate}`} colunas=${cols} linhas=${prods} abas=${abas} /></div>
-      <${Tabela} linhas=${prods} aoClicar=${setAberta} ordemInicial=${{ chave: 'id', dir: -1 }} vazio="Nenhuma receita pesada neste período." colunas=${[
+      <div class="filtros"><${ExportarC} verCusto=${verCusto} titulo="Receitas pesadas" filtros=${periodo} arquivo=${`receitas-pesadas-${de}-a-${ate}`} colunas=${cols} linhas=${prods} abas=${abas} /></div>
+      <${TabelaC} verCusto=${verCusto} linhas=${prods} aoClicar=${setAberta} ordemInicial=${{ chave: 'id', dir: -1 }} vazio="Nenhuma receita pesada neste período." colunas=${[
         { chave: 'id', titulo: 'Data/hora', valor: (p) => p.id, render: (p) => dataHora(p.data_hora) },
         { chave: 'r', titulo: 'Receita', valor: (p) => ficha(p.ficha_id)?.nome, render: (p) => html`<b>${ficha(p.ficha_id)?.codigo} · ${ficha(p.ficha_id)?.nome}</b>
           ${p.alterada ? html` <${Etiqueta} cor="laranja">alterada</${Etiqueta}>` : ''}${!p.programacao_id ? html` <${Etiqueta} cor="cinza">fora da programação</${Etiqueta}>` : ''}` },
@@ -577,7 +588,7 @@ function SaidasProducaoConteudo({ aba, de, ate, prods, movs }) {
         <p>Pesado por <b>${nomeUsuario(perfil(aberta.usuario_id))}</b>${aberta.alterada ? html` · <${Etiqueta} cor="laranja">receita alterada</${Etiqueta}>` : ''}
           ${!aberta.programacao_id ? html` · <${Etiqueta} cor="cinza">fora da programação</${Etiqueta}>` : ''}</p>
         ${aberta.observacao && html`<p class="nota">${aberta.observacao}</p>`}
-        <${Tabela} linhas=${movsProd(aberta.id)} colunas=${[
+        <${TabelaC} verCusto=${verCusto} linhas=${movsProd(aberta.id)} colunas=${[
           { chave: 'p', titulo: 'Ingrediente usado', render: (m) => html`${prod(m.produto_id)?.descricao}${m.tipo === 'correcao' ? html` <${Etiqueta} cor="roxo">correção</${Etiqueta}>` : ''}` },
           { chave: 'quantidade', titulo: 'Quantidade', num: true, render: (m) => qu(-m.quantidade, prod(m.produto_id)?.unidade_estoque) },
           { chave: 'valor', titulo: 'Custo', num: true, render: (m) => moeda(-m.valor) },
@@ -592,8 +603,8 @@ function SaidasProducaoConteudo({ aba, de, ate, prods, movs }) {
       { titulo: 'Custo', valor: (m) => -Number(m.valor), texto: (m) => moeda(-m.valor), num: true }, { titulo: 'Quem', valor: (m) => nomeUsuario(perfil(m.usuario_id)), largura: 28 },
       { titulo: 'Justificativa', valor: (m) => (m.tipo === 'correcao' ? `Correção: ${m.motivo || ''}` : m.observacao), largura: 45 }];
     return html`
-      <div class="filtros"><${Exportar} titulo="Saídas avulsas da pesagem" filtros=${periodo} arquivo=${`saidas-avulsas-${de}-a-${ate}`} colunas=${cols} linhas=${lista} /></div>
-      <${Tabela} linhas=${lista} ordemInicial=${{ chave: 'id', dir: -1 }} vazio="Nenhuma saída avulsa neste período." colunas=${[
+      <div class="filtros"><${ExportarC} verCusto=${verCusto} titulo="Saídas avulsas da pesagem" filtros=${periodo} arquivo=${`saidas-avulsas-${de}-a-${ate}`} colunas=${cols} linhas=${lista} /></div>
+      <${TabelaC} verCusto=${verCusto} linhas=${lista} ordemInicial=${{ chave: 'id', dir: -1 }} vazio="Nenhuma saída avulsa neste período." colunas=${[
         { chave: 'id', titulo: 'Data/hora', valor: (m) => m.id, render: (m) => dataHora(m.data_hora) },
         { chave: 'p', titulo: 'Produto', valor: (m) => prod(m.produto_id)?.descricao, render: (m) => html`<b>${prod(m.produto_id)?.descricao}</b>${m.tipo === 'correcao' ? html` <${Etiqueta} cor="roxo">correção</${Etiqueta}>` : ''}` },
         { chave: 'quantidade', titulo: 'Quantidade', num: true, valor: (m) => -m.quantidade, render: (m) => qu(-m.quantidade, prod(m.produto_id)?.unidade_estoque) },
@@ -619,9 +630,9 @@ function SaidasProducaoConteudo({ aba, de, ate, prods, movs }) {
     { titulo: 'Unid.', valor: un }, { titulo: 'Custo', valor: (x) => Math.round(x.valor * 100) / 100, texto: (x) => moeda(x.valor), num: true }];
   const tV = linhas.reduce((s, x) => s + x.valor, 0);
   return html`
-    <div class="filtros"><${Exportar} titulo="Matéria-prima consumida na produção" filtros=${periodo} arquivo=${`consumo-producao-${de}-a-${ate}`} colunas=${cols} linhas=${linhas}
+    <div class="filtros"><${ExportarC} verCusto=${verCusto} titulo="Matéria-prima consumida na produção" filtros=${periodo} arquivo=${`consumo-producao-${de}-a-${ate}`} colunas=${cols} linhas=${linhas}
       totais=${['TOTAL', '', '', '', '', '', '', moeda(tV)]} /></div>
-    <${Tabela} linhas=${linhas} vazio="Nenhum consumo neste período." colunas=${[
+    <${TabelaC} verCusto=${verCusto} linhas=${linhas} vazio="Nenhum consumo neste período." colunas=${[
       { chave: 'p', titulo: 'Matéria-prima', valor: (x) => prod(x.id)?.descricao, render: (x) => html`<b>${prod(x.id)?.descricao}</b><br /><small>${prod(x.id)?.codigo}${prod(x.id)?.classificacao ? ` · classificação ${prod(x.id).classificacao}` : ''}</small>` },
       { chave: 'receita', titulo: 'Pelas receitas', num: true, render: (x) => qu(x.receita, un(x)) },
       { chave: 'avulsa', titulo: 'Avulsas', num: true, render: (x) => (x.avulsa ? qu(x.avulsa, un(x)) : '–') },

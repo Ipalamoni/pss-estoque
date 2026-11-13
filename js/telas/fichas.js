@@ -11,6 +11,7 @@ export function custoFicha(itens, mapaProduto) {
 
 export function TelaFichas() {
   const { dados, podeFazer, ir } = useApp();
+  const verCusto = podeFazer('custos');   // custo da receita só para a controladoria
   const [busca, setBusca] = useState('');
   const [inativos, setInativos] = useState(false);
   const [editando, setEditando] = useState(null);
@@ -26,7 +27,7 @@ export function TelaFichas() {
           { titulo: 'Unid. rendimento', valor: (x) => (x.i === 0 ? x.f.rendimento_unidade || '' : '') },
           { titulo: 'Cód. ingrediente', valor: (x) => dados.mapa.produto.get(x.it.produto_id)?.codigo }, { titulo: 'Ingrediente', valor: (x) => dados.mapa.produto.get(x.it.produto_id)?.descricao, largura: 32 },
           { titulo: 'Quantidade por receita', valor: (x) => Number(x.it.quantidade), num: true }, { titulo: 'Unid.', valor: (x) => dados.mapa.produto.get(x.it.produto_id)?.unidade_estoque },
-          { titulo: 'Custo estimado', valor: (x) => Math.round(Number(x.it.quantidade) * Number(dados.mapa.produto.get(x.it.produto_id)?.custo_medio || 0) * 100) / 100, num: true }]} />
+          verCusto && { titulo: 'Custo estimado', valor: (x) => Math.round(Number(x.it.quantidade) * Number(dados.mapa.produto.get(x.it.produto_id)?.custo_medio || 0) * 100) / 100, num: true }].filter(Boolean)} />
       ${pode && html`<button class="btn btn-pri" onClick=${() => setEditando({})}><${Icone} nome="mais" tam=${18} /> Nova ficha</button>`}
     </${Cabecalho}>
     <div class="filtros">
@@ -43,9 +44,9 @@ export function TelaFichas() {
         { chave: 'n', titulo: 'Ingredientes', num: true, valor: (f) => itensDe(f.id).length, render: (f) => itensDe(f.id).length },
         { chave: 'peso', titulo: 'Massa (kg)', num: true, valor: (f) => pesoKg(itensDe(f.id), dados.mapa.produto), render: (f) => qtd(pesoKg(itensDe(f.id), dados.mapa.produto)) },
         { chave: 'atualizado_em', titulo: 'Última alteração', render: (f) => (f.atualizado_em ? html`${dados.mapa.perfil.get(f.atualizado_por)?.nome}<br /><small>${dataHora(f.atualizado_em)}</small>` : '–') },
-        { chave: 'custo', titulo: 'Custo estimado', num: true, valor: (f) => custoFicha(itensDe(f.id), dados.mapa.produto), render: (f) => moeda(custoFicha(itensDe(f.id), dados.mapa.produto)) },
-      ]} />
-    <p class="nota">Custo estimado = quantidade de cada ingrediente × custo médio atual do estoque.</p>
+        verCusto && { chave: 'custo', titulo: 'Custo estimado', num: true, valor: (f) => custoFicha(itensDe(f.id), dados.mapa.produto), render: (f) => moeda(custoFicha(itensDe(f.id), dados.mapa.produto)) },
+      ].filter(Boolean)} />
+    ${verCusto && html`<p class="nota">Custo estimado = quantidade de cada ingrediente × custo médio atual do estoque. Custo completo (último e médio, por unidade) em Gestão de custos.</p>`}
     ${editando && html`<${FormFicha} ficha=${editando} itens=${editando.id ? itensDe(editando.id) : []} aoFechar=${() => setEditando(null)}
       somenteLeitura=${!pode} aoUsar=${podeFazer('saida_receita') && editando.id ? () => ir('saidas', { aba: 'receita', ficha: editando.id }) : null} />`}`;
 }
@@ -55,7 +56,7 @@ function pesoKg(itens, mp) {
 }
 
 function FormFicha({ ficha, itens, aoFechar, somenteLeitura, aoUsar }) {
-  const { dados, recarregar, api } = useApp();
+  const { dados, recarregar, api, podeFazer } = useApp();
   const mps = dados.produtos.filter((p) => p.categoria === 'materia_prima' && p.ativo);
   const [f, setF] = useState({ codigo: ficha.codigo || '', nome: ficha.nome || '', produto_final: ficha.produto_final || '', rendimento: ficha.rendimento || '',
     rendimento_qtd: ficha.rendimento_qtd ? String(Number(ficha.rendimento_qtd)).replace('.', ',') : '', rendimento_unidade: ficha.rendimento_unidade || 'pacotes',
@@ -114,7 +115,7 @@ function FormFicha({ ficha, itens, aoFechar, somenteLeitura, aoUsar }) {
       </div>`; })}
     </div>
     ${!somenteLeitura && html`<button class="btn btn-sec" onClick=${() => setLinhas((x) => [...x, { k: Math.random(), produto_id: null, quantidade: '', unidade: null }])}>+ Ingrediente</button>`}
-    <p class="nota">Custo estimado de 1 receita: <b>${moeda(custo)}</b>.</p>
+    ${podeFazer('custos') && html`<p class="nota">Custo estimado de 1 receita: <b>${moeda(custo)}</b>.</p>`}
     ${ficha.id && html`<${UltimaAlteracao} reg=${ficha} /><${HistoricoFicha} fichaId=${ficha.id} />`}
   </${Modal}>`;
 }

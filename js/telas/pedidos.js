@@ -48,6 +48,7 @@ export function TelaPedidos() {
   const [aberto, setAberto] = useState(estadoRota?.abrir || null);
   const [editando, setEditando] = useState(estadoRota?.novo ? {} : null);
   const [pendencias, setPendencias] = useState(!!estadoRota?.pendencias);
+  const [ultimas, setUltimas] = useState(false);
   useEffect(() => { if (estadoRota) setEstadoRota(null); }, []);
   const pendRec = (dados.recebimentos || []).filter((r) => r.divergencia && !r.ciente_por);
 
@@ -93,8 +94,10 @@ export function TelaPedidos() {
     <${Cabecalho} titulo="Pedidos de compra" sub="Pedidos feitos, o que falta chegar e o que já chegou">
       <${Exportar} titulo="Pedidos de compra" filtros=${pl(linhas.length, 'pedido', 'pedidos')} arquivo=${`pedidos-${hojeISO()}`} colunas=${colExp} linhas=${linhas}
         abas=${abasPedidos} totais=${['', '', '', '', '', '', 'TOTAL', moeda(total), '', '', '', '']} />
+      <button class="btn btn-sec" onClick=${() => setUltimas(true)}>Últimas compras</button>
       ${podeFazer('pedido') && html`<button class="btn btn-pri" onClick=${() => setEditando({})}><${Icone} nome="mais" tam=${18} /> Novo pedido</button>`}
     </${Cabecalho}>
+    ${ultimas && html`<${UltimasCompras} aoFechar=${() => setUltimas(false)} />`}
     ${pendRec.length > 0 && html`<div class="aviso-faixa">
       <span>⚠ <b>${pl(pendRec.length, 'recebimento', 'recebimentos')} aguardando a ciência do comprador</b>${' '}
         (${[qtdDivPend && pl(qtdDivPend, 'pedido com divergência', 'pedidos com divergência'), pendRec.filter((r) => !r.pedido_id).length && pl(pendRec.filter((r) => !r.pedido_id).length, 'sem pedido', 'sem pedido')].filter(Boolean).join(' · ')}).</span>
@@ -289,6 +292,7 @@ function FormPedido({ pedido, aoFechar }) {
   const [f, setF] = useState({ fornecedor_id: pedido.fornecedor_id || null, data_pedido: pedido.data_pedido || hoje,
     previsao_entrega: pedido.previsao_entrega || '', previsao_pagamento: pedido.previsao_pagamento || '', condicao_pagamento: pedido.condicao_pagamento || '', observacao: pedido.observacao || '' });
   const [prevManual, setPrevManual] = useState(!novo);
+  const [historico, setHistorico] = useState(null);
   const [linhas, setLinhas] = useState(() => itensAtuais.length ? itensAtuais.map((i) => ({ k: i.id, id: i.id, produto_id: i.produto_id,
     quantidade: virgula(i.quantidade), unidade: i.unidade, preco: virgula(i.preco_unitario), recebido: i.qtd_recebida_base > 0 }))
     : [{ k: Math.random(), produto_id: null, quantidade: '', unidade: null, preco: '' }]);
@@ -349,6 +353,7 @@ function FormPedido({ pedido, aoFechar }) {
             <${Escolher} itens=${dados.produtos.filter((x) => x.ativo)} valor=${l.produto_id} desabilitado=${l.recebido}
               rotuloDe=${(x) => `${x.codigo} · ${x.descricao}`} aoMudar=${(id, pr) => escolherProduto(l.k, id, pr)} placeholder="Produto…" />
             ${ip && html`<small class="dica">Saldo ${qu(ip.saldo, ip.unidade_estoque)} · consumo ${num(ip.media_dia, 1)}/dia${ip.sugestao_compra ? ` · sugestão ${qu(ip.sugestao_compra, ip.unidade_compra || ip.unidade_estoque, 0)}` : ''}</small>`}
+            ${l.produto_id && html`<${DicaUltimaCompra} produtoId=${l.produto_id} fornecedorId=${f.fornecedor_id} pedidoId=${pedido.id} aoVer=${() => setHistorico(l.produto_id)} />`}
           </div>
           <${QtdUnidade} produto=${p} valor=${l.quantidade} unidade=${l.unidade} desabilitado=${!p}
             aoMudar=${(v, u) => mudar(l.k, u !== l.unidade ? { quantidade: v, unidade: u, preco: virgula(ultimoPreco(dados, l.produto_id, u)) } : { quantidade: v })} />
@@ -361,6 +366,7 @@ function FormPedido({ pedido, aoFechar }) {
       <button class="btn btn-sec" onClick=${() => setLinhas((x) => [...x, { k: Math.random(), produto_id: null, quantidade: '', unidade: null, preco: '' }])}>+ Item</button>
       <span>Total do pedido: <b>${moeda(total)}</b></span>
     </div>
+    ${historico && html`<${UltimasCompras} produtoInicial=${historico} aoFechar=${() => setHistorico(null)} />`}
   </${Modal}>`;
 }
 
@@ -380,5 +386,75 @@ export function AjustarPagamento({ pedido, aoFechar, aoSalvo }) {
     <p>Data atual: <b>${data(pedido.previsao_pagamento)}</b>${pedido.fin_lancado ? ' · já lançado no contas a pagar (avise o financeiro / ajuste lá também)' : ''}</p>
     <${Campo} rotulo="Nova previsão de pagamento" obrigatorio><input class="entrada" type="date" value=${d} onChange=${(e) => setD(e.target.value)} /></${Campo}>
     <${Campo} rotulo="Motivo" obrigatorio><input class="entrada" value=${motivo} onInput=${(e) => setMotivo(e.target.value)} placeholder="ex.: mercadoria atrasou; fornecedor prorrogou o boleto" /></${Campo}>
+  </${Modal}>`;
+}
+
+// --------------------------- ÚLTIMAS COMPRAS ------------------------
+// Histórico de preço por produto e fornecedor (pedidos não cancelados, do mais novo ao mais antigo)
+export function historicoCompras(dados, { produtoId, fornecedorId, excetoPedido } = {}) {
+  const ped = new Map(dados.pedidos.map((p) => [p.id, p]));
+  return dados.pedidoItens.filter((i) => { const p = ped.get(i.pedido_id);
+    return p && p.status !== 'cancelado' && i.pedido_id !== excetoPedido && Number(i.preco_unitario) > 0
+      && (!produtoId || i.produto_id === produtoId) && (!fornecedorId || p.fornecedor_id === fornecedorId); })
+    .map((i) => { const p = ped.get(i.pedido_id); const pr = dados.mapa.produto.get(i.produto_id);
+      const f = pr ? fator(pr, i.unidade) : 1;
+      return { ...i, chave: i.id, pedido: p, pr, forn: dados.mapa.fornecedor.get(p.fornecedor_id), data: p.data_pedido,
+        precoBase: f ? Number(i.preco_unitario) / f : null }; })
+    .sort((a, b) => b.data.localeCompare(a.data) || b.id - a.id);
+}
+
+function DicaUltimaCompra({ produtoId, fornecedorId, pedidoId, aoVer }) {
+  const { dados } = useApp();
+  const todos = historicoCompras(dados, { produtoId, excetoPedido: pedidoId });
+  if (!todos.length) return html`<small class="dica">Sem compra anterior deste produto.</small>`;
+  const u = todos[0];
+  const doForn = fornecedorId && u.pedido.fornecedor_id !== fornecedorId ? todos.find((x) => x.pedido.fornecedor_id === fornecedorId) : null;
+  const txt = (x) => `${moeda(x.preco_unitario)}/${x.unidade} em ${data(x.data).slice(0, 5)}/${x.data.slice(2, 4)}`;
+  return html`<small class="dica">Última compra: <b>${txt(u)}</b> (${u.forn?.nome}, ${numeroPedido(u.pedido.id)})${doForn ? html` · deste fornecedor: <b>${txt(doForn)}</b>` : ''}
+    ${' '}<button type="button" class="btn-link" onClick=${aoVer}>histórico</button></small>`;
+}
+
+export function UltimasCompras({ aoFechar, produtoInicial, fornecedorInicial }) {
+  const { dados } = useApp();
+  const [prod, setProd] = useState(produtoInicial || null);
+  const [forn, setForn] = useState(fornecedorInicial || null);
+  const [so, setSo] = useState(!produtoInicial);   // só a última de cada produto × fornecedor
+  const [busca, setBusca] = useState('');
+  const linhas = useMemo(() => {
+    let l = historicoCompras(dados, { produtoId: prod, fornecedorId: forn });
+    if (busca) l = l.filter((x) => contem(`${x.pr?.codigo} ${x.pr?.descricao} ${x.forn?.nome}`, busca));
+    if (so) { const vistos = new Set(); l = l.filter((x) => { const k = `${x.produto_id}-${x.pedido.fornecedor_id}`; if (vistos.has(k)) return false; vistos.add(k); return true; }); }
+    return l;
+  }, [dados, prod, forn, so, busca]);
+  const colunas = [
+    { titulo: 'Data do pedido', valor: (x) => data(x.data) }, { titulo: 'Pedido', valor: (x) => numeroPedido(x.pedido.id) },
+    { titulo: 'Fornecedor', valor: (x) => x.forn?.nome }, { titulo: 'Código', valor: (x) => x.pr?.codigo }, { titulo: 'Produto', valor: (x) => x.pr?.descricao, largura: 30 },
+    { titulo: 'Qtd', valor: (x) => Number(x.quantidade), num: true }, { titulo: 'Unid.', valor: (x) => x.unidade },
+    { titulo: 'Preço unit.', valor: (x) => Number(x.preco_unitario), texto: (x) => moeda(x.preco_unitario), num: true },
+    { titulo: 'Preço por unid. estoque', valor: (x) => (x.precoBase === null ? '' : Math.round(x.precoBase * 10000) / 10000), texto: (x) => (x.precoBase === null ? '' : `${moeda(x.precoBase)}/${x.pr?.unidade_estoque}`), num: true },
+    { titulo: 'Situação', valor: (x) => STATUS_PEDIDO[x.pedido.status] },
+  ];
+  return html`<${Modal} titulo="Últimas compras" aoFechar=${aoFechar} largo
+    rodape=${html`<${Exportar} titulo="Últimas compras" filtros=${[prod && dados.mapa.produto.get(prod)?.descricao, forn && dados.mapa.fornecedor.get(forn)?.nome, so ? 'só a última de cada produto/fornecedor' : 'todas'].filter(Boolean).join(' · ')}
+      arquivo=${`ultimas-compras-${hojeISO()}`} colunas=${colunas} linhas=${linhas} /><span class="espaco"></span><button class="btn btn-sec" onClick=${aoFechar}>Fechar</button>`}>
+    <div class="filtros">
+      <div class="filtro-escolher"><${Escolher} itens=${dados.produtos} valor=${prod} aoMudar=${setProd} rotuloDe=${(x) => `${x.codigo} · ${x.descricao}`} placeholder="Produto (todos)" /></div>
+      ${prod && html`<button class="btn btn-sec btn-peq" onClick=${() => setProd(null)}>Limpar produto</button>`}
+      <div class="filtro-escolher"><${Escolher} itens=${dados.fornecedores} valor=${forn} aoMudar=${setForn} rotuloDe=${(x) => x.nome} placeholder="Fornecedor (todos)" /></div>
+      ${forn && html`<button class="btn btn-sec btn-peq" onClick=${() => setForn(null)}>Limpar fornecedor</button>`}
+      ${!prod && html`<${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Buscar produto ou fornecedor" />`}
+      <label class="check"><input type="checkbox" checked=${so} onChange=${(e) => setSo(e.target.checked)} /> Só a última de cada produto/fornecedor</label>
+    </div>
+    <${Tabela} linhas=${linhas} chave="chave" max=${300} vazio="Nenhuma compra encontrada."
+      colunas=${[
+        { chave: 'data', titulo: 'Data', render: (x) => html`${data(x.data)}<br /><small>${numeroPedido(x.pedido.id)}</small>` },
+        { chave: 'forn', titulo: 'Fornecedor', valor: (x) => x.forn?.nome, render: (x) => x.forn?.nome },
+        { chave: 'prod', titulo: 'Produto', valor: (x) => x.pr?.descricao, render: (x) => html`<b>${x.pr?.descricao}</b><br /><small>${x.pr?.codigo}</small>` },
+        { chave: 'quantidade', titulo: 'Qtd', num: true, valor: (x) => Number(x.quantidade), render: (x) => qu(x.quantidade, x.unidade) },
+        { chave: 'preco_unitario', titulo: 'Preço unit.', num: true, valor: (x) => Number(x.preco_unitario), render: (x) => html`<b>${moeda(x.preco_unitario)}</b>/${x.unidade}` },
+        { chave: 'precoBase', titulo: 'Por unid. estoque', num: true, valor: (x) => x.precoBase ?? 0, render: (x) => (x.precoBase === null ? '–' : `${moeda(x.precoBase)}/${x.pr?.unidade_estoque}`) },
+        { chave: 'st', titulo: 'Situação', valor: (x) => x.pedido.status, render: (x) => html`<${Etiqueta} cor=${COR_STATUS[x.pedido.status]}>${STATUS_PEDIDO[x.pedido.status]}</${Etiqueta}>` },
+      ]} />
+    <p class="nota">Preço do pedido (o que foi negociado). Se a nota veio com outro preço, a divergência aparece no recebimento do pedido.</p>
   </${Modal}>`;
 }

@@ -533,3 +533,4 @@ label.btn { cursor: pointer; }
 .previsao-total { font-size: 1.05rem; }
 .previsao-resumo { margin-top: 14px; }
 .previsao-resumo h3 { margin: 0 0 6px; font-size: 1rem; }
+.txt-verde { color: var(--verde); }

@@ -67,6 +67,7 @@ function InicioOperacao() {
   const verProg = papeis.some((x) => ['admin', 'engenharia', 'pesagem', 'diretoria'].includes(x));
   const atalhos = [
     papeis.some((x) => ['admin', 'diretoria', 'comprador', 'almoxarifado', 'engenharia'].includes(x)) && { t: 'Resumo (indicadores)', i: 'painel', f: () => ir('painel') },
+    podeFazer('custos') && { t: 'Gestão de custos', i: 'custos', f: () => ir('custos') },
     podeFazer('previsao_producao') && { t: 'Previsão de produção', i: 'previsao', f: () => ir('previsao') },
     papeis.some((x) => ['admin', 'diretoria'].includes(x)) && { t: 'Financeiro · a pagar', i: 'financeiro', f: () => ir('financeiro') },
     podeFazer('programacao') ? { t: 'Programar produção', i: 'programacao', f: () => ir('programacao') }

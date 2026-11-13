@@ -33,6 +33,7 @@ const P = {
   setaBaixo: 'M6 9l6 6 6-6',
   financeiro: 'M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6',
   previsao: 'M3 3v18h18M7 15l4-4 3 3 6-6M14 8h6v6',
+  custos: 'M4 2h16v20H4zM8 6h8M8 10h2M14 10h2M8 14h2M14 14h2M8 18h2M14 18h2',
   painel: 'M3 3h7v9H3zM14 3h7v5h-7zM14 12h7v9h-7zM3 16h7v5H3z',
 };
 
