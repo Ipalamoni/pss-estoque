@@ -42,7 +42,7 @@ function SaidaReceita({ fichaInicial, aoConcluir }) {
   const m = n(mult) || 0;
   // programação de hoje desta receita (para a saída contar como baixa)
   const hoje = hojeISO();
-  const progsHoje = dados.programacoes.filter((p) => p.situacao === 'ativa' && p.data === hoje);
+  const progsHoje = dados.programacoes.filter((p) => p.situacao === 'ativa' && !p.finalizada_em && p.data === hoje);
   const feitas = useProducoes(hoje, hoje, progsHoje.map((p) => p.id)) || [];
   const feitoDe = (id) => feitas.filter((x) => x.programacao_id === id).reduce((s, x) => s + Number(x.multiplicador), 0);
   const prog = progsHoje.find((p) => p.ficha_id === fichaId && feitoDe(p.id) < Number(p.quantidade) - 0.0005) || null;

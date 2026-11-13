@@ -512,3 +512,11 @@ label.btn { cursor: pointer; }
   .abc { grid-template-columns: 1fr; }
 }
 @media print { .painel-grade { grid-template-columns: 1fr 1fr; } .painel { break-inside: avoid; } }
+
+/* ---------- ver como / versão nova ---------- */
+.faixa-vendo { background: #e8f1ff; color: #17355e; border-bottom: 1px solid #c4d8f5; padding: 6px 14px; font-size: .88rem; display: flex; align-items: center; gap: 6px 12px; flex-wrap: wrap; justify-content: center; }
+.faixa-versao { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 90; background: #fff; border: 1px solid var(--borda); border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(16,24,40,.18); padding: 8px 12px; display: flex; gap: 10px; align-items: center; font-size: .9rem; }
+.senha-temporaria { font-family: ui-monospace, Consolas, monospace; font-size: 1.3rem; letter-spacing: .08em; background: var(--fundo); border: 1px dashed var(--cor); border-radius: 8px; padding: 10px; text-align: center; user-select: all; }
+
+.mudo { color: var(--texto-2); font-size: .74rem; }

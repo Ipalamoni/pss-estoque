@@ -3,7 +3,7 @@
 // =====================================================================
 import { html, useState, useEffect, useMemo, useApp, Cabecalho, Cartao, Carregando, Etiqueta, Tabela, avisar } from '../ui.js';
 import { STATUS_ESTOQUE } from '../calc.js';
-import { CATEGORIAS, moeda, num, data, dataHora, hojeISO, somarDias, diasEntre, pl, qtdDupla, numeroPedido, mensagemErro, diaLocal } from '../util.js';
+import { CATEGORIAS, plural, moeda, num, data, dataHora, hojeISO, somarDias, diasEntre, pl, qtdDupla, numeroPedido, mensagemErro, diaLocal } from '../util.js';
 import { BarrasH, Colunas, BarraParte } from '../graficos.js';
 import { Exportar } from '../exportar.js';
 import { resumoPedido, PrazoEtiqueta } from './pedidos.js';
@@ -53,7 +53,7 @@ export function TelaPainel() {
     html`<button class=${'chip' + (per === id ? ' ativo' : '')} onClick=${() => setPer(id)}>${t}</button>`)}</span>`;
 
   return html`
-    <${Cabecalho} titulo="Painel gerencial" sub=${`Estoque, compras e consumo · atualizado em ${dataHora(dados.carregadoEm || new Date())}`}>
+    <${Cabecalho} titulo="Resumo (indicadores)" sub=${`Estoque, compras e consumo · atualizado em ${dataHora(dados.carregadoEm || new Date())}`}>
       ${cmp && html`<${Exportar} titulo="Painel gerencial de estoque e compras" filtros=${`Compras e consumo: ${P.rotulo} (${data(P.de)} a ${data(P.ate)})`}
         arquivo=${`painel-gerencial-${h}`} paisagem=${false} colunas=${[{ titulo: 'Indicador', valor: (l) => l[0], largura: 42 }, { titulo: 'Valor', valor: (l) => l[1], largura: 22 }, { titulo: 'Detalhe', valor: (l) => l[2] || '', largura: 40 }]}
         linhas=${resumoIndicadores(est, cmp, P)} abas=${() => abasExcel(est, cmp, P, dados)} />`}
@@ -68,6 +68,16 @@ export function TelaPainel() {
       <${Cartao} titulo="Críticos ou zerados" valor=${est.alerta.length} sub=${pl(est.comprar, 'item no ponto de pedido', 'itens no ponto de pedido')}
         cor=${est.alerta.length ? 'c-vermelho' : ''} aoClicar=${() => ir('estoque')} />
     </div>
+    <section class="painel"><h3>Quantidades em estoque (por grupo e classificação)</h3>
+      <${Tabela} linhas=${est.quant} chave="k" max=${12} colunas=${[
+        { chave: 'grupo', titulo: 'Grupo', render: (g) => html`<b>${g.grupo}</b>` },
+        { chave: 'classe', titulo: 'Classif.', render: (g) => (g.classe ? html`<${Etiqueta} cor="azul">${g.classe}</${Etiqueta}>` : '–') },
+        { chave: 'saldo', titulo: 'Quantidade', num: true, render: (g) => html`<b>${num(g.saldo, g.saldo < 100 ? 2 : 0)}</b> <small>${g.unidade}</small>` },
+        { chave: 'emb', titulo: 'Em embalagens', num: true, valor: (g) => g.embQtd || 0, render: (g) => g.embTxt || '–' },
+        { chave: 'valor', titulo: 'Valor', num: true, render: (g) => moeda(g.valor) },
+        { chave: 'marcas', titulo: 'Marcas / itens', valor: (g) => g.itens.length, render: (g) => html`<small>${g.itens.map((p) => p.marca || p.codigo).join(', ')}</small>` },
+      ]} />
+    </section>
     <div class="painel-grade">
       <section class="painel"><h3>Participação por categoria</h3>
         <${BarrasH} itens=${est.cats.map((c) => ({ rotulo: c.rotulo, valor: c.valor, texto: `${moeda(c.valor)} · ${pct(c.valor, est.total)}`, sub: pl(c.itens, 'item', 'itens') }))} formatar=${moeda} />
@@ -160,8 +170,21 @@ function calcEstoque(dados) {
   for (const p of comSaldo) { const k = p.grupo || CATEGORIAS[p.categoria]; const x = g.get(k) || { nome: k, valor: 0, itens: 0 }; x.valor += p.valor; x.itens += 1; g.set(k, x); }
   let grupos = [...g.values()].sort((a, b) => b.valor - a.valor);
   if (grupos.length > 8) { const resto = grupos.slice(7); grupos = [...grupos.slice(0, 7), { nome: `Outros (${resto.length} grupos)`, valor: resto.reduce((s, x) => s + x.valor, 0), itens: resto.reduce((s, x) => s + x.itens, 0) }]; }
+  // quantidade física por grupo + classificação (na unidade padrão; e em embalagens quando todas iguais)
+  const qm = new Map();
+  for (const p of comSaldo) {
+    const k = `${p.grupo || CATEGORIAS[p.categoria]}|${p.classificacao || ''}|${p.unidade_estoque}`;
+    const x = qm.get(k) || { k, grupo: p.grupo || CATEGORIAS[p.categoria], classe: p.classificacao || '', unidade: p.unidade_estoque, saldo: 0, valor: 0, itens: [] };
+    x.saldo += p.saldo; x.valor += p.valor; x.itens.push(p); qm.set(k, x);
+  }
+  const quant = [...qm.values()].sort((a, b) => b.valor - a.valor).map((g) => {
+    const embs = new Set(g.itens.map((p) => (p.unidade_compra ? `${p.unidade_compra}|${Number(p.fator_compra)}` : '')));
+    if (embs.size === 1 && !embs.has('')) { const [u, f] = [...embs][0].split('|'); const q = g.saldo / Number(f);
+      return { ...g, embQtd: q, embTxt: `${num(q, 1)} ${q > 0 && q < 2 ? u : plural(u, q)} de ${num(Number(f), 2)} ${g.unidade}` }; }
+    return { ...g, embTxt: embs.size > 1 ? 'embalagens diferentes' : '' };
+  });
   const alerta = lista.filter((p) => p.status === 'critico' || p.status === 'zerado').sort((a, b) => a.status_ordem - b.status_ordem || (a.cobertura ?? 0) - (b.cobertura ?? 0));
-  return { total, itens: comSaldo.length, cats: cats.filter((c) => c.itens > 0 || c.valor > 0), top: comAcum.slice(0, 10), grupos, abc: Object.values(abcMap), alerta,
+  return { quant, total, itens: comSaldo.length, cats: cats.filter((c) => c.itens > 0 || c.valor > 0), top: comAcum.slice(0, 10), grupos, abc: Object.values(abcMap), alerta,
     comprar: lista.filter((p) => p.status === 'comprar').length, lista: comAcum };
 }
 
@@ -259,6 +282,9 @@ function abasExcel(est, cmp, P, dados) {
   const r2 = (v) => Math.round(v * 100) / 100;
   return [
     { nome: 'Indicadores', linhas: resumoIndicadores(est, cmp, P), colunas: [{ titulo: 'Indicador', valor: (l) => l[0], largura: 40 }, { titulo: 'Valor', valor: (l) => l[1], largura: 20 }, { titulo: 'Detalhe', valor: (l) => l[2], largura: 50 }] },
+    { nome: 'Quantidades', linhas: est.quant, colunas: [{ titulo: 'Grupo', valor: (g) => g.grupo }, { titulo: 'Classificação', valor: (g) => g.classe },
+      { titulo: 'Quantidade', valor: (g) => r2(g.saldo) }, { titulo: 'Unid.', valor: (g) => g.unidade }, { titulo: 'Em embalagens', valor: (g) => g.embTxt },
+      { titulo: 'Valor', valor: (g) => r2(g.valor) }, { titulo: 'Marcas / itens', valor: (g) => g.itens.map((p) => `${p.codigo} ${p.marca || ''}`.trim()).join('; '), largura: 40 }] },
     { nome: 'Estoque por categoria', linhas: est.cats, colunas: [{ titulo: 'Categoria', valor: (c) => c.rotulo }, { titulo: 'Itens', valor: (c) => c.itens }, { titulo: 'Valor', valor: (c) => r2(c.valor) }, { titulo: '% do estoque', valor: (c) => (est.total ? r2((c.valor / est.total) * 100) : 0) }] },
     { nome: 'Curva ABC', linhas: est.lista, colunas: [{ titulo: 'Classe', valor: (p) => p.abc }, { titulo: 'Código', valor: (p) => p.codigo }, { titulo: 'Produto', valor: (p) => p.descricao, largura: 36 },
       { titulo: 'Categoria', valor: (p) => CATEGORIAS[p.categoria] }, { titulo: 'Grupo', valor: (p) => p.grupo }, { titulo: 'Saldo', valor: (p) => r2(p.saldo) }, { titulo: 'Unid.', valor: (p) => p.unidade_estoque },

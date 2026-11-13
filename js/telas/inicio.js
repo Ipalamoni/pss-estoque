@@ -4,6 +4,7 @@ import { STATUS_ESTOQUE } from '../calc.js';
 import { moeda, num, qtdDupla, numeroPedido, data, hojeISO, diasEntre, somarDias, pl, qu } from '../util.js';
 import { resumoPedido } from './pedidos.js';
 import { Icone } from '../icones.js';
+import { AvisoFinalizar } from './producao.js';
 
 export function TelaInicio() {
   const { usuario, dados, ir, podeFazer, papeis } = useApp();
@@ -23,6 +24,7 @@ export function TelaInicio() {
 
   const verProg = papeis.some((x) => ['admin', 'engenharia', 'pesagem', 'diretoria'].includes(x));
   const atalhos = [
+    papeis.some((x) => ['admin', 'diretoria', 'comprador', 'almoxarifado', 'engenharia'].includes(x)) && { t: 'Resumo (indicadores)', i: 'painel', f: () => ir('painel') },
     podeFazer('programacao') ? { t: 'Programar produção', i: 'programacao', f: () => ir('programacao') }
       : verProg && podeFazer('saida_receita') && { t: 'Programação de hoje', i: 'programacao', f: () => ir('programacao') },
     podeFazer('recebimento') && { t: 'Receber mercadoria', i: 'receber', f: () => ir('receber') },
@@ -35,6 +37,7 @@ export function TelaInicio() {
     { t: 'Posição de estoque', i: 'estoque', f: () => ir('estoque') },
   ].filter(Boolean);
   const progHoje = (dados.programacoes || []).filter((p) => p.situacao === 'ativa' && p.data === hoje);
+  const pendFinal = (dados.programacoes || []).filter((p) => p.situacao === 'ativa' && !p.finalizada_em && p.data < hoje);
 
   const atencao = ativos.filter((p) => ['zerado', 'critico', 'comprar'].includes(p.status))
     .sort((a, b) => a.status_ordem - b.status_ordem || (a.cobertura ?? 0) - (b.cobertura ?? 0));
@@ -43,6 +46,7 @@ export function TelaInicio() {
 
   return html`
     <${Cabecalho} titulo=${`${saudacao}, ${usuario.nome.split(' ')[0]}!`} sub="O que você precisa fazer agora?" />
+    ${podeFazer('programacao') && pendFinal.length > 0 && html`<${AvisoFinalizar} progs=${pendFinal} aoAbrir=${() => ir('programacao')} />`}
     <div class="atalhos">
       ${atalhos.map((a) => html`<button class="atalho" onClick=${a.f}><${Icone} nome=${a.i} tam=${26} /><span>${a.t}</span></button>`)}
     </div>

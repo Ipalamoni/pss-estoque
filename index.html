@@ -6,6 +6,8 @@
   <meta name="theme-color" content="#026e57" />
   <meta name="robots" content="noindex, nofollow" />
   <meta name="referrer" content="no-referrer" />
+  <!-- Segurança: só roda código deste site e só conversa com o Supabase -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'" />
   <title>Compras & Estoque · Pães São Sebastião</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" href="icons/icon-192.png" />
@@ -17,6 +19,7 @@
 <body>
   <div id="app"><div class="carregando"><span class="giro"></span>Carregando…</div></div>
   <noscript>Este sistema precisa de JavaScript ligado.</noscript>
+  <script src="versao.js"></script>
   <script src="config.js"></script>
   <script src="js/vendor/supabase.js"></script>
   <script src="js/vendor/jspdf.umd.min.js"></script>

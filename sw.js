@@ -1,7 +1,7 @@
 // Service worker: deixa o app instalável e abre rápido.
 // A CADA MUDANÇA DE TELA, AUMENTE O NÚMERO DA VERSÃO ABAIXO (ex.: v0.1.1).
-const VERSAO = 'estoque-pss-v0.5.0';
-const ARQUIVOS = ['./', 'index.html', 'config.js', 'manifest.json', 'css/app.css',
+const VERSAO = 'estoque-pss-v1.0.0';
+const ARQUIVOS = ['./', 'index.html', 'versao.js', 'config.js', 'manifest.json', 'css/app.css',
   'js/app.js', 'js/api.js', 'js/demo.js', 'js/calc.js', 'js/util.js', 'js/ui.js', 'js/export.js', 'js/icones.js', 'js/historico.js', 'js/importacao.js', 'js/exportar.js', 'js/modelo/planilha-modelo.js',
   'js/telas/inicio.js', 'js/telas/receber.js', 'js/telas/saidas.js', 'js/telas/inventario.js', 'js/telas/pedidos.js',
   'js/telas/estoque.js', 'js/telas/movimentos.js', 'js/telas/relatorios.js', 'js/telas/produtos.js', 'js/telas/fornecedores.js',

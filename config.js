@@ -9,5 +9,4 @@ window.CONFIG = {
   DOMINIO_LOGIN: 'estoque.pss',     // login "carlos" vira carlos@estoque.pss no Supabase
   SAIR_APOS_MINUTOS_SEM_USO: 480,   // sai sozinho após 8 h sem uso
   COR_PDF: [2, 110, 87],           // cor principal nos PDFs (R, G, B)
-  VERSAO: '0.5.0',
 };

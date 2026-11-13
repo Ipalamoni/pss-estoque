@@ -34,18 +34,32 @@ function criarApiSupabase() {
         await sb.auth.signOut();
         throw new Error('Usuário sem acesso liberado. Fale com o administrador.');
       }
+      p.trocar_senha = data.user.user_metadata?.trocar_senha === true;
       return p;
     },
     async sessaoAtual() {
       const { data } = await sb.auth.getSession();
       if (!data?.session) return null;
       const p = await perfilDe(data.session.user.id);
-      return p && p.ativo && (p.papeis || []).length ? p : null;
+      if (!p || !p.ativo || !(p.papeis || []).length) return null;
+      p.trocar_senha = data.session.user.user_metadata?.trocar_senha === true;
+      return p;
     },
     async sair() { await sb.auth.signOut(); },
     async trocarSenha(nova) {
-      const { error } = await sb.auth.updateUser({ password: nova });
+      const { error } = await sb.auth.updateUser({ password: nova, data: { trocar_senha: false } });
       falhou(error);
+    },
+    // Gerenciar usuários (só administrador): roda na função segura do servidor
+    async adminUsuarios(corpo) {
+      const { data, error } = await sb.functions.invoke('admin-usuarios', { body: corpo });
+      if (error) {
+        let msg = error.message;
+        try { const j = await error.context.json(); if (j?.erro) msg = j.erro; } catch { /* sem corpo */ }
+        throw new Error(msg);
+      }
+      if (data?.erro) throw new Error(data.erro);
+      return data;
     },
     // Lê uma tabela inteira (em blocos de 1000 linhas) com filtros simples
     async listar(tabela, o = {}) {

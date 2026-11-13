@@ -9,7 +9,7 @@
 import { calcularEstatisticas } from './calc.js';
 import { plural } from './util.js';
 
-const CHAVE = 'pss-estoque-demo-v4';
+const CHAVE = 'pss-estoque-demo-v5';
 let db = null;
 let usuario = null;      // user_id logado
 let relogio = null;      // usado só para gerar o histórico de exemplo
@@ -333,6 +333,7 @@ const RPC = {
     if (progId) {
       const pg = db.programacoes.find((x) => x.id === progId);
       if (!pg || pg.situacao !== 'ativa') erro('Programação não encontrada ou cancelada.');
+      if (pg.finalizada_em) erro('Esta programação já foi finalizada pela engenharia; lance como saída fora da programação.');
       if (!fichaId) fichaId = pg.ficha_id;
       if (fichaId !== pg.ficha_id) erro('A receita não confere com a programação.');
       if (!alterada && pg.itens_alterados) { alterada = true; itens = pg.itens_alterados; }
@@ -376,16 +377,31 @@ const RPC = {
       situacao: 'ativa', cancelado_motivo: null, criado_por: usuario, criado_em: agora().toISOString(), ...autoria() }, true).id;
     const reg = db.programacoes.find((x) => x.id === id) || erro('Programação não encontrada.');
     if (reg.situacao !== 'ativa') erro('Esta programação foi cancelada.');
+    if (reg.finalizada_em) erro('Esta programação já foi finalizada.');
     const feito = db.producoes.filter((x) => x.programacao_id === id).reduce((s, x) => s + Number(x.multiplicador), 0);
     if (feito > 0 && (p.data !== reg.data || fichaId !== reg.ficha_id)) erro('Já houve baixa nesta programação: o dia e a receita não podem mudar. Programe o restante em outro dia.');
     if (qtd < feito) erro(`Já foram feitas ${f3(feito)} receitas desta programação; a quantidade não pode ficar menor.`);
     atualizar('programacoes', reg, { data: p.data, ficha_id: fichaId, quantidade: qtd, itens_alterados: itens, observacao: txt(p.observacao), ...autoria() });
     return id;
   },
+  finalizar_programacao({ p_id, p_obs }) {
+    exigir('programacao');
+    const reg = db.programacoes.find((x) => x.id === Number(p_id) && x.situacao === 'ativa') || erro('Programação não encontrada ou cancelada.');
+    if (reg.finalizada_em) erro('Esta programação já foi finalizada.');
+    const feito = db.producoes.filter((x) => x.programacao_id === reg.id).reduce((s, x) => s + Number(x.multiplicador), 0);
+    if (feito < reg.quantidade - 0.0005 && !txt(p_obs)) erro(`Foram feitas ${f3(feito)} de ${f3(reg.quantidade)} receitas: explique a diferença na observação.`);
+    atualizar('programacoes', reg, { finalizada_em: agora().toISOString(), finalizada_por: usuario, finalizada_obs: txt(p_obs), ...autoria() });
+  },
+  registrar_acesso({ p_evento, p_detalhe, p_agente }) {
+    if (!usuario) erro('Sem sessão.');
+    if (!['entrada', 'saida', 'ver_como', 'senha_trocada'].includes(p_evento)) erro('Evento inválido.');
+    if (p_evento === 'ver_como' && !papeis().includes('admin')) erro('Só o administrador usa "ver como".');
+    inserir('acessos', { data_hora: agora().toISOString(), usuario_id: usuario, evento: p_evento, detalhe: txt(p_detalhe), agente: txt(p_agente) });
+  },
   cancelar_programacao({ p_id, p_motivo }) {
     exigir('programacao');
     if (!txt(p_motivo)) erro('Informe o motivo do cancelamento.');
-    const reg = db.programacoes.find((x) => x.id === Number(p_id) && x.situacao === 'ativa') || erro('Programação não encontrada ou já cancelada.');
+    const reg = db.programacoes.find((x) => x.id === Number(p_id) && x.situacao === 'ativa' && !x.finalizada_em) || erro('Programação não encontrada, já cancelada ou já finalizada.');
     atualizar('programacoes', reg, { situacao: 'cancelada', cancelado_motivo: String(p_motivo).trim(), ...autoria() });
   },
   registrar_saida({ p }) {
@@ -534,7 +550,8 @@ const RPC = {
 function semente() {
   db = { seq: {} };
   for (const t of ['perfis', 'parametros', 'fornecedores', 'produtos', 'fichas_tecnicas', 'fichas_historico', 'ficha_itens', 'pedidos', 'pedido_itens',
-    'recebimentos', 'programacoes', 'producoes', 'inventarios', 'inventario_itens', 'movimentos', 'auditoria']) db[t] = [];
+    'recebimentos', 'programacoes', 'producoes', 'inventarios', 'inventario_itens', 'movimentos', 'auditoria', 'acessos']) db[t] = [];
+  db.versao_banco = [{ versao: '1.0.0', descricao: 'Instalação inicial', aplicada_em: agora().toISOString() }];
 
   const P = [
     ['empresa_nome', 'Indústria e Comércio de Pães São Sebastião', 'Nome no cabeçalho do pedido de compra'],
@@ -553,10 +570,11 @@ function semente() {
   db.parametros = P.map(([chave, valor, descricao]) => ({ chave, valor, descricao }));
 
   const U = [
-    ['ithalo', 'Ithalo', 'Controladoria', 'admin'], ['comprador', 'Comprador', 'Comprador', 'comprador'],
+    ['ithalo', 'Ithalo', 'Controladoria', 'admin'], ['comprador', 'Ivan', 'Comprador', 'comprador'],
     ['carlos', 'Carlos', 'Responsável do almoxarifado', 'almoxarifado'], ['recebimento', 'Assistente', 'Assistente de almoxarifado', 'recebimento'],
-    ['pesagem', 'Resp. pesagem', 'Responsável da pesagem', 'pesagem'], ['auxpesagem', 'Aux. pesagem', 'Auxiliar de pesagem', 'pesagem'],
-    ['juliano', 'Juliano', 'Engenheiro de produção', 'engenharia'], ['diretoria', 'Diretoria', 'Diretor', 'diretoria'],
+    ['pesagem', 'Nayara', 'Responsável da pesagem', 'pesagem'], ['auxpesagem', 'Sheila', 'Auxiliar de pesagem', 'pesagem'],
+    ['juliano', 'Juliano', 'Engenheiro de produção', 'engenharia'], ['abner', 'Abner', 'Gerente de produção', 'engenharia'],
+    ['diretoria', 'Eduardo', 'Diretor', 'diretoria'], ['leonardo', 'Leonardo', 'Diretor', 'diretoria'],
   ];
   db.perfis = U.map(([u, nome, funcao, pap]) => ({ user_id: 'u-' + u, usuario: u, nome, funcao, papeis: [pap], ativo: true, criado_em: new Date().toISOString() }));
 
@@ -701,6 +719,10 @@ function semente() {
         if (q + extra > 0) prog[fid] = RPC.salvar_programacao({ p: { data: dataProd, ficha_id: fid, quantidade: q + extra } });
       });
     }) });
+    // a engenharia confere e finaliza no dia seguinte (ontem fica pendente, para mostrar o lembrete)
+    if (d >= -10 && d <= -2) agenda.push({ d: d + 1, h: 9, fn: () => como('juliano', d + 1, 9, () => Object.values(prog).forEach((id) => {
+      try { RPC.finalizar_programacao({ p_id: id, p_obs: 'Conferido com a pesagem' }); } catch { /* já finalizada */ }
+    })) });
     agenda.push({ d, h: 6, fn: () => {
       const u = rnd() > 0.5 ? 'pesagem' : 'auxpesagem';
       const pr = (fid, q, h) => como(u, d, h, () => RPC.registrar_producao({ p: { ficha_id: fid, multiplicador: q, programacao_id: prog[fid] || null } }));
@@ -786,6 +808,32 @@ export const apiDemo = {
   },
   async sair() { usuario = null; try { sessionStorage.removeItem(CHAVE + '-sessao'); } catch { /* ignora */ } },
   async trocarSenha() { throw new Error('No modo demonstração não há senha.'); },
+  // imita a função segura do servidor (admin-usuarios)
+  async adminUsuarios(p) {
+    garantir();
+    if (!papeis().includes('admin')) throw new Error('Só o administrador gerencia usuários.');
+    const senha = () => Array.from({ length: 12 }, () => 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 55)]).join('');
+    const reg = (evento, detalhe) => { db.acessos.push({ id: novoId('acessos'), data_hora: agora().toISOString(), usuario_id: usuario, evento, detalhe, agente: 'demo' }); };
+    let r;
+    if (p.acao === 'criar') {
+      const u = String(p.usuario || '').trim().toLowerCase();
+      if (!/^[a-z0-9][a-z0-9._-]{2,29}$/.test(u)) throw new Error('Usuário deve ter de 3 a 30 letras minúsculas, números, ponto, hífen ou sublinhado (sem espaço e sem acento).');
+      if (db.perfis.some((x) => x.usuario === u)) throw new Error(`Já existe o usuário "${u}".`);
+      if (!String(p.nome || '').trim()) throw new Error('Informe o nome.');
+      if (!(p.papeis || []).length) throw new Error('Marque pelo menos um papel.');
+      const id = 'demo-' + u;
+      db.perfis.push({ user_id: id, usuario: u, nome: String(p.nome).trim(), funcao: txt(p.funcao), papeis: [...p.papeis], ativo: true, criado_em: agora().toISOString() });
+      reg('usuario_criado', `${u} (${p.nome})`); r = { user_id: id, usuario: u, senha_temporaria: senha() };
+    } else {
+      const pf = db.perfis.find((x) => x.user_id === p.user_id) || erro('Usuário não encontrado.');
+      if (p.acao === 'redefinir_senha') { reg('senha_redefinida', pf.usuario); r = { senha_temporaria: senha() }; }
+      else if (p.acao === 'bloquear') {
+        if (pf.user_id === usuario && p.bloquear) throw new Error('Você não pode bloquear a si mesmo.');
+        atualizar('perfis', pf, { ativo: !p.bloquear }); reg(p.bloquear ? 'usuario_bloqueado' : 'usuario_desbloqueado', pf.usuario); r = { ok: true };
+      } else throw new Error('Ação desconhecida.');
+    }
+    persistir(); return clone(r);
+  },
   async listar(tabela, o = {}) {
     garantir();
     if (!perfil() && tabela !== 'perfis') return [];

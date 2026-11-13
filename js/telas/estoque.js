@@ -48,9 +48,10 @@ export function TelaEstoque() {
     completo && { chave: 'grupo', titulo: 'Grupo', render: (p) => p.grupo || '–', exp: (p) => p.grupo },
     { chave: 'classificacao', titulo: 'Classif.', render: (p) => (p.classificacao ? html`<${Etiqueta} cor="azul">${p.classificacao}</${Etiqueta}>` : '–'), exp: (p) => p.classificacao },
     completo && { chave: 'categoria', titulo: 'Categoria', render: (p) => CATEGORIAS[p.categoria], exp: (p) => CATEGORIAS[p.categoria] },
-    { chave: 'saldo', titulo: 'Saldo', num: true, render: (p) => html`${qtd(p.saldo)} <small>${plural(p.unidade_estoque, p.saldo)}</small>`, exp: (p) => p.saldo, txt: (p) => `${qu(p.saldo, p.unidade_estoque)}` },
-    completo && { chave: 'saldo_compra', titulo: 'Saldo (un. compra)', num: true, render: (p) => (p.unidade_compra ? html`${num(p.saldo_compra, 2)} <small>${plural(p.unidade_compra, p.saldo_compra)}</small>` : '–'),
-      exp: (p) => p.saldo_compra, txt: (p) => (p.unidade_compra ? `${qu(p.saldo_compra, p.unidade_compra, 2)}` : '') },
+    { chave: 'saldo', titulo: 'Saldo (unid. padrão)', num: true, render: (p) => html`${qtd(p.saldo)} <small>${plural(p.unidade_estoque, p.saldo)}</small>`, exp: (p) => p.saldo, txt: (p) => `${qu(p.saldo, p.unidade_estoque)}` },
+    { chave: 'saldo_compra', titulo: 'Saldo (embalagem do fornecedor)', num: true, render: (p) => (p.unidade_compra ? html`${num(p.saldo_compra, 2)} <small>${plural(p.unidade_compra, p.saldo_compra)}</small>
+        <br /><small class="mudo">1 ${p.unidade_compra} = ${qu(Number(p.fator_compra), p.unidade_estoque)}</small>` : '–'),
+      exp: (p) => (p.unidade_compra ? Math.round(p.saldo_compra * 100) / 100 : ''), txt: (p) => (p.unidade_compra ? `${qu(p.saldo_compra, p.unidade_compra, 2)} (1 = ${qu(Number(p.fator_compra), p.unidade_estoque)})` : '') },
     completo && { chave: 'custo_medio', titulo: 'Custo médio', num: true, render: (p) => moeda(p.custo_medio), exp: (p) => p.custo_medio, txt: (p) => moeda(p.custo_medio) },
     { chave: 'valor', titulo: 'Valor total', num: true, render: (p) => moeda(p.valor), exp: (p) => Math.round(p.valor * 100) / 100, txt: (p) => moeda(p.valor) },
     completo && { chave: 'media_dia', titulo: 'Consumo/dia', num: true, render: (p) => v(p.media_dia), exp: (p) => p.media_dia, txt: (p) => v(p.media_dia) },
@@ -70,7 +71,8 @@ export function TelaEstoque() {
   const abasExcel = () => [{ nome: 'Posição de estoque', linhas, colunas: [
     ['Código', (p) => p.codigo], ['Código ERP', (p) => p.codigo_erp], ['Descrição', (p) => p.descricao], ['Categoria', (p) => CATEGORIAS[p.categoria]], ['Grupo', (p) => p.grupo], ['Classificação', (p) => p.classificacao],
     ['Marca', (p) => p.marca], ['Unid. estoque', (p) => p.unidade_estoque],
-    ['Saldo', (p) => p.saldo], ['Unid. compra', (p) => p.unidade_compra], ['Saldo (un. compra)', (p) => p.saldo_compra], ['Custo médio', (p) => p.custo_medio],
+    ['Saldo (unid. padrão)', (p) => p.saldo], ['Embalagem do fornecedor', (p) => p.unidade_compra], ['Conteúdo da embalagem', (p) => (p.unidade_compra ? Number(p.fator_compra) : '')],
+    ['Saldo (embalagens)', (p) => (p.unidade_compra ? p.saldo_compra : '')], ['Custo médio', (p) => p.custo_medio],
     ['Valor total', (p) => Math.round(p.valor * 100) / 100], ['Consumo/dia', (p) => p.media_dia], ['Consumo/semana', (p) => p.media_semana], ['Consumo/mês', (p) => p.media_mes],
     ['Desvio padrão/dia', (p) => p.desvio_dia], ['Dias de histórico', (p) => p.dias_historico], ['Cobertura (dias)', (p) => p.cobertura], ['Prazo de entrega (dias)', (p) => p.prazo],
     ['Origem do prazo', (p) => p.fonte_prazo], ['Estoque de segurança', (p) => p.estoque_seguranca], ['Mín. definido', (p) => p.min_definido], ['Mín. calculado', (p) => p.min_calculado],
