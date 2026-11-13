@@ -520,3 +520,16 @@ label.btn { cursor: pointer; }
 .senha-temporaria { font-family: ui-monospace, Consolas, monospace; font-size: 1.3rem; letter-spacing: .08em; background: var(--fundo); border: 1px dashed var(--cor); border-radius: 8px; padding: 10px; text-align: center; user-select: all; }
 
 .mudo { color: var(--texto-2); font-size: .74rem; }
+
+/* ---- 1.1: financeiro e previsão de produção ---- */
+.linha-campo { display: flex; gap: 8px; align-items: center; }
+.linha-campo .entrada { flex: 1; min-width: 0; }
+.cartao.c-ativo { outline: 2px solid var(--cor); outline-offset: -2px; background: var(--cor-clara); }
+.txt-vermelho { color: var(--vermelho); }
+.tabela tr.linha-alerta td { background: #fff1f0; }
+.flag-fin { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-weight: 600; color: var(--laranja); white-space: nowrap; }
+.flag-fin.ok { color: var(--verde, #1e7b34); }
+.flag-fin input { width: 20px; height: 20px; accent-color: var(--cor); }
+.previsao-total { font-size: 1.05rem; }
+.previsao-resumo { margin-top: 14px; }
+.previsao-resumo h3 { margin: 0 0 6px; font-size: 1rem; }

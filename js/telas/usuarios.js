@@ -9,6 +9,8 @@ const ACOES = {
   saida_almox: 'Saída almoxarifado', inventario: 'Inventário', corrigir: 'Corrigir lançamentos de qualquer usuário', implantacao: 'Implantação de saldo',
   usuarios: 'Usuários, senhas, bloqueio e "ver como"', parametros: 'Configurações', auditoria: 'Ver auditoria (log)', importacao: 'Importar planilhas (cadastro em massa)',
   programacao: 'Programar e finalizar produção',
+  financeiro: 'Marcar pedido como lançado no contas a pagar', data_pagamento: 'Ajustar previsão de pagamento do pedido',
+  previsao_producao: 'Ver previsão de produção (receitas × rendimento)',
 };
 
 export function TelaUsuarios() {
@@ -39,7 +41,8 @@ export function TelaUsuarios() {
     <div class="tabela-rolagem"><table class="tabela matriz">
       <thead><tr><th>Ação</th>${Object.values(PAPEIS).map((p) => html`<th>${p}</th>`)}</tr></thead>
       <tbody>${Object.entries(ACOES).map(([k, t]) => html`<tr><td>${t}</td>${Object.keys(PAPEIS).map((p) => html`<td class="c">${PERMISSOES[k].includes(p) ? '✓' : ''}</td>`)}</tr>`)}
-        <tr><td>Consultar estoque, movimentações e receitas</td>${Object.keys(PAPEIS).map(() => html`<td class="c">✓</td>`)}</tr>
+        <tr><td>Consultar estoque, movimentações e receitas</td>${Object.keys(PAPEIS).map((p) => html`<td class="c">${['financeiro', 'faturamento'].includes(p) ? '' : '✓'}</td>`)}</tr>
+        <tr><td>Consultar pedidos de compra e situação da entrega</td>${Object.keys(PAPEIS).map((p) => html`<td class="c">${p === 'faturamento' ? '' : '✓'}</td>`)}</tr>
         <tr><td>Dar ciência de divergência / recebimento sem pedido</td>${Object.keys(PAPEIS).map((p) => html`<td class="c">${PERMISSOES.pedido.includes(p) ? '✓' : ''}</td>`)}</tr>
         <tr><td>Alterar a receita só para a produção do dia</td>${Object.keys(PAPEIS).map((p) => html`<td class="c">${PERMISSOES.saida_receita.includes(p) ? '✓' : ''}</td>`)}</tr>
         <tr><td>Corrigir os próprios lançamentos do dia</td>${Object.keys(PAPEIS).map((p) => html`<td class="c">${['admin', 'almoxarifado', 'recebimento', 'pesagem'].includes(p) ? '✓' : ''}</td>`)}</tr>

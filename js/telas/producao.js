@@ -8,6 +8,7 @@ import { qtd, num, moeda, data, dataHora, hojeISO, somarDias, fator, qu, pl, nom
 import { Exportar } from '../exportar.js';
 import { UltimaAlteracao, HistoricoAuditoria } from '../historico.js';
 import { Icone } from '../icones.js';
+import { ResumoPrevisao } from './previsao.js';
 
 const inicioDia = (iso) => new Date(iso + 'T00:00:00').toISOString();
 const virg = (v) => String(Math.round(Number(v) * 10000) / 10000).replace('.', ',');
@@ -82,7 +83,8 @@ export function TelaProgramacao() {
     <${Cabecalho} titulo="Programação de produção"
       sub=${engenharia ? 'Programe quantas receitas fazer em cada dia; a pesagem dá baixa conforme pesa.' : 'O que a engenharia programou para produzir. Dê baixa a cada receita pesada.'} />
     <${Abas} abas=${[{ id: 'dia', titulo: 'Programação do dia' }, { id: 'periodo', titulo: 'Programado × produzido (período)' }]} ativa=${aba} aoMudar=${setAba} />
-    ${aba === 'dia' ? html`<${ProgramacaoDia} dia=${dia} setDia=${setDia} engenharia=${engenharia} pesagem=${pesagem} />`
+    ${aba === 'dia' ? html`<${ProgramacaoDia} dia=${dia} setDia=${setDia} engenharia=${engenharia} pesagem=${pesagem} />
+      ${podeFazer('previsao_producao') && html`<${ResumoPrevisao} dia=${dia} />`}`
       : html`<${ProgramacaoPeriodo} aoAbrirDia=${(d) => { setDia(d); setAba('dia'); }} />`}`;
 }
 

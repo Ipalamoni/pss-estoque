@@ -1,12 +1,54 @@
 // Tela inicial: atalhos por perfil, indicadores e alertas
 import { html, useApp, Cartao, Tabela, Etiqueta, Cabecalho } from '../ui.js';
 import { STATUS_ESTOQUE } from '../calc.js';
-import { moeda, num, qtdDupla, numeroPedido, data, hojeISO, diasEntre, somarDias, pl, qu } from '../util.js';
+import { moeda, num, qtdDupla, numeroPedido, data, hojeISO, diasEntre, somarDias, pl, qu, acessoAmplo, pode } from '../util.js';
+import { linhasFinanceiro } from './financeiro.js';
+import { ResumoPrevisao } from './previsao.js';
 import { resumoPedido } from './pedidos.js';
 import { Icone } from '../icones.js';
 import { AvisoFinalizar } from './producao.js';
 
 export function TelaInicio() {
+  const { papeis } = useApp();
+  return acessoAmplo(papeis) ? html`<${InicioOperacao} />` : html`<${InicioRestrito} />`;
+}
+
+// Financeiro e faturamento: só pedidos a pagar e previsão de produção
+function InicioRestrito() {
+  const { usuario, dados, ir, podeFazer, papeis } = useApp();
+  const h = new Date().getHours();
+  const saudacao = h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite';
+  const hoje = hojeISO();
+  const fin = papeis.includes('financeiro');
+  const l = fin ? linhasFinanceiro(dados) : [];
+  const soma = (x) => moeda(x.reduce((s, p) => s + p.r.valor, 0));
+  const grupo = {
+    hoje: l.filter((p) => p.criadoDia === hoje),
+    pendentes: l.filter((p) => !p.fin_lancado && p.status !== 'cancelado'),
+    vence_hoje: l.filter((p) => p.diasPgto === 0 && p.status !== 'cancelado'),
+    vence_7: l.filter((p) => p.diasPgto !== null && p.diasPgto >= 0 && p.diasPgto <= 7 && p.status !== 'cancelado'),
+    alerta: l.filter((p) => p.alertaEntrega),
+  };
+  return html`
+    <${Cabecalho} titulo=${`${saudacao}, ${usuario.nome.split(' ')[0]}!`} sub=${fin ? 'Pedidos a pagar e previsão de produção' : 'Previsão de produção'} />
+    <div class="atalhos">
+      ${fin && html`<button class="atalho" onClick=${() => ir('financeiro')}><${Icone} nome="financeiro" tam=${26} /><span>Pedidos a pagar</span></button>`}
+      ${pode(papeis, 'previsao_producao') && html`<button class="atalho" onClick=${() => ir('previsao')}><${Icone} nome="previsao" tam=${26} /><span>Previsão de produção</span></button>`}
+    </div>
+    ${fin && html`<div class="cartoes">
+      <${Cartao} titulo="Pedidos feitos hoje" valor=${grupo.hoje.length} sub=${soma(grupo.hoje)} aoClicar=${() => ir('financeiro', { rapido: 'hoje' })} />
+      <${Cartao} titulo="Pendentes de lançar" valor=${grupo.pendentes.length} sub=${soma(grupo.pendentes)} cor=${grupo.pendentes.length ? 'c-laranja' : ''} aoClicar=${() => ir('financeiro', { rapido: 'pendentes' })} />
+      <${Cartao} titulo="Vencem hoje" valor=${grupo.vence_hoje.length} sub=${soma(grupo.vence_hoje)} cor=${grupo.vence_hoje.length ? 'c-laranja' : ''} aoClicar=${() => ir('financeiro', { rapido: 'vence_hoje' })} />
+      <${Cartao} titulo="Vencem em 7 dias" valor=${grupo.vence_7.length} sub=${soma(grupo.vence_7)} aoClicar=${() => ir('financeiro', { rapido: 'vence_7' })} />
+      ${grupo.alerta.length > 0 && html`<${Cartao} titulo="Vencendo sem a mercadoria" valor=${grupo.alerta.length} sub="fale com o comprador" cor="c-vermelho" aoClicar=${() => ir('financeiro', { rapido: 'alerta' })} />`}
+    </div>`}
+    ${pode(papeis, 'previsao_producao') && html`<div class="duas-colunas">
+      <${ResumoPrevisao} dia=${hoje} aoAbrir=${() => ir('previsao')} />
+      <${ResumoPrevisao} dia=${somarDias(hoje, 1)} aoAbrir=${() => ir('previsao')} />
+    </div>`}`;
+}
+
+function InicioOperacao() {
   const { usuario, dados, ir, podeFazer, papeis } = useApp();
   const { ind, pedidos, pedidoItens, mapa } = dados;
   const hoje = hojeISO();
@@ -25,6 +67,8 @@ export function TelaInicio() {
   const verProg = papeis.some((x) => ['admin', 'engenharia', 'pesagem', 'diretoria'].includes(x));
   const atalhos = [
     papeis.some((x) => ['admin', 'diretoria', 'comprador', 'almoxarifado', 'engenharia'].includes(x)) && { t: 'Resumo (indicadores)', i: 'painel', f: () => ir('painel') },
+    podeFazer('previsao_producao') && { t: 'Previsão de produção', i: 'previsao', f: () => ir('previsao') },
+    papeis.some((x) => ['admin', 'diretoria'].includes(x)) && { t: 'Financeiro · a pagar', i: 'financeiro', f: () => ir('financeiro') },
     podeFazer('programacao') ? { t: 'Programar produção', i: 'programacao', f: () => ir('programacao') }
       : verProg && podeFazer('saida_receita') && { t: 'Programação de hoje', i: 'programacao', f: () => ir('programacao') },
     podeFazer('recebimento') && { t: 'Receber mercadoria', i: 'receber', f: () => ir('receber') },
@@ -64,6 +108,7 @@ export function TelaInicio() {
         sub=${divPend.length ? 'aguardando ciência do comprador' : 'nenhuma pendente'} aoClicar=${() => ir('pedidos', { pendencias: true })} />`}
     </div>
 
+    ${podeFazer('previsao_producao') && html`<${ResumoPrevisao} dia=${hoje} aoAbrir=${() => ir('previsao')} />`}
     <div class="duas-colunas">
       <section class="painel">
         <h2>Itens que pedem atenção</h2>

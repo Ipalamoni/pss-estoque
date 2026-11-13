@@ -9,7 +9,7 @@
 import { calcularEstatisticas } from './calc.js';
 import { plural } from './util.js';
 
-const CHAVE = 'pss-estoque-demo-v5';
+const CHAVE = 'pss-estoque-demo-v6';
 let db = null;
 let usuario = null;      // user_id logado
 let relogio = null;      // usado só para gerar o histórico de exemplo
@@ -34,7 +34,18 @@ const PERM = {
   saida_avulsa: ['admin', 'pesagem', 'almoxarifado'], saida_almox: ['admin', 'almoxarifado', 'recebimento'],
   inventario: ['admin', 'almoxarifado', 'recebimento'], corrigir: ['admin', 'almoxarifado'], implantacao: ['admin'],
   usuarios: ['admin'], parametros: ['admin'], auditoria: ['admin', 'diretoria'], importacao: ['admin'], programacao: ['admin', 'engenharia'],
+  financeiro: ['admin', 'financeiro'], data_pagamento: ['admin', 'comprador', 'financeiro'],
+  previsao_producao: ['admin', 'engenharia', 'diretoria', 'financeiro', 'faturamento'],
 };
+// mesma regra de leitura do banco (02_seguranca.sql): financeiro e faturamento só leem o que precisam
+const AMPLOS = ['admin', 'comprador', 'almoxarifado', 'recebimento', 'pesagem', 'engenharia', 'diretoria'];
+const LEITURA_FIN = ['pedidos', 'pedido_itens', 'recebimentos', 'fornecedores', 'produtos'];
+function podeLer(t) {
+  if (t === 'perfis' || t === 'parametros' || t === 'versao_banco') return true;
+  if (t === 'acessos') return papeis().includes('admin');
+  if (papeis().some((x) => AMPLOS.includes(x))) return true;
+  return papeis().includes('financeiro') && LEITURA_FIN.includes(t);
+}
 const temPapel = (p) => p && p.ativo && (p.papeis || []).length > 0;
 const perfil = () => db.perfis.find((p) => p.user_id === usuario && temPapel(p));
 const papeis = () => perfil()?.papeis || [];
@@ -165,8 +176,14 @@ const RPC = {
       const id = Number(it.produto_id);
       novos.set(id, r4((novos.get(id) || 0) + Number(it.quantidade) * fator(id, it.unidade)));
     }
+    let rq = numOuNull(p.rendimento_qtd), ru = txt(p.rendimento_unidade);
+    if (rq === null && txt(p.rendimento)) {   // lê do texto: "180 pacotes", "1.000 unidades"
+      const m = txt(p.rendimento).match(/^\s*([0-9][0-9.]*(,[0-9]+)?)\s*(.*)$/);
+      if (m && m[3]) { rq = Number(m[1].replace(/\./g, '').replace(',', '.')); ru = ru || m[3].trim(); }
+    }
+    if (rq !== null && !(rq > 0)) erro('O rendimento precisa ser maior que zero.');
     const dados = { nome: String(p.nome).trim(), produto_final: txt(p.produto_final), rendimento: txt(p.rendimento),
-      observacao: txt(p.observacao), ativo: p.ativo !== false };
+      rendimento_qtd: rq, rendimento_unidade: rq === null ? null : ru, observacao: txt(p.observacao), ativo: p.ativo !== false };
     let id = numOuNull(p.id); const desc = [];
     if (txt(p.codigo) && db.fichas_tecnicas.some((f) => f.codigo.toLowerCase() === txt(p.codigo).toLowerCase() && f.id !== id))
       erro(`Já existe uma ficha técnica com o código ${p.codigo}.`);
@@ -181,6 +198,8 @@ const RPC = {
       if (reg.nome !== dados.nome) desc.push(`nome: "${reg.nome}" → "${dados.nome}"`);
       if ((reg.produto_final || null) !== dados.produto_final) desc.push(`produto final: "${reg.produto_final || ''}" → "${dados.produto_final || ''}"`);
       if ((reg.rendimento || null) !== dados.rendimento) desc.push(`rendimento: "${reg.rendimento || ''}" → "${dados.rendimento || ''}"`);
+      if ((reg.rendimento_qtd ?? null) !== dados.rendimento_qtd || (reg.rendimento_unidade || null) !== dados.rendimento_unidade)
+        desc.push(`rendimento por receita: ${reg.rendimento_qtd ?? '–'} ${reg.rendimento_unidade || ''} → ${dados.rendimento_qtd ?? '–'} ${dados.rendimento_unidade || ''}`);
       if ((reg.observacao || null) !== dados.observacao) desc.push('alterou a observação');
       if (reg.ativo !== dados.ativo) desc.push(dados.ativo ? 'reativou a ficha' : 'desativou a ficha');
       atualizar('fichas_tecnicas', reg, { ...dados, ...autoria() });
@@ -211,10 +230,13 @@ const RPC = {
     if (!p.data_pedido) erro('Informe a data do pedido.');
     if (!(p.itens || []).length) erro('O pedido precisa de pelo menos 1 item.');
     if (p.previsao_entrega && p.previsao_entrega < p.data_pedido) erro('A previsão de entrega não pode ser antes da data do pedido.');
-    const cab = { fornecedor_id: Number(p.fornecedor_id), data_pedido: p.data_pedido, previsao_entrega: p.previsao_entrega || null,
+    if (!p.previsao_pagamento) erro('Informe a previsão de pagamento.');
+    if (p.previsao_pagamento < p.data_pedido) erro('A previsão de pagamento não pode ser antes da data do pedido.');
+    const cab = { fornecedor_id: Number(p.fornecedor_id), data_pedido: p.data_pedido, previsao_entrega: p.previsao_entrega || null, previsao_pagamento: p.previsao_pagamento,
       condicao_pagamento: txt(p.condicao_pagamento), observacao: txt(p.observacao) };
     let id = numOuNull(p.id);
-    if (!id) id = inserir('pedidos', { ...cab, status: 'aberto', motivo_cancelamento: null, comprador_id: usuario, criado_em: agora().toISOString() }, true).id;
+    if (!id) id = inserir('pedidos', { ...cab, status: 'aberto', motivo_cancelamento: null, comprador_id: usuario, criado_em: agora().toISOString(),
+      fin_lancado: false, fin_lancado_em: null, fin_lancado_por: null, fin_obs: null }, true).id;
     else {
       const pe = db.pedidos.find((x) => x.id === id) || erro('Pedido não encontrado.');
       if (!['aberto', 'parcial'].includes(pe.status)) erro(`Pedido ${id} está ${pe.status} e não pode ser alterado.`);
@@ -392,6 +414,43 @@ const RPC = {
     if (feito < reg.quantidade - 0.0005 && !txt(p_obs)) erro(`Foram feitas ${f3(feito)} de ${f3(reg.quantidade)} receitas: explique a diferença na observação.`);
     atualizar('programacoes', reg, { finalizada_em: agora().toISOString(), finalizada_por: usuario, finalizada_obs: txt(p_obs), ...autoria() });
   },
+  financeiro_marcar({ p_pedido, p_lancado, p_obs }) {
+    exigir('financeiro');
+    const pe = db.pedidos.find((x) => x.id === Number(p_pedido)) || erro('Pedido não encontrado.');
+    const quando = agora();
+    const obs = txt(p_obs) ? [pe.fin_obs, `${String(quando.getDate()).padStart(2, '0')}/${String(quando.getMonth() + 1).padStart(2, '0')} ${txt(p_obs)}`].filter(Boolean).join(' | ') : pe.fin_obs;
+    atualizar('pedidos', pe, p_lancado ? { fin_lancado: true, fin_lancado_em: quando.toISOString(), fin_lancado_por: usuario, fin_obs: obs }
+      : { fin_lancado: false, fin_lancado_em: null, fin_lancado_por: null, fin_obs: obs });
+  },
+  ajustar_previsao_pagamento({ p_pedido, p_data, p_motivo }) {
+    exigir('data_pagamento');
+    const pe = db.pedidos.find((x) => x.id === Number(p_pedido)) || erro('Pedido não encontrado.');
+    if (pe.status === 'cancelado') erro('Pedido cancelado.');
+    if (!p_data) erro('Informe a nova data.');
+    if (!txt(p_motivo)) erro('Informe o motivo da mudança.');
+    if (p_data < pe.data_pedido) erro('A previsão de pagamento não pode ser antes da data do pedido.');
+    if (p_data === pe.previsao_pagamento) return;
+    const q = agora(), dd = (n) => String(n).padStart(2, '0'), br = (d) => (d ? d.split('-').reverse().join('/') : '–');
+    const linha = `${dd(q.getDate())}/${dd(q.getMonth() + 1)} ${dd(q.getHours())}:${dd(q.getMinutes())} data ${br(pe.previsao_pagamento)} → ${br(p_data)}: ${txt(p_motivo)}`;
+    atualizar('pedidos', pe, { previsao_pagamento: p_data, fin_obs: [pe.fin_obs, linha].filter(Boolean).join(' | '), ...autoria() });
+  },
+  previsao_producao({ p_de, p_ate }) {
+    exigir('previsao_producao');
+    if (!p_de || !p_ate || p_ate < p_de) erro('Período inválido.');
+    const m = new Map();
+    for (const pg of db.programacoes.filter((x) => x.situacao === 'ativa' && x.data >= p_de && x.data <= p_ate)) {
+      const f = db.fichas_tecnicas.find((x) => x.id === pg.ficha_id);
+      const k = `${pg.data}|${f.id}`;
+      const a = m.get(k) || { data: pg.data, ficha_id: f.id, codigo: f.codigo, nome: f.nome, produto_final: f.produto_final, receitas: 0, receitas_pesadas: 0,
+        rendimento_qtd: f.rendimento_qtd ?? null, rendimento_unidade: f.rendimento_unidade || null, previsto: null, finalizada: true };
+      a.receitas = r4(a.receitas + Number(pg.quantidade));
+      a.receitas_pesadas = r4(a.receitas_pesadas + db.producoes.filter((x) => x.programacao_id === pg.id).reduce((s, x) => s + Number(x.multiplicador), 0));
+      a.finalizada = a.finalizada && !!pg.finalizada_em;
+      m.set(k, a);
+    }
+    return [...m.values()].map((a) => ({ ...a, previsto: a.rendimento_qtd === null ? null : r4(a.receitas * a.rendimento_qtd) }))
+      .sort((a, b) => a.data.localeCompare(b.data) || a.nome.localeCompare(b.nome));
+  },
   registrar_acesso({ p_evento, p_detalhe, p_agente }) {
     if (!usuario) erro('Sem sessão.');
     if (!['entrada', 'saida', 'ver_como', 'senha_trocada'].includes(p_evento)) erro('Evento inválido.');
@@ -532,6 +591,7 @@ const RPC = {
   },
   estatisticas_estoque({ p_janela }) {
     if (!perfil()) erro('Usuário inativo.');
+    if (!papeis().some((x) => AMPLOS.includes(x))) return [];
     return calcularEstatisticas({ produtos: db.produtos, movimentos: db.movimentos, pedidos: db.pedidos,
       pedidoItens: db.pedido_itens, janela: Number(p_janela || 90), hoje: hoje() });
   },
@@ -551,7 +611,8 @@ function semente() {
   db = { seq: {} };
   for (const t of ['perfis', 'parametros', 'fornecedores', 'produtos', 'fichas_tecnicas', 'fichas_historico', 'ficha_itens', 'pedidos', 'pedido_itens',
     'recebimentos', 'programacoes', 'producoes', 'inventarios', 'inventario_itens', 'movimentos', 'auditoria', 'acessos']) db[t] = [];
-  db.versao_banco = [{ versao: '1.0.0', descricao: 'Instalação inicial', aplicada_em: agora().toISOString() }];
+  db.versao_banco = [{ versao: '1.0.0', descricao: 'Instalação inicial', aplicada_em: agora().toISOString() },
+    { versao: '1.1.0', descricao: 'Financeiro, previsão de produção e perfil faturamento', aplicada_em: agora().toISOString() }];
 
   const P = [
     ['empresa_nome', 'Indústria e Comércio de Pães São Sebastião', 'Nome no cabeçalho do pedido de compra'],
@@ -575,6 +636,7 @@ function semente() {
     ['pesagem', 'Nayara', 'Responsável da pesagem', 'pesagem'], ['auxpesagem', 'Sheila', 'Auxiliar de pesagem', 'pesagem'],
     ['juliano', 'Juliano', 'Engenheiro de produção', 'engenharia'], ['abner', 'Abner', 'Gerente de produção', 'engenharia'],
     ['diretoria', 'Eduardo', 'Diretor', 'diretoria'], ['leonardo', 'Leonardo', 'Diretor', 'diretoria'],
+    ['financeiro', 'Financeiro', 'Contas a pagar', 'financeiro'], ['faturamento', 'Faturamento', 'Faturamento', 'faturamento'],
   ];
   db.perfis = U.map(([u, nome, funcao, pap]) => ({ user_id: 'u-' + u, usuario: u, nome, funcao, papeis: [pap], ativo: true, criado_em: new Date().toISOString() }));
 
@@ -682,7 +744,7 @@ function semente() {
   for (const pd of pedidos) {
     agenda.push({ d: pd.d, h: 10, fn: () => como('comprador', pd.d, 10, () => {
       pd.id = RPC.salvar_pedido({ p: { fornecedor_id: pd.forn, data_pedido: hoje(), previsao_entrega: iso(new Date(dia(pd.d + pd.prev))),
-        condicao_pagamento: '28 dias', itens: pd.itens.map(([produto_id, quantidade, unidade, preco_unitario]) => ({ produto_id, quantidade, unidade, preco_unitario })) } });
+        condicao_pagamento: '28 dias', previsao_pagamento: iso(new Date(dia(pd.d + pd.prev + 28))), itens: pd.itens.map(([produto_id, quantidade, unidade, preco_unitario]) => ({ produto_id, quantidade, unidade, preco_unitario })) } });
     }) });
     for (const [de, frac, div] of pd.ent) {
       agenda.push({ d: de, h: 8, fn: () => como(div?.quem || 'recebimento', de, 8, () => {
@@ -768,6 +830,16 @@ function semente() {
     RPC.salvar_programacao({ p: { data: h1, ficha_id: FT.frances, quantidade: 4 } });
     RPC.salvar_programacao({ p: { data: h1, ficha_id: FT.integral, quantidade: 1 } });
     agenda.push({ d: 0, h: 6, fn: () => como('pesagem', 0, 6, () => RPC.registrar_producao({ p: { programacao_id: a, multiplicador: 2 } })) });
+    const h2 = iso(new Date(dia(2)));
+    RPC.salvar_programacao({ p: { data: h2, ficha_id: FT.forma, quantidade: 6 } });
+    RPC.salvar_programacao({ p: { data: h2, ficha_id: FT.bisna, quantidade: 3 } });
+  }) });
+  // financeiro: lança no contas a pagar os pedidos com mais de 2 dias; um vence hoje sem a mercadoria
+  agenda.push({ d: 0, h: 8, fn: () => como('financeiro', 0, 8, () => {
+    const h = iso(new Date(dia(0)));
+    db.pedidos.filter((p) => p.data_pedido <= iso(new Date(dia(-2))) && p.status !== 'cancelado').forEach((p) => RPC.financeiro_marcar({ p_pedido: p.id, p_lancado: true, p_obs: null }));
+    const aberto = db.pedidos.filter((p) => ['aberto', 'parcial'].includes(p.status) && p.data_pedido < h).sort((a, b) => a.id - b.id)[0];
+    if (aberto) RPC.ajustar_previsao_pagamento({ p_pedido: aberto.id, p_data: h, p_motivo: 'Boleto antecipado pelo fornecedor' });
   }) });
 
   while (agenda.length) {
@@ -837,6 +909,7 @@ export const apiDemo = {
   async listar(tabela, o = {}) {
     garantir();
     if (!perfil() && tabela !== 'perfis') return [];
+    if (!podeLer(tabela)) return [];
     let l = db[tabela] || [];
     const campo = o.campoData || 'data_hora';
     if (o.desde) l = l.filter((x) => String(x[campo]) >= o.desde);

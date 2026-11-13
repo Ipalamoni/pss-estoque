@@ -23,13 +23,17 @@ import { TelaConfiguracoes } from './telas/configuracoes.js';
 import { TelaAuditoria } from './telas/auditoria.js';
 import { TelaProgramacao, TelaSaidasProducao } from './telas/producao.js';
 import { TelaPainel } from './telas/painel.js';
+import { TelaFinanceiro } from './telas/financeiro.js';
+import { TelaPrevisao } from './telas/previsao.js';
 
 const CFG = window.CONFIG || {};
-const TODOS = Object.keys(PAPEIS);
+const TODOS = Object.keys(PAPEIS).filter((p) => !['financeiro', 'faturamento'].includes(p));   // financeiro: só pedidos/pagamentos e previsão; faturamento: só previsão
 
 // Menu: quem vê cada tela (as gravações são conferidas de novo no banco)
 const MENU = [
-  { id: 'inicio', titulo: 'Início', papeis: TODOS, tela: TelaInicio },
+  { id: 'inicio', titulo: 'Início', papeis: [...TODOS, 'financeiro', 'faturamento'], tela: TelaInicio },
+  { id: 'financeiro', titulo: 'Financeiro · pedidos a pagar', papeis: ['admin', 'financeiro', 'diretoria'], tela: TelaFinanceiro },
+  { id: 'previsao', titulo: 'Previsão de produção', papeis: ['admin', 'engenharia', 'diretoria', 'financeiro', 'faturamento'], tela: TelaPrevisao },
   { id: 'painel', titulo: 'Resumo (indicadores)', papeis: ['admin', 'diretoria', 'comprador', 'almoxarifado', 'engenharia'], tela: TelaPainel },
   { grupo: 'Operação' },
   { id: 'receber', titulo: 'Receber mercadoria', papeis: ['admin', 'almoxarifado', 'recebimento'], tela: TelaReceber },

@@ -10,6 +10,8 @@ export const PAPEIS = {
   pesagem: 'Pesagem',
   engenharia: 'Engenharia de produção',
   diretoria: 'Diretoria (consulta)',
+  financeiro: 'Financeiro (pedidos e pagamentos)',
+  faturamento: 'Faturamento (previsão de produção)',
 };
 
 export const CATEGORIAS = {
@@ -71,7 +73,13 @@ export const PERMISSOES = {
   auditoria: ['admin', 'diretoria'],
   importacao: ['admin'],
   programacao: ['admin', 'engenharia'],
+  financeiro: ['admin', 'financeiro'],
+  data_pagamento: ['admin', 'comprador', 'financeiro'],
+  previsao_producao: ['admin', 'engenharia', 'diretoria', 'financeiro', 'faturamento'],
 };
+// Papéis que NÃO enxergam estoque/produção (o banco também bloqueia a leitura)
+export const PAPEIS_RESTRITOS = ['financeiro', 'faturamento'];
+export const acessoAmplo = (papeis) => (papeis || []).some((x) => !PAPEIS_RESTRITOS.includes(x));
 // papeis = lista de papéis da pessoa (uma pessoa pode ter mais de um)
 export const pode = (papeis, acao) => (PERMISSOES[acao] || []).some((x) => (papeis || []).includes(x));
 export const temAlgum = (papeis, lista) => (papeis || []).some((x) => lista.includes(x));

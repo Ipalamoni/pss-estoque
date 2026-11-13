@@ -31,6 +31,8 @@ const P = {
   programacao: 'M8 2v4M16 2v4M3 9h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM8 14l2 2 4-4',
   'saidas-producao': 'M3 21h18M5 21V10l5 3V10l5 3V7l4 2v12M9 17h.01M14 17h.01',
   setaBaixo: 'M6 9l6 6 6-6',
+  financeiro: 'M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6',
+  previsao: 'M3 3v18h18M7 15l4-4 3 3 6-6M14 8h6v6',
   painel: 'M3 3h7v9H3zM14 3h7v5h-7zM14 12h7v9h-7zM3 16h7v5H3z',
 };
 

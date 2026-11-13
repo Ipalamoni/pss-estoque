@@ -1,5 +1,5 @@
 // Cadastro de fichas técnicas (receitas)
-import { html, useState, useMemo, useEffect, useApp, Tabela, Modal, Campo, Escolher, QtdUnidade, Busca, Etiqueta, Cabecalho, Carregando, useAcao, confirmar, n } from '../ui.js';
+import { html, useState, useMemo, useEffect, useApp, Tabela, Modal, Campo, Escolher, QtdUnidade, Busca, Etiqueta, Cabecalho, Carregando, useAcao, confirmar, avisar, n } from '../ui.js';
 import { contem, qtd, moeda, fator, dataHora, nomeUsuario, pl, hojeISO } from '../util.js';
 import { Exportar } from '../exportar.js';
 import { UltimaAlteracao } from '../historico.js';
@@ -22,7 +22,8 @@ export function TelaFichas() {
     <${Cabecalho} titulo="Fichas técnicas" sub="Receitas usadas na saída da pesagem (quantidades por 1 receita)">
       <${Exportar} titulo="Fichas técnicas" filtros=${pl(linhas.length, 'receita', 'receitas')} arquivo=${`fichas-tecnicas-${hojeISO()}`} linhas=${linhas.flatMap((f) => itensDe(f.id).map((it, i) => ({ f, it, i })))}
         colunas=${[{ titulo: 'Código', valor: (x) => (x.i === 0 ? x.f.codigo : '') }, { titulo: 'Receita', valor: (x) => (x.i === 0 ? x.f.nome : ''), largura: 28 },
-          { titulo: 'Produto final', valor: (x) => (x.i === 0 ? x.f.produto_final : '') }, { titulo: 'Rendimento', valor: (x) => (x.i === 0 ? x.f.rendimento : '') },
+          { titulo: 'Produto final', valor: (x) => (x.i === 0 ? x.f.produto_final : '') }, { titulo: 'Rende por receita', valor: (x) => (x.i === 0 && x.f.rendimento_qtd ? Number(x.f.rendimento_qtd) : '') },
+          { titulo: 'Unid. rendimento', valor: (x) => (x.i === 0 ? x.f.rendimento_unidade || '' : '') },
           { titulo: 'Cód. ingrediente', valor: (x) => dados.mapa.produto.get(x.it.produto_id)?.codigo }, { titulo: 'Ingrediente', valor: (x) => dados.mapa.produto.get(x.it.produto_id)?.descricao, largura: 32 },
           { titulo: 'Quantidade por receita', valor: (x) => Number(x.it.quantidade), num: true }, { titulo: 'Unid.', valor: (x) => dados.mapa.produto.get(x.it.produto_id)?.unidade_estoque },
           { titulo: 'Custo estimado', valor: (x) => Math.round(Number(x.it.quantidade) * Number(dados.mapa.produto.get(x.it.produto_id)?.custo_medio || 0) * 100) / 100, num: true }]} />
@@ -37,7 +38,8 @@ export function TelaFichas() {
         { chave: 'codigo', titulo: 'Código', render: (f) => html`<b>${f.codigo}</b>` },
         { chave: 'nome', titulo: 'Receita', render: (f) => html`<b>${f.nome}</b>${!f.ativo && html` <${Etiqueta}>inativa</${Etiqueta}>`}` },
         { chave: 'produto_final', titulo: 'Produto final' },
-        { chave: 'rendimento', titulo: 'Rendimento' },
+        { chave: 'rendimento_qtd', titulo: 'Rende por receita', num: true, valor: (f) => Number(f.rendimento_qtd || 0),
+          render: (f) => (f.rendimento_qtd ? `${qtd(f.rendimento_qtd)} ${f.rendimento_unidade || ''}` : html`<${Etiqueta} cor="laranja">preencher</${Etiqueta}>`) },
         { chave: 'n', titulo: 'Ingredientes', num: true, valor: (f) => itensDe(f.id).length, render: (f) => itensDe(f.id).length },
         { chave: 'peso', titulo: 'Massa (kg)', num: true, valor: (f) => pesoKg(itensDe(f.id), dados.mapa.produto), render: (f) => qtd(pesoKg(itensDe(f.id), dados.mapa.produto)) },
         { chave: 'atualizado_em', titulo: 'Última alteração', render: (f) => (f.atualizado_em ? html`${dados.mapa.perfil.get(f.atualizado_por)?.nome}<br /><small>${dataHora(f.atualizado_em)}</small>` : '–') },
@@ -56,6 +58,7 @@ function FormFicha({ ficha, itens, aoFechar, somenteLeitura, aoUsar }) {
   const { dados, recarregar, api } = useApp();
   const mps = dados.produtos.filter((p) => p.categoria === 'materia_prima' && p.ativo);
   const [f, setF] = useState({ codigo: ficha.codigo || '', nome: ficha.nome || '', produto_final: ficha.produto_final || '', rendimento: ficha.rendimento || '',
+    rendimento_qtd: ficha.rendimento_qtd ? String(Number(ficha.rendimento_qtd)).replace('.', ',') : '', rendimento_unidade: ficha.rendimento_unidade || 'pacotes',
     observacao: ficha.observacao || '', ativo: ficha.ativo !== false });
   const [linhas, setLinhas] = useState(() => itens.length ? itens.map((i) => ({ k: Math.random(), produto_id: i.produto_id, quantidade: String(i.quantidade).replace('.', ','), unidade: dados.mapa.produto.get(i.produto_id)?.unidade_estoque }))
     : [{ k: Math.random(), produto_id: null, quantidade: '', unidade: null }]);
@@ -66,7 +69,11 @@ function FormFicha({ ficha, itens, aoFechar, somenteLeitura, aoUsar }) {
 
   async function salvar() {
     const its = linhas.filter((l) => l.produto_id && n(l.quantidade) > 0).map((l) => ({ produto_id: l.produto_id, quantidade: n(l.quantidade), unidade: l.unidade }));
-    const ok = await executar(() => api.rpc('salvar_ficha', { p: { ...f, id: ficha.id || null, itens: its } }), 'Ficha técnica salva.');
+    const rq = n(f.rendimento_qtd);
+    if (f.rendimento_qtd && !(rq > 0)) return avisar('O rendimento por receita precisa ser um número maior que zero.', 'erro');
+    const rend = rq > 0 ? { rendimento_qtd: rq, rendimento_unidade: String(f.rendimento_unidade || 'un').trim(), rendimento: `${String(f.rendimento_qtd).trim()} ${String(f.rendimento_unidade || 'un').trim()}` }
+      : { rendimento_qtd: null, rendimento_unidade: null };
+    const ok = await executar(() => api.rpc('salvar_ficha', { p: { ...f, ...rend, id: ficha.id || null, itens: its } }), 'Ficha técnica salva.');
     if (ok) { await recarregar(); aoFechar(); }
   }
   async function alternarAtivo() {
@@ -89,7 +96,10 @@ function FormFicha({ ficha, itens, aoFechar, somenteLeitura, aoUsar }) {
         <input class="entrada" value=${f.codigo} placeholder=${ficha.id ? '' : 'automático'} onInput=${set('codigo')} /></${Campo}>
       <${Campo} rotulo="Nome da receita" obrigatorio classe="larga"><input class="entrada" value=${f.nome} onInput=${set('nome')} /></${Campo}>
       <${Campo} rotulo="Produto final"><input class="entrada" value=${f.produto_final} onInput=${set('produto_final')} /></${Campo}>
-      <${Campo} rotulo="Rendimento"><input class="entrada" placeholder="ex.: 180 pacotes" value=${f.rendimento} onInput=${set('rendimento')} /></${Campo}>
+      <${Campo} rotulo="Rende por receita" ajuda="Quanto 1 receita produz. Usado na previsão de produção.">
+        <div class="linha-campo"><input class="entrada" inputmode="decimal" placeholder="ex.: 180" value=${f.rendimento_qtd} onInput=${set('rendimento_qtd')} />
+          <input class="entrada" list="unidades-rendimento" placeholder="pacotes" value=${f.rendimento_unidade} onInput=${set('rendimento_unidade')} />
+          <datalist id="unidades-rendimento"><option value="pacotes" /><option value="unidades" /><option value="pães" /><option value="kg" /><option value="caixas" /></datalist></div></${Campo}>
       <${Campo} rotulo="Observação" classe="larga"><textarea class="entrada" rows="2" value=${f.observacao} onInput=${set('observacao')}></textarea></${Campo}>
     </fieldset>
     <h3>Ingredientes (quantidade para 1 receita)</h3>

@@ -70,6 +70,7 @@ export function TelaPedidos() {
   const colExp = [
     { titulo: 'Pedido', valor: (p) => numeroPedido(p.id) }, { titulo: 'Data do pedido', valor: (p) => data(p.data_pedido) },
     { titulo: 'Fornecedor', valor: (p) => p.r.fornecedor?.nome }, { titulo: 'Previsão de entrega', valor: (p) => data(p.previsao_entrega) },
+    { titulo: 'Previsão de pagamento', valor: (p) => data(p.previsao_pagamento) }, { titulo: 'Financeiro', valor: (p) => (p.fin_lancado ? 'Lançado' : 'Pendente') },
     { titulo: 'Dias p/ chegar', valor: (p) => p.r.dias, num: true }, { titulo: 'Valor total', valor: (p) => Number(p.r.valor.toFixed(2)), texto: (p) => moeda(p.r.valor), num: true },
     { titulo: '% recebido', valor: (p) => Math.round(p.r.perc), num: true }, { titulo: 'Situação', valor: (p) => STATUS_PEDIDO[p.status] },
     { titulo: 'Divergência', valor: (p) => (p.r.divPendente ? 'aguardando ciência' : p.r.divergencia ? 'ciente' : '') },
@@ -91,7 +92,7 @@ export function TelaPedidos() {
   return html`
     <${Cabecalho} titulo="Pedidos de compra" sub="Pedidos feitos, o que falta chegar e o que já chegou">
       <${Exportar} titulo="Pedidos de compra" filtros=${pl(linhas.length, 'pedido', 'pedidos')} arquivo=${`pedidos-${hojeISO()}`} colunas=${colExp} linhas=${linhas}
-        abas=${abasPedidos} totais=${['', '', '', '', 'TOTAL', moeda(total), '', '', '', '']} />
+        abas=${abasPedidos} totais=${['', '', '', '', '', '', 'TOTAL', moeda(total), '', '', '', '']} />
       ${podeFazer('pedido') && html`<button class="btn btn-pri" onClick=${() => setEditando({})}><${Icone} nome="mais" tam=${18} /> Novo pedido</button>`}
     </${Cabecalho}>
     ${pendRec.length > 0 && html`<div class="aviso-faixa">
@@ -162,6 +163,7 @@ export function PedidoDetalhe({ pedido, aoFechar, aoEditar }) {
   const r = resumoPedido(pedido, dados);
   const [ocupado, executar] = useAcao();
   const [ciencia, setCiencia] = useState(null);
+  const [ajustar, setAjustar] = useState(false);
   const perfil = (id) => dados.mapa.perfil.get(id);
   const comprador = perfil(pedido.comprador_id);
 
@@ -212,7 +214,12 @@ export function PedidoDetalhe({ pedido, aoFechar, aoEditar }) {
       <div><small>Valor total</small><b>${moeda(r.valor)}</b></div>
       <div><small>Recebido</small><b>${num(r.perc, 0)}%</b></div>
       <div><small>Pagamento</small><b>${pedido.condicao_pagamento || '–'}</b></div>
+      <div><small>Previsão de pagamento</small><b>${data(pedido.previsao_pagamento)}</b>
+        ${podeFazer('data_pagamento') && pedido.status !== 'cancelado' && html`<button class="btn-link" onClick=${() => setAjustar(true)}>ajustar</button>`}</div>
+      <div><small>Financeiro</small>${pedido.fin_lancado ? html`<${Etiqueta} cor="verde">lançado no contas a pagar</${Etiqueta}>` : html`<${Etiqueta} cor="laranja">pendente de lançar</${Etiqueta}>`}</div>
     </div>
+    ${pedido.fin_obs && html`<p class="nota">Financeiro: ${pedido.fin_obs}</p>`}
+    ${ajustar && html`<${AjustarPagamento} pedido=${pedido} aoFechar=${() => setAjustar(false)} aoSalvo=${aoFechar} />`}
     <p class="autoria">Criado por <b>${nomeUsuario(comprador)}</b> em ${dataHora(pedido.criado_em)}${pedido.atualizado_em
       ? html` · última alteração por <b>${nomeUsuario(perfil(pedido.atualizado_por))}</b> em ${dataHora(pedido.atualizado_em)}` : ''}</p>
     ${pedido.observacao && html`<p class="nota"><b>Obs.:</b> ${pedido.observacao}</p>`}
@@ -280,7 +287,7 @@ function FormPedido({ pedido, aoFechar }) {
   const hoje = hojeISO();
   const itensAtuais = novo ? [] : dados.pedidoItens.filter((i) => i.pedido_id === pedido.id);
   const [f, setF] = useState({ fornecedor_id: pedido.fornecedor_id || null, data_pedido: pedido.data_pedido || hoje,
-    previsao_entrega: pedido.previsao_entrega || '', condicao_pagamento: pedido.condicao_pagamento || '', observacao: pedido.observacao || '' });
+    previsao_entrega: pedido.previsao_entrega || '', previsao_pagamento: pedido.previsao_pagamento || '', condicao_pagamento: pedido.condicao_pagamento || '', observacao: pedido.observacao || '' });
   const [prevManual, setPrevManual] = useState(!novo);
   const [linhas, setLinhas] = useState(() => itensAtuais.length ? itensAtuais.map((i) => ({ k: i.id, id: i.id, produto_id: i.produto_id,
     quantidade: virgula(i.quantidade), unidade: i.unidade, preco: virgula(i.preco_unitario), recebido: i.qtd_recebida_base > 0 }))
@@ -310,11 +317,15 @@ function FormPedido({ pedido, aoFechar }) {
   }
   async function salvar() {
     const itens = linhas.filter((l) => l.produto_id).map((l) => ({ id: l.id || null, produto_id: l.produto_id, quantidade: n(l.quantidade), unidade: l.unidade, preco_unitario: n(l.preco) || 0 }));
+    if (!f.previsao_pagamento) return avisar('Informe a previsão de pagamento: o financeiro usa para lançar no contas a pagar.', 'erro');
     const id = await executar(() => api.rpc('salvar_pedido', { p: { ...f, id: pedido.id || null, previsao_entrega: f.previsao_entrega || null, itens } }),
       novo ? 'Pedido criado.' : 'Pedido alterado.');
     if (id) { await recarregar(); aoFechar(pedido.id || id); }
   }
 
+  // sugestão de pagamento: 1º número da condição (ex.: "28 dias", "28/35/42") contado da entrega (ou do pedido)
+  const diasCond = (() => { const m = String(f.condicao_pagamento || '').match(/\d+/); return m ? Number(m[0]) : null; })();
+  const sugestaoPgto = diasCond !== null && (f.previsao_entrega || f.data_pedido) ? somarDias(f.previsao_entrega || f.data_pedido, diasCond) : null;
   return html`<${Modal} titulo=${novo ? 'Novo pedido de compra' : `Editar ${numeroPedido(pedido.id)}`} aoFechar=${() => aoFechar(null)} largo
     rodape=${html`<button class="btn btn-sec" onClick=${() => aoFechar(null)}>Cancelar</button>
       <button class="btn btn-pri" disabled=${ocupado} onClick=${salvar}>${ocupado ? 'Salvando…' : 'Salvar pedido'}</button>`}>
@@ -325,6 +336,9 @@ function FormPedido({ pedido, aoFechar }) {
       <${Campo} rotulo="Previsão de entrega" ajuda=${fornecedor?.prazo_entrega_dias ? `Prazo habitual: ${pl(fornecedor.prazo_entrega_dias, 'dia', 'dias')}` : ''}>
         <input class="entrada" type="date" value=${f.previsao_entrega} onChange=${(e) => { setPrevManual(true); set('previsao_entrega')(e); }} /></${Campo}>
       <${Campo} rotulo="Condição de pagamento"><input class="entrada" placeholder="ex.: 28 dias" value=${f.condicao_pagamento} onInput=${set('condicao_pagamento')} /></${Campo}>
+      <${Campo} rotulo="Previsão de pagamento" obrigatorio ajuda=${sugestaoPgto ? `Sugestão pela condição: ${data(sugestaoPgto)}` : 'Data em que o financeiro deve pagar.'}>
+        <div class="linha-campo"><input class="entrada" type="date" value=${f.previsao_pagamento} onChange=${set('previsao_pagamento')} />
+        ${sugestaoPgto && sugestaoPgto !== f.previsao_pagamento && html`<button type="button" class="btn btn-sec btn-peq" onClick=${() => setF((x) => ({ ...x, previsao_pagamento: sugestaoPgto }))}>Usar ${data(sugestaoPgto).slice(0, 5)}</button>`}</div></${Campo}>
       <${Campo} rotulo="Observação" classe="larga"><textarea class="entrada" rows="2" value=${f.observacao} onInput=${set('observacao')}></textarea></${Campo}>
     </div>
     <div class="titulo-com-acao"><h3>Itens</h3><button class="btn btn-sec" onClick=${adicionarSugestoes}>+ Sugestões de compra</button></div>
@@ -347,5 +361,24 @@ function FormPedido({ pedido, aoFechar }) {
       <button class="btn btn-sec" onClick=${() => setLinhas((x) => [...x, { k: Math.random(), produto_id: null, quantidade: '', unidade: null, preco: '' }])}>+ Item</button>
       <span>Total do pedido: <b>${moeda(total)}</b></span>
     </div>
+  </${Modal}>`;
+}
+
+// Comprador ou financeiro: ajustar a previsão de pagamento (motivo obrigatório, fica no histórico)
+export function AjustarPagamento({ pedido, aoFechar, aoSalvo }) {
+  const { recarregar, api } = useApp();
+  const [d, setD] = useState(pedido.previsao_pagamento || hojeISO());
+  const [motivo, setMotivo] = useState('');
+  const [ocupado, executar] = useAcao();
+  async function salvar() {
+    if (!motivo.trim()) return avisar('Informe o motivo da mudança.', 'erro');
+    const r = await executar(() => api.rpc('ajustar_previsao_pagamento', { p_pedido: pedido.id, p_data: d, p_motivo: motivo }), 'Previsão de pagamento ajustada.');
+    if (r) { await recarregar(); aoFechar(); if (aoSalvo) aoSalvo(); }
+  }
+  return html`<${Modal} titulo=${`Previsão de pagamento · ${numeroPedido(pedido.id)}`} aoFechar=${aoFechar}
+    rodape=${html`<button class="btn btn-sec" onClick=${aoFechar}>Voltar</button><button class="btn btn-pri" disabled=${ocupado} onClick=${salvar}>Salvar nova data</button>`}>
+    <p>Data atual: <b>${data(pedido.previsao_pagamento)}</b>${pedido.fin_lancado ? ' · já lançado no contas a pagar (avise o financeiro / ajuste lá também)' : ''}</p>
+    <${Campo} rotulo="Nova previsão de pagamento" obrigatorio><input class="entrada" type="date" value=${d} onChange=${(e) => setD(e.target.value)} /></${Campo}>
+    <${Campo} rotulo="Motivo" obrigatorio><input class="entrada" value=${motivo} onInput=${(e) => setMotivo(e.target.value)} placeholder="ex.: mercadoria atrasou; fornecedor prorrogou o boleto" /></${Campo}>
   </${Modal}>`;
 }
