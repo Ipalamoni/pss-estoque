@@ -159,7 +159,8 @@ function TrocarSenha({ aoFechar, obrigatoria, usuario, aoConcluir }) {
     } catch (e) { avisar(mensagemErro(e), 'erro'); } finally { setOc(false); }
   }
   return html`<${Modal} titulo=${obrigatoria ? 'Crie a sua senha' : 'Trocar minha senha'} aoFechar=${obrigatoria ? null : aoFechar}
-    rodape=${html`${!obrigatoria && html`<button class="btn btn-sec" onClick=${aoFechar}>Cancelar</button>`}<button class="btn btn-pri" disabled=${oc} onClick=${salvar}>Salvar</button>`}>
+    rodape=${html`${!obrigatoria ? html`<button class="btn btn-sec" onClick=${aoFechar}>Cancelar</button>`
+      : html`<button class="btn btn-sec" onClick=${async () => { await api.sair(); location.reload(); }}>Sair</button>`}<button class="btn btn-pri" disabled=${oc} onClick=${salvar}>Salvar</button>`}>
     ${obrigatoria && html`<p>Este é o seu primeiro acesso (ou a senha foi redefinida). Crie uma senha só sua; ninguém, nem o administrador, fica sabendo qual é.</p>`}
     <${Campo} rotulo="Nova senha" ajuda="Pelo menos 10 caracteres, com letras e números."><input class="entrada" type="password" autocomplete="new-password" value=${a} onInput=${(e) => setA(e.target.value)} /></${Campo}>
     <${Campo} rotulo="Repita a nova senha"><input class="entrada" type="password" autocomplete="new-password" value=${b} onInput=${(e) => setB(e.target.value)} /></${Campo}>

@@ -42,12 +42,21 @@ function criarApiSupabase() {
       if (!data?.session) return null;
       const p = await perfilDe(data.session.user.id);
       if (!p || !p.ativo || !(p.papeis || []).length) return null;
-      p.trocar_senha = data.session.user.user_metadata?.trocar_senha === true;
+      // confere no servidor (a sessão guardada no aparelho pode estar desatualizada,
+      // ex.: a senha já foi trocada em outro computador)
+      let meta = data.session.user.user_metadata;
+      try { const r = await sb.auth.getUser(); if (r?.data?.user) meta = r.data.user.user_metadata; } catch (_) {}
+      p.trocar_senha = meta?.trocar_senha === true;
       return p;
     },
     async sair() { await sb.auth.signOut(); },
     async trocarSenha(nova) {
       const { error } = await sb.auth.updateUser({ password: nova, data: { trocar_senha: false } });
+      if (error && (error.code === 'same_password' || /different from the old/i.test(error.message || ''))) {
+        // a senha digitada já é a senha atual (trocada em outro aparelho): só libera o acesso
+        const r = await sb.auth.updateUser({ data: { trocar_senha: false } });
+        return falhou(r.error);
+      }
       falhou(error);
     },
     // Gerenciar usuários (só administrador): roda na função segura do servidor
