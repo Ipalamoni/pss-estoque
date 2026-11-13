@@ -26,6 +26,7 @@ import { TelaPainel } from './telas/painel.js';
 import { TelaFinanceiro } from './telas/financeiro.js';
 import { TelaPrevisao } from './telas/previsao.js';
 import { TelaCustos } from './telas/custos.js';
+import { TelaContagemInicial } from './telas/contagem.js';
 
 const CFG = window.CONFIG || {};
 const TODOS = Object.keys(PAPEIS).filter((p) => !['financeiro', 'faturamento'].includes(p));   // financeiro: só pedidos/pagamentos e previsão; faturamento: só previsão
@@ -41,6 +42,7 @@ const MENU = [
   { id: 'receber', titulo: 'Receber mercadoria', papeis: ['admin', 'almoxarifado', 'recebimento'], tela: TelaReceber },
   { id: 'saidas', titulo: 'Saídas', papeis: ['admin', 'pesagem', 'almoxarifado', 'recebimento'], tela: TelaSaidas },
   { id: 'inventario', titulo: 'Inventário', papeis: ['admin', 'almoxarifado', 'recebimento'], tela: TelaInventario },
+  { id: 'contagem', titulo: 'Contagem inicial (saldo)', papeis: ['admin', 'almoxarifado'], tela: TelaContagemInicial },
   { grupo: 'Produção' },
   { id: 'programacao', titulo: 'Programação de produção', papeis: ['admin', 'engenharia', 'pesagem', 'diretoria'], tela: TelaProgramacao },
   { id: 'saidas-producao', titulo: 'Saídas da produção', papeis: ['admin', 'engenharia', 'pesagem', 'almoxarifado', 'diretoria'], tela: TelaSaidasProducao },

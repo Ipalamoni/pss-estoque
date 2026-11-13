@@ -6,6 +6,7 @@ const P = {
   receber: 'M21 8 12 3 3 8v8l9 5 9-5zM3 8l9 5 9-5M12 13v8',
   saidas: 'M12 3v3M5 21h14M7 6h10l3 7a4 4 0 0 1-8 0zM4 13l3-7M12 6v15',
   inventario: 'M9 3h6v3H9zM7 4.5H5v16.5h14V4.5h-2M8.5 12l2 2 4-4M8.5 17h7',
+  contagem: 'M9 3h6v3H9zM7 4.5H5v16.5h14V4.5h-2M8 11h8M8 14.5h8M8 18h5',
   pedidos: 'M6 2h9l5 5v15H6zM14 2v6h6M9 13h8M9 17h6',
   estoque: 'M3 7l9-4 9 4-9 4zM3 12l9 4 9-4M3 17l9 4 9-4',
   movimentos: 'M17 3l4 4-4 4M21 7H8M7 21l-4-4 4-4M3 17h13',

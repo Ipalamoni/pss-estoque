@@ -1,10 +1,13 @@
 // Configurações (parâmetros) e implantação de saldo — somente administrador
 import { html, useState, useMemo, useApp, Campo, Numero, QtdUnidade, Busca, Cabecalho, Abas, Tabela, useAcao, confirmar, avisar, n } from '../ui.js';
 import { lerPlanilha, planilhaDoCadastro } from '../importacao.js';
-import { CATEGORIAS, qtd, moeda, contem, qtdDupla, fator, pl, hojeISO, mensagemErro } from '../util.js';
+import { CATEGORIAS, qtd, moeda, contem, qtdDupla, fator, pl, hojeISO, mensagemErro, qu, dataHora, nomeUsuario } from '../util.js';
+import { useContagens } from './contagem.js';
 
 export function TelaConfiguracoes() {
-  const [aba, setAba] = useState('parametros');
+  const { estadoRota, setEstadoRota } = useApp();
+  const [aba, setAba] = useState(estadoRota?.aba || 'parametros');
+  if (estadoRota) setTimeout(() => setEstadoRota(null), 0);
   return html`
     <${Cabecalho} titulo="Configurações" />
     <${Abas} abas=${[{ id: 'parametros', titulo: 'Parâmetros' }, { id: 'importar', titulo: 'Importar planilha' }, { id: 'implantacao', titulo: 'Implantação de saldo' }]} ativa=${aba} aoMudar=${setAba} />
@@ -39,7 +42,17 @@ function Implantacao() {
   const [v, setV] = useState({});   // id -> { q, un, c }
   const [obs, setObs] = useState('Implantação de saldo (contagem inicial)');
   const [ocupado, executar] = useAcao();
-  const lista = useMemo(() => dados.ind.filter((p) => p.ativo && (!cat || p.categoria === cat) && contem(`${p.codigo} ${p.descricao}`, busca)), [dados, busca, cat]);
+  const contagens = useContagens();
+  const pend = useMemo(() => new Map((contagens || []).filter((c) => c.situacao === 'pendente').map((c) => [c.produto_id, c])), [contagens]);
+  const [soContados, setSoContados] = useState(false);
+  const lista = useMemo(() => dados.ind.filter((p) => p.ativo && (!cat || p.categoria === cat) && contem(`${p.codigo} ${p.descricao}`, busca)
+    && (!soContados || pend.has(p.id))), [dados, busca, cat, soContados, pend]);
+  function trazer() {
+    if (!pend.size) return avisar('Não há contagem do almoxarifado aguardando implantação.', 'aviso');
+    setV((x) => { const y = { ...x }; for (const [id, c] of pend) y[id] = { ...(y[id] || {}), q: String(Number(c.qtd_informada)).replace('.', ','), un: c.unidade_informada }; return y; });
+    setSoContados(true);
+    avisar(`${pl(pend.size, 'item trazido', 'itens trazidos')} da contagem. Agora informe o custo de cada um.`);
+  }
   const mudar = (p, ch) => setV((x) => ({ ...x, [p.id]: { un: p.unidade_compra || p.unidade_estoque, ...x[p.id], ...ch } }));
   const preenchidos = Object.entries(v).filter(([, x]) => n(x.q) > 0);
   const total = preenchidos.reduce((s, [, x]) => s + n(x.q) * (n(x.c) || 0), 0);
@@ -52,11 +65,15 @@ function Implantacao() {
   }
   return html`<section class="painel">
     <p class="nota">Digite a quantidade contada e o custo unitário (na unidade escolhida). O custo forma o custo médio inicial. Itens em branco são ignorados.</p>
+    ${pend.size > 0 && html`<div class="aviso-faixa"><span>O almoxarifado contou <b>${pl(pend.size, 'item', 'itens')}</b> que aguardam implantação.</span>
+      <button class="btn btn-destaque btn-peq" onClick=${trazer}>Trazer contagem do almoxarifado</button></div>`}
+    ${pend.size > 0 && html`<label class="check"><input type="checkbox" checked=${soContados} onChange=${(e) => setSoContados(e.target.checked)} /> Mostrar só os itens contados pelo almoxarifado</label>`}
     <div class="filtros"><${Busca} valor=${busca} aoMudar=${setBusca} />
       <select class="entrada" value=${cat} onChange=${(e) => setCat(e.target.value)}><option value="">Todas as categorias</option>
         ${Object.entries(CATEGORIAS).map(([k, t]) => html`<option value=${k}>${t}</option>`)}</select></div>
     <div class="lista-conferencia">${lista.map((p) => { const x = v[p.id] || {}; return html`<div class="conf-item" key=${p.id}>
       <div class="conf-cab"><b>${p.descricao}</b><small>${p.codigo} · saldo atual ${qtdDupla(p, p.saldo)}</small></div>
+      ${pend.get(p.id) && html`<div class="conf-info">Contado pelo almoxarifado: <b>${qu(pend.get(p.id).qtd_informada, pend.get(p.id).unidade_informada)}</b> · ${nomeUsuario(dados.mapa.perfil.get(pend.get(p.id).contado_por))} · ${dataHora(pend.get(p.id).contado_em)}${pend.get(p.id).observacao ? ` · ${pend.get(p.id).observacao}` : ''}</div>`}
       <div class="conf-entrada"><span>Quantidade:</span><${QtdUnidade} produto=${p} valor=${x.q ?? ''} unidade=${x.un || p.unidade_compra || p.unidade_estoque} aoMudar=${(q, un) => mudar(p, { q, un })} /></div>
       <div class="conf-entrada"><span>Custo por ${x.un || p.unidade_compra || p.unidade_estoque}:</span><${Numero} valor=${x.c ?? ''} placeholder="0,00" aoMudar=${(c) => mudar(p, { c })} /></div>
     </div>`; })}</div>

@@ -12,6 +12,7 @@ const ACOES = {
   financeiro: 'Marcar pedido como lançado no contas a pagar', data_pagamento: 'Ajustar previsão de pagamento do pedido',
   previsao_producao: 'Ver previsão de produção (receitas × rendimento)',
   custos: 'Gestão de custos (último custo, custo médio, custo das receitas)',
+  contagem_inicial: 'Digitar a contagem inicial (saldo de abertura)',
 };
 
 export function TelaUsuarios() {

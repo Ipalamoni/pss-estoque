@@ -68,6 +68,7 @@ export const PERMISSOES = {
   inventario: ['admin', 'almoxarifado', 'recebimento'],
   corrigir: ['admin', 'almoxarifado'],
   implantacao: ['admin'],
+  contagem_inicial: ['admin', 'almoxarifado'],
   usuarios: ['admin'],
   parametros: ['admin'],
   auditoria: ['admin', 'diretoria'],

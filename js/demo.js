@@ -9,7 +9,7 @@
 import { calcularEstatisticas } from './calc.js';
 import { plural } from './util.js';
 
-const CHAVE = 'pss-estoque-demo-v7';
+const CHAVE = 'pss-estoque-demo-v8';
 let db = null;
 let usuario = null;      // user_id logado
 let relogio = null;      // usado só para gerar o histórico de exemplo
@@ -32,7 +32,7 @@ const PERM = {
   ficha_tecnica: ['admin', 'engenharia'], pedido: ['admin', 'comprador'],
   recebimento: ['admin', 'almoxarifado', 'recebimento'], saida_receita: ['admin', 'pesagem', 'almoxarifado'],
   saida_avulsa: ['admin', 'pesagem', 'almoxarifado'], saida_almox: ['admin', 'almoxarifado', 'recebimento'],
-  inventario: ['admin', 'almoxarifado', 'recebimento'], corrigir: ['admin', 'almoxarifado'], implantacao: ['admin'],
+  inventario: ['admin', 'almoxarifado', 'recebimento'], corrigir: ['admin', 'almoxarifado'], implantacao: ['admin'], contagem_inicial: ['admin', 'almoxarifado'],
   usuarios: ['admin'], parametros: ['admin'], auditoria: ['admin', 'diretoria'], importacao: ['admin'], programacao: ['admin', 'engenharia'],
   financeiro: ['admin', 'financeiro'], data_pagamento: ['admin', 'comprador', 'financeiro'],
   previsao_producao: ['admin', 'engenharia', 'diretoria', 'financeiro', 'faturamento'],
@@ -545,6 +545,25 @@ const RPC = {
     }
     return id;
   },
+  salvar_contagem_inicial({ p }) {
+    exigir('contagem_inicial');
+    db.contagem_inicial = db.contagem_inicial || [];
+    let n = 0;
+    for (const it of p.itens || []) {
+      if (it.quantidade === null || it.quantidade === undefined || String(it.quantidade).trim() === '') continue;
+      if (!db.produtos.some((x) => x.id === Number(it.produto_id))) erro('Produto não encontrado.');
+      const q = Number(it.quantidade) * fator(it.produto_id, it.unidade);
+      if (q < 0) erro('Quantidade não pode ser negativa.');
+      const ant = db.contagem_inicial.find((x) => x.produto_id === Number(it.produto_id) && x.situacao === 'pendente');
+      const dados = { quantidade: r4(q), qtd_informada: Number(it.quantidade), unidade_informada: it.unidade, observacao: txt(it.observacao),
+        contado_por: usuario, contado_em: agora().toISOString() };
+      if (ant) atualizar('contagem_inicial', ant, dados);
+      else inserir('contagem_inicial', { produto_id: Number(it.produto_id), situacao: 'pendente', implantado_por: null, implantado_em: null, ...dados });
+      n++;
+    }
+    if (!n) erro('Nenhuma quantidade informada.');
+    return n;
+  },
   implantar_saldo({ p }) {
     exigir('implantacao');
     let n = 0;
@@ -555,6 +574,8 @@ const RPC = {
       if (!q) continue;
       movimentar(it.produto_id, 'implantacao', q, Number(it.custo_unitario || 0) / f,
         { observacao: txt(p.observacao) || 'Implantação de saldo', qtd_informada: it.quantidade, unidade_informada: it.unidade });
+      for (const c of (db.contagem_inicial || []).filter((x) => x.produto_id === Number(it.produto_id) && x.situacao === 'pendente'))
+        atualizar('contagem_inicial', c, { situacao: 'implantada', implantado_por: usuario, implantado_em: agora().toISOString() });
       n++;
     }
     if (!n) erro('Nenhuma quantidade informada.');
@@ -631,7 +652,9 @@ function semente() {
     'recebimentos', 'programacoes', 'producoes', 'inventarios', 'inventario_itens', 'movimentos', 'auditoria', 'acessos']) db[t] = [];
   db.versao_banco = [{ versao: '1.0.0', descricao: 'Instalação inicial', aplicada_em: agora().toISOString() },
     { versao: '1.1.0', descricao: 'Financeiro, previsão de produção e perfil faturamento', aplicada_em: agora().toISOString() },
-    { versao: '1.2.0', descricao: 'Gestão de custos e últimas compras', aplicada_em: agora().toISOString() }];
+    { versao: '1.2.0', descricao: 'Gestão de custos e últimas compras', aplicada_em: agora().toISOString() },
+    { versao: '1.3.0', descricao: 'Contagem inicial pelo almoxarifado', aplicada_em: agora().toISOString() }];
+  db.contagem_inicial = [];
 
   const P = [
     ['empresa_nome', 'Indústria e Comércio de Pães São Sebastião', 'Nome no cabeçalho do pedido de compra'],

@@ -68,6 +68,7 @@ function InicioOperacao() {
   const atalhos = [
     papeis.some((x) => ['admin', 'diretoria', 'comprador', 'almoxarifado', 'engenharia'].includes(x)) && { t: 'Resumo (indicadores)', i: 'painel', f: () => ir('painel') },
     podeFazer('custos') && { t: 'Gestão de custos', i: 'custos', f: () => ir('custos') },
+    podeFazer('contagem_inicial') && !dados.produtos.some((p) => Number(p.saldo) !== 0) && { t: 'Contagem inicial (saldo)', i: 'contagem', f: () => ir('contagem') },
     podeFazer('previsao_producao') && { t: 'Previsão de produção', i: 'previsao', f: () => ir('previsao') },
     papeis.some((x) => ['admin', 'diretoria'].includes(x)) && { t: 'Financeiro · a pagar', i: 'financeiro', f: () => ir('financeiro') },
     podeFazer('programacao') ? { t: 'Programar produção', i: 'programacao', f: () => ir('programacao') }
