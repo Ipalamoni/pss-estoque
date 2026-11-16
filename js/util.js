@@ -105,6 +105,8 @@ export function lerNumero(txt) {
   let s = String(txt).trim().replace(/\s/g, '');
   if (s === '') return null;
   if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
+  // padrão brasileiro: ponto separa milhar ("8.501" = oito mil quinhentos e um; "1.250.000")
+  else if (/^-?\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, '');
   const n = Number(s);
   return Number.isFinite(n) ? n : null;
 }
