@@ -911,16 +911,16 @@ export const apiDemo = {
     if (!p) throw new Error('Usuário ou senha incorretos.');
     if (!temPapel(p)) throw new Error('Usuário sem acesso liberado. Fale com o administrador.');
     usuario = p.user_id;
-    try { sessionStorage.setItem(CHAVE + '-sessao', usuario); } catch { /* ignora */ }
+    try { localStorage.setItem(CHAVE + '-sessao', usuario); } catch { /* ignora */ }
     return clone(p);
   },
   async sessaoAtual() {
     garantir();
-    if (!usuario) { try { usuario = sessionStorage.getItem(CHAVE + '-sessao'); } catch { /* ignora */ } }
+    if (!usuario) { try { usuario = localStorage.getItem(CHAVE + '-sessao'); } catch { /* ignora */ } }
     const p = usuario && db.perfis.find((x) => x.user_id === usuario && temPapel(x));
     return p ? clone(p) : null;
   },
-  async sair() { usuario = null; try { sessionStorage.removeItem(CHAVE + '-sessao'); } catch { /* ignora */ } },
+  async sair() { usuario = null; try { localStorage.removeItem(CHAVE + '-sessao'); } catch { /* ignora */ } },
   async trocarSenha() { throw new Error('No modo demonstração não há senha.'); },
   // imita a função segura do servidor (admin-usuarios)
   async adminUsuarios(p) {
@@ -976,5 +976,5 @@ export const apiDemo = {
       throw e;
     }
   },
-  async reiniciarDemo() { semente(); persistir(); usuario = null; try { sessionStorage.removeItem(CHAVE + '-sessao'); } catch { /* ignora */ } },
+  async reiniciarDemo() { semente(); persistir(); usuario = null; try { localStorage.removeItem(CHAVE + '-sessao'); } catch { /* ignora */ } },
 };

@@ -227,13 +227,14 @@ function App() {
   // administrador: depois de entrar, escolhe o próprio acesso ou o de outra pessoa (uma vez por sessão)
   useEffect(() => {
     if (!usuario || !(usuario.papeis || []).includes('admin')) return;
-    let ja = null; try { ja = sessionStorage.getItem('pss-estoque-visao'); } catch { /* ignora */ }
+    // a escolha vale para todas as abas do mesmo navegador até sair (abrir nova aba não pergunta de novo)
+    let ja = null; try { ja = localStorage.getItem('pss-estoque-visao:' + usuario.user_id); } catch { /* ignora */ }
     if (ja === null && api.modo !== 'demo') setEscolher(true);
     else if (ja) api.listar('perfis', { eq: { user_id: ja } }).then((l) => l[0] && l[0].ativo && setVisao(l[0])).catch(() => {});
   }, [usuario?.user_id]);
   function escolherVisao(p) {
-    setVisao(p); setEscolher(false); location.hash = '#inicio';
-    try { sessionStorage.setItem('pss-estoque-visao', p ? p.user_id : ''); } catch { /* ignora */ }
+    setVisao(p); setEscolher(false);   // continua na mesma tela (não volta para o Início)
+    try { localStorage.setItem('pss-estoque-visao:' + usuario.user_id, p ? p.user_id : ''); } catch { /* ignora */ }
     if (p) api.rpc('registrar_acesso', { p_evento: 'ver_como', p_detalhe: `${p.usuario} (${p.nome})`, p_agente: navigator.userAgent }).catch(() => {});
   }
 
@@ -255,7 +256,7 @@ function App() {
   async function sair() {
     await api.rpc('registrar_acesso', { p_evento: 'saida', p_detalhe: null, p_agente: navigator.userAgent }).catch(() => {});
     await api.sair(); setUsuario(null); setVisao(null); setDados(null); location.hash = '#inicio';
-    try { sessionStorage.removeItem('pss-estoque-visao'); } catch { /* ignora */ }
+    try { Object.keys(localStorage).filter((k) => k.startsWith('pss-estoque-visao')).forEach((k) => localStorage.removeItem(k)); } catch { /* ignora */ }
   }
   function voltar() {
     const ant = pilha.current.pop() || 'inicio';
