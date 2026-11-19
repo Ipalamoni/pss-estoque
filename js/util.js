@@ -222,3 +222,73 @@ export function mensagemErro(e) {
   if (/Invalid login credentials/i.test(m)) return 'Usuário ou senha incorretos.';
   return m;
 }
+
+// ---------------------------------------------------------------------
+// CNPJ / CPF (v1.3.1): grava SEM pontuação; mostra no formato padrão.
+// CNPJ aceita o formato alfanumérico da Receita (desde jul/2026): 12 posições
+// com 0-9 ou A-Z + 2 dígitos verificadores. CPF: 11 números.
+// tipo: 'PJ' (jurídica, CNPJ) ou 'PF' (física, CPF). Sem tipo: deduz pelo tamanho.
+// ---------------------------------------------------------------------
+export const rotuloDoc = (tipo) => (tipo === 'PF' ? 'CPF' : 'CNPJ');
+export const TIPOS_PESSOA = [{ id: 'PJ', titulo: 'Pessoa jurídica (CNPJ)' }, { id: 'PF', titulo: 'Pessoa física (CPF)' }];
+
+// tira a pontuação; no CNPJ letras só nas 12 primeiras posições, números nas 2 últimas
+export function docLimpo(v, tipo) {
+  const s = String(v ?? '').toUpperCase();
+  if (tipo === 'PF') return s.replace(/\D/g, '').slice(0, 11);
+  if (tipo === 'PJ') {
+    let out = '';
+    for (const c of s.replace(/[^0-9A-Z]/g, '')) {
+      if (out.length >= 14) break;
+      if (out.length >= 12 && !/[0-9]/.test(c)) continue;
+      out += c;
+    }
+    return out;
+  }
+  return s.replace(/[^0-9A-Z]/g, '');
+}
+
+// formata enquanto digita (00.000.000/0000-00 · 000.000.000-00)
+export function mascaraDoc(v, tipo) {
+  const d = docLimpo(v, tipo);
+  if (tipo === 'PF') return d.replace(/^(\d{3})(\d)/, '$1.$2').replace(/^(\d{3})\.(\d{3})(\d)/, '$1.$2.$3').replace(/\.(\d{3})(\d)/, '.$1-$2');
+  const p = [d.slice(0, 2), d.slice(2, 5), d.slice(5, 8), d.slice(8, 12), d.slice(12, 14)];
+  let s = p[0];
+  if (p[1]) s += '.' + p[1];
+  if (p[2]) s += '.' + p[2];
+  if (p[3]) s += '/' + p[3];
+  if (p[4]) s += '-' + p[4];
+  return s;
+}
+
+// para mostrar em telas, PDF e Excel (número completo formatado; incompleto fica como está)
+export function formatarDoc(v, tipo) {
+  const d = docLimpo(v);
+  if (!d) return '';
+  if (d.length === 14 && tipo !== 'PF') return mascaraDoc(d, 'PJ');
+  if (d.length === 11 && /^\d+$/.test(d) && tipo !== 'PJ') return mascaraDoc(d, 'PF');
+  return String(v);
+}
+
+export function cnpjValido(v) {
+  const d = docLimpo(v);
+  if (!/^[0-9A-Z]{12}[0-9]{2}$/.test(d) || d === d[0].repeat(14)) return false;
+  const dv = (base, pesos) => { const s = [...base].reduce((t, c, i) => t + (c.charCodeAt(0) - 48) * pesos[i], 0) % 11; return s < 2 ? 0 : 11 - s; };
+  const d1 = dv(d.slice(0, 12), [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]);
+  const d2 = dv(d.slice(0, 12) + d1, [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]);
+  return d.slice(12) === `${d1}${d2}`;
+}
+export function cpfValido(v) {
+  const d = docLimpo(v);
+  if (!/^\d{11}$/.test(d) || d === d[0].repeat(11)) return false;
+  const dv = (n) => { const s = [...d.slice(0, n)].reduce((t, c, i) => t + Number(c) * (n + 1 - i), 0); const r = (s * 10) % 11; return r === 10 ? 0 : r; };
+  return dv(9) === Number(d[9]) && dv(10) === Number(d[10]);
+}
+// '' = vazio ou ainda digitando; texto = problema no número completo
+export function problemaDoc(v, tipo) {
+  const d = docLimpo(v, tipo);
+  if (!d) return '';
+  const total = tipo === 'PF' ? 11 : 14;
+  if (d.length < total) return '';
+  return (tipo === 'PF' ? cpfValido(d) : cnpjValido(d)) ? '' : `${rotuloDoc(tipo)} inválido: confira os números digitados.`;
+}

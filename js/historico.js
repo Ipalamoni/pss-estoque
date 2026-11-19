@@ -5,7 +5,7 @@ import { dataHora, nomeUsuario } from './util.js';
 const NOMES = {
   codigo: 'código', descricao: 'descrição', categoria: 'categoria', unidade_estoque: 'unidade de estoque', unidade_compra: 'unidade de compra',
   fator_compra: 'fator de compra', estoque_minimo: 'estoque mínimo', prazo_entrega_dias: 'prazo de entrega (dias)', fornecedor_padrao_id: 'fornecedor principal',
-  observacao: 'observação', ativo: 'ativo', nome: 'nome', cnpj: 'CNPJ', contato: 'contato', telefone: 'telefone', email: 'e-mail',
+  observacao: 'observação', ativo: 'ativo', nome: 'nome', cnpj: 'CNPJ/CPF', tipo_pessoa: 'tipo de pessoa', contato: 'contato', telefone: 'telefone', email: 'e-mail',
   fornecedor_id: 'fornecedor', data_pedido: 'data do pedido', previsao_entrega: 'previsão de entrega', condicao_pagamento: 'condição de pagamento',
   produto_id: 'produto', quantidade: 'quantidade', unidade: 'unidade', preco_unitario: 'preço unitário', valor_total: 'valor total',
   papeis: 'papéis', funcao: 'função', valor: 'valor', motivo_cancelamento: 'motivo do cancelamento', ciente_obs: 'obs. da ciência',

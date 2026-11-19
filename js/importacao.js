@@ -3,7 +3,7 @@
 // tudo antes de enviar ao banco (função importar_cadastros, só admin).
 // Também gera a planilha no mesmo formato com o cadastro atual.
 // =====================================================================
-import { lerNumero, normalizar, CATEGORIAS } from './util.js';
+import { lerNumero, normalizar, CATEGORIAS, formatarDoc } from './util.js';
 
 const CAB_INICIAL = { fornecedores: 'nome', produtos: 'codigo', receitas: 'codigo da receita', saldos: 'codigo do produto' };
 const ABAS = { fornecedores: 'fornecedores', produtos: 'produtos', receitas: 'receitas', saldos: 'saldo inicial' };
@@ -126,7 +126,7 @@ export function planilhaDoCadastro(XLSX, dados) {
   const c = (x) => x ?? '';
   XLSX.utils.book_append_sheet(wb, aba('Fornecedores', 'Cadastro atual exportado do sistema', ['Nome fantasia *', 'Razão social', 'CNPJ', 'Inscrição estadual', 'Contato', 'Telefone', 'WhatsApp',
     'E-mail', 'Endereço (rua, número)', 'Bairro', 'Cidade', 'UF', 'CEP', 'Condição de pagamento', 'Prazo de entrega (dias)', 'Observação', 'Ativo'],
-    dados.fornecedores.map((f) => [f.nome, c(f.razao_social), c(f.cnpj), c(f.inscricao_estadual), c(f.contato), c(f.telefone), c(f.whatsapp), c(f.email), c(f.endereco), c(f.bairro),
+    dados.fornecedores.map((f) => [f.nome, c(f.razao_social), c(formatarDoc(f.cnpj, f.tipo_pessoa)), c(f.inscricao_estadual), c(f.contato), c(f.telefone), c(f.whatsapp), c(f.email), c(f.endereco), c(f.bairro),
       c(f.cidade), c(f.uf), c(f.cep), c(f.condicao_pagamento), c(f.prazo_entrega_dias), c(f.observacao), f.ativo ? 'SIM' : 'NÃO'])), 'Fornecedores');
   XLSX.utils.book_append_sheet(wb, aba('Produtos', 'Cadastro atual exportado do sistema', ['Código *', 'Código no ERP', 'Descrição *', 'Categoria *', 'Grupo', 'Classificação', 'Marca', 'Unidade de estoque *', 'Unidade de compra',
     'Quantas unid. de estoque tem 1 unid. de compra', 'Estoque mínimo (unid. de estoque)', 'Prazo de entrega (dias)', 'Fornecedor principal', 'Observação', 'Ativo'],

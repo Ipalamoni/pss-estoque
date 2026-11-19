@@ -1,7 +1,7 @@
 // Configurações (parâmetros) e implantação de saldo — somente administrador
 import { html, useState, useMemo, useApp, Campo, Numero, QtdUnidade, Busca, Cabecalho, Abas, Tabela, useAcao, confirmar, avisar, n } from '../ui.js';
 import { lerPlanilha, planilhaDoCadastro } from '../importacao.js';
-import { CATEGORIAS, qtd, moeda, contem, qtdDupla, fator, pl, hojeISO, mensagemErro, qu, dataHora, nomeUsuario } from '../util.js';
+import { CATEGORIAS, qtd, moeda, contem, qtdDupla, fator, pl, hojeISO, mensagemErro, qu, dataHora, nomeUsuario, mascaraDoc, docLimpo, problemaDoc } from '../util.js';
 import { useContagens } from './contagem.js';
 
 export function TelaConfiguracoes() {
@@ -25,7 +25,11 @@ function Parametros() {
   async function salvar() { if (await executar(() => api.rpc('salvar_parametros', { p: vals }), 'Configurações salvas.')) await recarregar(); }
   return html`<section class="painel">
     <div class="grade">
-      ${dados.parametros.map((p) => html`<${Campo} rotulo=${p.chave.replace(/_/g, ' ')} ajuda=${p.descricao} classe=${p.chave.startsWith('empresa_nome') || p.chave === 'pedido_rodape' ? 'larga' : ''}>
+      ${dados.parametros.map((p) => p.chave === 'empresa_cnpj' ? html`<${Campo} rotulo="empresa cnpj"
+          ajuda=${problemaDoc(vals.empresa_cnpj, 'PJ') ? html`<span class="texto-erro">${problemaDoc(vals.empresa_cnpj, 'PJ')}</span>` : `${p.descricao}. Digite só os números.`}>
+          <input class="entrada" inputmode="numeric" value=${mascaraDoc(vals.empresa_cnpj, 'PJ')} placeholder="00.000.000/0000-00"
+            onInput=${(e) => setVals({ ...vals, empresa_cnpj: docLimpo(e.target.value, 'PJ') })} /></${Campo}>`
+        : html`<${Campo} rotulo=${p.chave.replace(/_/g, ' ')} ajuda=${p.descricao} classe=${p.chave.startsWith('empresa_nome') || p.chave === 'pedido_rodape' ? 'larga' : ''}>
         ${OPCOES[p.chave] ? html`<select class="entrada" value=${vals[p.chave]} onChange=${(e) => setVals({ ...vals, [p.chave]: e.target.value })}>
             ${OPCOES[p.chave].map((o) => html`<option>${o}</option>`)}</select>`
           : html`<input class="entrada" value=${vals[p.chave]} onInput=${(e) => setVals({ ...vals, [p.chave]: e.target.value })} />`}

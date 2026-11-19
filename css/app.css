@@ -137,6 +137,7 @@ textarea.entrada { resize: vertical; }
 .campo { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
 .campo-rotulo { font-weight: 600; font-size: .85rem; color: #3a4757; }
 .campo-ajuda { font-size: .8rem; }
+.campo-ajuda .texto-erro { color: var(--vermelho); font-weight: 600; }
 .obrig { color: var(--vermelho); }
 .campo-inline { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 .campo-inline .entrada { width: auto; }

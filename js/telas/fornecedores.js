@@ -1,6 +1,6 @@
 // Cadastro de fornecedores
 import { html, useState, useMemo, useApp, Tabela, Modal, Campo, Numero, Busca, Etiqueta, Cabecalho, useAcao, confirmar, n } from '../ui.js';
-import { contem, hojeISO, pl } from '../util.js';
+import { contem, hojeISO, pl, formatarDoc, mascaraDoc, docLimpo, problemaDoc, rotuloDoc, TIPOS_PESSOA } from '../util.js';
 import { Exportar } from '../exportar.js';
 import { Icone } from '../icones.js';
 import { UltimaAlteracao, HistoricoAuditoria } from '../historico.js';
@@ -11,13 +11,13 @@ export function TelaFornecedores() {
   const [inativos, setInativos] = useState(false);
   const [editando, setEditando] = useState(null);
   const pode = podeFazer('cadastro_fornecedor');
-  const linhas = useMemo(() => dados.fornecedores.filter((f) => (inativos || f.ativo) && contem(`${f.nome} ${f.razao_social || ''} ${f.cnpj} ${f.contato} ${f.cidade || ''}`, busca)), [dados, busca, inativos]);
+  const linhas = useMemo(() => dados.fornecedores.filter((f) => (inativos || f.ativo) && contem(`${f.nome} ${f.razao_social || ''} ${f.cnpj || ''} ${formatarDoc(f.cnpj, f.tipo_pessoa)} ${f.contato} ${f.cidade || ''}`, busca)), [dados, busca, inativos]);
   const qtdProdutos = (id) => dados.produtos.filter((p) => p.fornecedor_padrao_id === id).length;
 
   return html`
     <${Cabecalho} titulo="Fornecedores">
       <${Exportar} titulo="Cadastro de fornecedores" filtros=${pl(linhas.length, 'fornecedor', 'fornecedores')} arquivo=${`fornecedores-${hojeISO()}`} linhas=${linhas} colunas=${[
-        { titulo: 'Nome fantasia', valor: (f) => f.nome, largura: 28 }, { titulo: 'Razão social', valor: (f) => f.razao_social, largura: 32 }, { titulo: 'CNPJ', valor: (f) => f.cnpj },
+        { titulo: 'Nome fantasia', valor: (f) => f.nome, largura: 28 }, { titulo: 'Razão social', valor: (f) => f.razao_social, largura: 32 }, { titulo: 'Tipo', valor: (f) => (f.tipo_pessoa === 'PF' ? 'Pessoa física' : 'Pessoa jurídica') }, { titulo: 'CNPJ / CPF', valor: (f) => formatarDoc(f.cnpj, f.tipo_pessoa), largura: 20 },
         { titulo: 'Inscr. estadual', valor: (f) => f.inscricao_estadual }, { titulo: 'Contato', valor: (f) => f.contato }, { titulo: 'Telefone', valor: (f) => f.telefone },
         { titulo: 'WhatsApp', valor: (f) => f.whatsapp }, { titulo: 'E-mail', valor: (f) => f.email, largura: 28 }, { titulo: 'Endereço', valor: (f) => f.endereco, largura: 30 },
         { titulo: 'Bairro', valor: (f) => f.bairro }, { titulo: 'Cidade', valor: (f) => f.cidade }, { titulo: 'UF', valor: (f) => f.uf }, { titulo: 'CEP', valor: (f) => f.cep },
@@ -26,13 +26,13 @@ export function TelaFornecedores() {
       ${pode && html`<button class="btn btn-pri" onClick=${() => setEditando({})}><${Icone} nome="mais" tam=${18} /> Novo fornecedor</button>`}
     </${Cabecalho}>
     <div class="filtros">
-      <${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Buscar por nome, CNPJ ou contato" />
+      <${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Buscar por nome, CNPJ, CPF ou contato" />
       <label class="check"><input type="checkbox" checked=${inativos} onChange=${(e) => setInativos(e.target.checked)} /> Mostrar inativos</label>
     </div>
     <${Tabela} linhas=${linhas} aoClicar=${setEditando} ordemInicial=${{ chave: 'nome', dir: 1 }}
       colunas=${[
         { chave: 'nome', titulo: 'Fornecedor', render: (f) => html`<b>${f.nome}</b>${!f.ativo && html` <${Etiqueta}>inativo</${Etiqueta}>`}` },
-        { chave: 'cnpj', titulo: 'CNPJ' },
+        { chave: 'cnpj', titulo: 'CNPJ / CPF', render: (f) => formatarDoc(f.cnpj, f.tipo_pessoa) || '–' },
         { chave: 'cidade', titulo: 'Cidade', render: (f) => [f.cidade, f.uf].filter(Boolean).join('/') || '–' },
         { chave: 'contato', titulo: 'Contato', render: (f) => [f.contato, f.whatsapp || f.telefone].filter(Boolean).join(' · ') },
         { chave: 'email', titulo: 'E-mail' },
@@ -44,13 +44,14 @@ export function TelaFornecedores() {
 
 function FormFornecedor({ fornecedor, aoFechar, somenteLeitura }) {
   const { recarregar, api } = useApp();
-  const [f, setF] = useState({ nome: '', razao_social: '', cnpj: '', inscricao_estadual: '', contato: '', telefone: '', whatsapp: '', email: '',
+  const [f, setF] = useState({ nome: '', razao_social: '', tipo_pessoa: 'PJ', cnpj: '', inscricao_estadual: '', contato: '', telefone: '', whatsapp: '', email: '',
     endereco: '', bairro: '', cidade: '', uf: '', cep: '', condicao_pagamento: '', prazo_entrega_dias: '', observacao: '', ativo: true,
-    ...Object.fromEntries(Object.entries(fornecedor).map(([k, v]) => [k, v ?? ''])) });
+    ...Object.fromEntries(Object.entries(fornecedor).map(([k, v]) => [k, v ?? ''])), tipo_pessoa: fornecedor.tipo_pessoa || 'PJ' });
+  const problema = problemaDoc(f.cnpj, f.tipo_pessoa);
   const [ocupado, executar] = useAcao();
   const set = (k) => (e) => setF((x) => ({ ...x, [k]: e?.target ? e.target.value : e }));
   async function salvar() {
-    const ok = await executar(() => api.rpc('salvar_fornecedor', { p: { ...f, id: fornecedor.id || null, prazo_entrega_dias: n(f.prazo_entrega_dias) } }), 'Fornecedor salvo.');
+    const ok = await executar(() => api.rpc('salvar_fornecedor', { p: { ...f, id: fornecedor.id || null, cnpj: docLimpo(f.cnpj, f.tipo_pessoa), prazo_entrega_dias: n(f.prazo_entrega_dias) } }), 'Fornecedor salvo.');
     if (ok) { await recarregar(); aoFechar(); }
   }
   async function alternarAtivo() {
@@ -68,7 +69,13 @@ function FormFornecedor({ fornecedor, aoFechar, somenteLeitura }) {
     <fieldset disabled=${somenteLeitura} class="grade">
       <${Campo} rotulo="Nome fantasia (aparece nas telas)" obrigatorio><input class="entrada" value=${f.nome} onInput=${set('nome')} /></${Campo}>
       <${Campo} rotulo="Razão social" classe="larga2"><input class="entrada" value=${f.razao_social} onInput=${set('razao_social')} /></${Campo}>
-      <${Campo} rotulo="CNPJ"><input class="entrada" inputmode="numeric" value=${f.cnpj} onInput=${set('cnpj')} placeholder="00.000.000/0000-00" /></${Campo}>
+      <${Campo} rotulo="Tipo de pessoa"><select class="entrada" value=${f.tipo_pessoa}
+          onChange=${(e) => setF((x) => ({ ...x, tipo_pessoa: e.target.value, cnpj: docLimpo(x.cnpj, e.target.value) }))}>
+        ${TIPOS_PESSOA.map((t) => html`<option value=${t.id}>${t.titulo}</option>`)}</select></${Campo}>
+      <${Campo} rotulo=${rotuloDoc(f.tipo_pessoa)} ajuda=${problema ? html`<span class="texto-erro">${problema}</span>` : 'Digite só os números; a pontuação entra sozinha. Opcional.'}>
+        <input class="entrada" inputmode="numeric" autocomplete="off" value=${mascaraDoc(f.cnpj, f.tipo_pessoa)}
+          onInput=${(e) => set('cnpj')(docLimpo(e.target.value, f.tipo_pessoa))}
+          placeholder=${f.tipo_pessoa === 'PF' ? '000.000.000-00' : '00.000.000/0000-00'} /></${Campo}>
       <${Campo} rotulo="Inscrição estadual"><input class="entrada" value=${f.inscricao_estadual} onInput=${set('inscricao_estadual')} /></${Campo}>
       <${Campo} rotulo="Contato (vendedor)"><input class="entrada" value=${f.contato} onInput=${set('contato')} /></${Campo}>
       <${Campo} rotulo="Telefone"><input class="entrada" inputmode="tel" value=${f.telefone} onInput=${set('telefone')} /></${Campo}>

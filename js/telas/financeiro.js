@@ -5,7 +5,7 @@
 //  - comprador ou financeiro ajustam a previsão de pagamento (com motivo)
 // =====================================================================
 import { html, useState, useMemo, useEffect, useApp, Tabela, Cartao, Cabecalho, Etiqueta, Busca, useAcao, avisar } from '../ui.js';
-import { STATUS_PEDIDO, numeroPedido, data, dataHora, hojeISO, somarDias, diasEntre, diaLocal, moeda, pl, contem, nomeUsuario } from '../util.js';
+import { STATUS_PEDIDO, numeroPedido, data, dataHora, hojeISO, somarDias, diasEntre, diaLocal, moeda, pl, contem, nomeUsuario, formatarDoc } from '../util.js';
 import { resumoPedido, PedidoDetalhe, AjustarPagamento } from './pedidos.js';
 import { Exportar } from '../exportar.js';
 
@@ -88,7 +88,7 @@ export function TelaFinanceiro() {
     if (lanc === 'sim' && !p.fin_lancado) return false;
     if (lanc === 'nao' && p.fin_lancado) return false;
     if (ent && p.ent.id !== ent) return false;
-    return contem(`${numeroPedido(p.id)} ${p.id} ${p.r.fornecedor?.nome} ${p.r.fornecedor?.cnpj || ''}`, busca);
+    return contem(`${numeroPedido(p.id)} ${p.id} ${p.r.fornecedor?.nome} ${p.r.fornecedor?.cnpj || ''} ${formatarDoc(p.r.fornecedor?.cnpj, p.r.fornecedor?.tipo_pessoa)}`, busca);
   }), [todos, rapido, pedDe, pedAte, venDe, venAte, lanc, ent, busca]);
   const total = linhas.reduce((s, p) => s + (p.status === 'cancelado' ? 0 : p.r.valor), 0);
 

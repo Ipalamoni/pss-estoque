@@ -7,7 +7,7 @@
 // Os dados ficam só neste navegador (e podem ser reiniciados).
 // =====================================================================
 import { calcularEstatisticas } from './calc.js';
-import { plural } from './util.js';
+import { plural, docLimpo, formatarDoc, cnpjValido, cpfValido } from './util.js';
 
 const CHAVE = 'pss-estoque-demo-v8';
 let db = null;
@@ -155,9 +155,17 @@ const RPC = {
     const uf = txt(p.uf) ? String(p.uf).trim().toUpperCase() : null;
     if (uf && !/^[A-Z]{2}$/.test(uf)) erro('UF deve ter 2 letras (ex.: SP).');
     const id = numOuNull(p.id);
-    const dig = (x) => String(x || '').replace(/\D/g, '');
-    if (txt(p.cnpj) && db.fornecedores.some((f) => dig(f.cnpj) === dig(p.cnpj) && f.id !== id)) erro(`Já existe um fornecedor com o CNPJ ${p.cnpj}.`);
-    const dados = { nome: String(p.nome).trim(), razao_social: txt(p.razao_social), cnpj: txt(p.cnpj), inscricao_estadual: txt(p.inscricao_estadual),
+    const ant = id ? db.fornecedores.find((x) => x.id === id) : null;
+    const doc = docLimpo(p.cnpj) || null;   // CNPJ ou CPF sem pontuação
+    const tipo = String(txt(p.tipo_pessoa) || (doc && /^\d{11}$/.test(doc) ? 'PF' : doc ? 'PJ' : ant?.tipo_pessoa || 'PJ')).toUpperCase();
+    if (!['PJ', 'PF'].includes(tipo)) erro('Tipo de pessoa inválido (use PJ = jurídica ou PF = física).');
+    const rot = tipo === 'PF' ? 'CPF' : 'CNPJ';
+    if (doc) {
+      if ((doc !== (docLimpo(ant?.cnpj) || null) || tipo !== ant?.tipo_pessoa) && !(tipo === 'PF' ? cpfValido(doc) : cnpjValido(doc)))
+        erro(`${rot} inválido: ${formatarDoc(doc)}. Confira os números digitados.`);
+      if (db.fornecedores.some((f) => docLimpo(f.cnpj) === doc && f.id !== id)) erro(`Já existe um fornecedor com o ${rot} ${formatarDoc(doc)}.`);
+    }
+    const dados = { nome: String(p.nome).trim(), razao_social: txt(p.razao_social), tipo_pessoa: tipo, cnpj: doc, inscricao_estadual: txt(p.inscricao_estadual),
       contato: txt(p.contato), telefone: txt(p.telefone), whatsapp: txt(p.whatsapp), email: txt(p.email), endereco: txt(p.endereco), bairro: txt(p.bairro),
       cidade: txt(p.cidade), uf, cep: txt(p.cep), condicao_pagamento: txt(p.condicao_pagamento),
       prazo_entrega_dias: numOuNull(p.prazo_entrega_dias), observacao: txt(p.observacao), ativo: p.ativo !== false };
@@ -591,14 +599,19 @@ const RPC = {
     exigir('parametros');
     for (const [k, v] of Object.entries(p)) {
       const reg = db.parametros.find((x) => x.chave === k);
-      if (reg) atualizar('parametros', reg, { valor: v });
+      let valor = v;
+      if (k === 'empresa_cnpj') {   // guarda sem pontuação
+        valor = docLimpo(v);
+        if (valor && !cnpjValido(valor) && !cpfValido(valor)) erro(`CNPJ da empresa inválido: ${formatarDoc(valor)}. Confira os números digitados.`);
+      }
+      if (reg) atualizar('parametros', reg, { valor });
     }
   },
   importar_cadastros({ p }) {
     exigir('importacao');
     const r = { fornecedores_novos: 0, fornecedores_atualizados: 0, produtos_novos: 0, produtos_atualizados: 0, receitas_novas: 0, receitas_atualizadas: 0, saldos_implantados: 0 };
     const linha = (aba, l, fn) => { try { return fn(); } catch (e) { erro(`Aba ${aba}, linha ${l}: ${e.message}`); } };
-    const soDig = (x) => String(x || '').replace(/\D/g, '');
+    const soDig = (x) => docLimpo(x);
     for (const it of p.fornecedores || []) linha('Fornecedores', it.linha, () => {
       const ex = db.fornecedores.find((f) => (txt(it.cnpj) && soDig(f.cnpj) === soDig(it.cnpj)) || f.nome.toLowerCase() === String(it.nome || '').trim().toLowerCase());
       RPC.salvar_fornecedor({ p: { ...it, id: ex?.id || null } }); r[ex ? 'fornecedores_atualizados' : 'fornecedores_novos']++;
@@ -689,8 +702,9 @@ function semente() {
   // cadastros
   const F = {};
   como('comprador', -61, 8, () => {
-    F.moinho = RPC.salvar_fornecedor({ p: { nome: 'Moinho Exemplo Ltda', razao_social: 'Moinho Exemplo Indústria de Farinhas Ltda', cnpj: '00.000.000/0001-00', prazo_entrega_dias: 10, contato: 'Vendas', telefone: '(16) 0000-0000', whatsapp: '(16) 90000-0000', cidade: 'Franca', uf: 'SP', condicao_pagamento: '28 dias' } });
-    F.ferm = RPC.salvar_fornecedor({ p: { nome: 'Fermentos Exemplo S.A.', prazo_entrega_dias: 7 } });
+    F.moinho = RPC.salvar_fornecedor({ p: { nome: 'Moinho Exemplo Ltda', razao_social: 'Moinho Exemplo Indústria de Farinhas Ltda', cnpj: '11222333000181', prazo_entrega_dias: 10, contato: 'Vendas', telefone: '(16) 0000-0000', whatsapp: '(16) 90000-0000', cidade: 'Franca', uf: 'SP', condicao_pagamento: '28 dias' } });
+    F.ferm = RPC.salvar_fornecedor({ p: { nome: 'Fermentos Exemplo S.A.', cnpj: '11444777000161', prazo_entrega_dias: 7 } });
+    RPC.salvar_fornecedor({ p: { nome: 'Produtor Rural Exemplo', tipo_pessoa: 'PF', cnpj: '52998224725', cidade: 'Franca', uf: 'SP', prazo_entrega_dias: 3 } });
     F.alim = RPC.salvar_fornecedor({ p: { nome: 'Atacadista de Alimentos Exemplo', prazo_entrega_dias: 5 } });
     F.emb = RPC.salvar_fornecedor({ p: { nome: 'Embalagens Exemplo Ind.', prazo_entrega_dias: 15 } });
     F.esc = RPC.salvar_fornecedor({ p: { nome: 'Papelaria e Limpeza Exemplo', prazo_entrega_dias: 4 } });

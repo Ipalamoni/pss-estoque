@@ -2,7 +2,7 @@
 // export.js — PDF (pedido de compra e relatórios), Excel e impressão
 // Bibliotecas locais: jsPDF + AutoTable (PDF) e SheetJS (Excel)
 // =====================================================================
-import { numeroPedido, data, dataHora, qtd, moeda, num } from './util.js';
+import { numeroPedido, data, dataHora, qtd, moeda, num, formatarDoc, rotuloDoc } from './util.js';
 
 const CFG = window.CONFIG || {};
 const COR = CFG.COR_PDF || [2, 110, 87]; // cor principal no PDF (R, G, B)
@@ -43,7 +43,7 @@ async function topo(doc, params, titulo, subtitulo) {
   doc.setTextColor(30); doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
   doc.text(params.empresa_nome || 'Pães São Sebastião', x, 13);
   doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(80);
-  const linhas = [params.empresa_cnpj && `CNPJ ${params.empresa_cnpj}`, params.empresa_endereco, params.empresa_telefone].filter(Boolean);
+  const linhas = [params.empresa_cnpj && `CNPJ ${formatarDoc(params.empresa_cnpj)}`, params.empresa_endereco, params.empresa_telefone].filter(Boolean);
   linhas.forEach((l, i) => doc.text(l, x, 18 + i * 4));
   doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.setTextColor(...COR);
   doc.text(titulo, w - 10, 14, { align: 'right' });
@@ -68,7 +68,7 @@ export async function pdfPedido({ pedido, itens, fornecedor, produtos, params, c
   doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.text('Fornecedor', 13, y + 1);
   doc.setFontSize(9); doc.text(fornecedor?.nome || '–', 13, y + 6.5);
   doc.setFont('helvetica', 'normal');
-  const fl = [fornecedor?.razao_social && fornecedor.razao_social !== fornecedor.nome && fornecedor.razao_social, fornecedor?.cnpj && `CNPJ ${fornecedor.cnpj}`,
+  const fl = [fornecedor?.razao_social && fornecedor.razao_social !== fornecedor.nome && fornecedor.razao_social, fornecedor?.cnpj && `${rotuloDoc(fornecedor.tipo_pessoa)} ${formatarDoc(fornecedor.cnpj, fornecedor.tipo_pessoa)}`,
     fornecedor?.inscricao_estadual && `IE ${fornecedor.inscricao_estadual}`, fornecedor?.contato && `Contato: ${fornecedor.contato}`,
     (fornecedor?.whatsapp || fornecedor?.telefone) && `Tel.: ${fornecedor.whatsapp || fornecedor.telefone}`, fornecedor?.email,
     [fornecedor?.cidade, fornecedor?.uf].filter(Boolean).join('/')].filter(Boolean).join('   ·   ');
