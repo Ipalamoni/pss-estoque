@@ -12,6 +12,7 @@ export const PAPEIS = {
   diretoria: 'Diretoria (consulta)',
   financeiro: 'Financeiro (pedidos e pagamentos)',
   faturamento: 'Faturamento (previsão de produção)',
+  padeiro: 'Padeiro (tablet da Produção Maceiras)',
 };
 
 export const CATEGORIAS = {
@@ -20,16 +21,42 @@ export const CATEGORIAS = {
   escritorio: 'Material de escritório',
   limpeza: 'Material de limpeza',
   outros: 'Outros',
+  intermediario: 'Produto intermediário (mistura)',
+  produto_acabado: 'Produto acabado',
 };
+// categorias que o usuário escolhe no cadastro (a mistura é criada pelo sistema)
+export const CATEGORIAS_CADASTRO = ['materia_prima', 'embalagem', 'escritorio', 'limpeza', 'outros'];
+// "tipo de produto" nos filtros
+export const TIPOS_PRODUTO = {
+  materia_prima: 'Matéria-prima', embalagem: 'Embalagem', intermediario: 'Intermediário (mistura)',
+  uso: 'Uso e consumo', produto_acabado: 'Produto acabado',
+};
+export const tipoProduto = (p) => (['escritorio', 'limpeza', 'outros'].includes(p?.categoria) ? 'uso' : p?.categoria);
+
+export const TIPOS_LOCAL = {
+  almoxarifado: 'Almoxarifado', deposito: 'Depósito', pesagem: 'Pesagem', maceiras: 'Produção (maceiras)',
+  pcp: 'PCP / engenharia', expedicao: 'Expedição', outro: 'Outro',
+};
+export const ETAPAS_TRANSF = {
+  separacao: 'separação', envio: 'envio', recebimento: 'recebimento', cancelamento_envio: 'envio cancelado',
+  cancelamento_separacao: 'separação cancelada', diferenca_volta: 'diferença voltou',
+};
+export const SITUACAO_TRANSF = { separada: 'Separada', enviada: 'Em trânsito', recebida: 'Recebida', cancelada: 'Cancelada' };
+export const SITUACAO_REQ = { pendente: 'Pendente', parcial: 'Atendida em parte', atendida: 'Atendida', encerrada: 'Encerrada', cancelada: 'Cancelada' };
 
 export const TIPOS_MOV = {
   implantacao: 'Implantação de saldo',
   entrada: 'Entrada (recebimento)',
-  saida_receita: 'Saída por receita',
-  saida_avulsa: 'Saída avulsa (pesagem)',
+  saida_receita: 'Consumo pela receita',
+  saida_avulsa: 'Saída avulsa',
   saida_almox: 'Saída almoxarifado',
   inventario: 'Ajuste de inventário',
   correcao: 'Correção',
+  transferencia: 'Transferência',
+  consumo: 'Consumo no setor',
+  entrada_producao: 'Entrada da produção',
+  perda: 'Perda',
+  entrada_manual: 'Entrada manual',
 };
 
 export const STATUS_PEDIDO = {
@@ -63,7 +90,7 @@ export const PERMISSOES = {
   pedido: ['admin', 'comprador'],
   recebimento: ['admin', 'almoxarifado', 'recebimento'],
   saida_receita: ['admin', 'pesagem', 'almoxarifado'],
-  saida_avulsa: ['admin', 'pesagem', 'almoxarifado'],
+  saida_avulsa: ['admin', 'pesagem', 'almoxarifado', 'padeiro', 'engenharia'],
   saida_almox: ['admin', 'almoxarifado', 'recebimento'],
   inventario: ['admin', 'almoxarifado', 'recebimento'],
   corrigir: ['admin', 'almoxarifado'],
@@ -77,8 +104,18 @@ export const PERMISSOES = {
   financeiro: ['admin', 'financeiro'],
   data_pagamento: ['admin', 'comprador', 'financeiro'],
   previsao_producao: ['admin', 'engenharia', 'diretoria', 'financeiro', 'faturamento'],
-  custos: ['admin'],
+  custos: ['admin', 'diretoria'],
+  requisicao: ['admin', 'engenharia'],
+  producao_config: ['admin', 'engenharia'],
+  batelada: ['admin', 'padeiro', 'engenharia'],
+  finalizar_batelada: ['admin', 'engenharia'],
+  consumo: ['admin', 'engenharia', 'almoxarifado', 'padeiro', 'pesagem'],
+  locais: ['admin'],
 };
+// o usuário opera este local? (administrador opera todos)
+export const operaLocal = (papeis, local) => (papeis || []).includes('admin') || (local?.papeis || []).some((x) => (papeis || []).includes(x));
+// gestão = vê tudo (estoque de todos os locais, produção, painel)
+export const ehGestao = (papeis) => (papeis || []).some((x) => ['admin', 'diretoria', 'engenharia', 'comprador'].includes(x));
 // Papéis que NÃO enxergam estoque/produção (o banco também bloqueia a leitura)
 export const PAPEIS_RESTRITOS = ['financeiro', 'faturamento'];
 export const acessoAmplo = (papeis) => (papeis || []).some((x) => !PAPEIS_RESTRITOS.includes(x));

@@ -36,6 +36,20 @@ const P = {
   previsao: 'M3 3v18h18M7 15l4-4 3 3 6-6M14 8h6v6',
   custos: 'M4 2h16v20H4zM8 6h8M8 10h2M14 10h2M8 14h2M14 14h2M8 18h2M14 18h2',
   painel: 'M3 3h7v9H3zM14 3h7v5h-7zM14 12h7v9h-7zM3 16h7v5H3z',
+  sino: 'M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0',
+  'painel-producao': 'M3 12a9 9 0 1 1 18 0M12 12l4-4M7 12h.01M17 12h.01M12 7h.01M4 20h16',
+  maceiras: 'M4 10h16v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zM2 10h20M8 10V7a4 4 0 0 1 8 0v3M12 14v3',
+  finalizar: 'M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11',
+  'estoque-local': 'M3 21V8l9-5 9 5v13M7 21v-6h4v6M13 21v-9h4v9',
+  transferencias: 'M1 7h13v9H1zM14 10h4l3 3v3h-7zM5 18.5a1.5 1.5 0 1 0 0-.1M17 18.5a1.5 1.5 0 1 0 0-.1M5 4h6M3 1h4',
+  requisicoes: 'M9 3h6v3H9zM7 4.5H5v16.5h14V4.5h-2M9 12h6M9 16h4M12 9v6',
+  'cadastros-producao': 'M12 2l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 14.3l-4.8 2.6.9-5.4-3.9-3.8 5.4-.8zM5 22h14',
+  lapis: 'M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z',
+  trocar: 'M16 3l4 4-4 4M20 7H4M8 21l-4-4 4-4M4 17h16',
+  relogio: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 6v6l4 2',
+  play: 'M6 4l14 8-14 8z',
+  caminhao: 'M1 7h13v9H1zM14 10h4l3 3v3h-7zM5 18.5a1.5 1.5 0 1 0 0-.1M17 18.5a1.5 1.5 0 1 0 0-.1',
+  anexo: 'M21.4 11.1l-9.2 9.2a6 6 0 0 1-8.5-8.5l9.2-9.2a4 4 0 0 1 5.7 5.7l-9.2 9.2a2 2 0 0 1-2.8-2.8l8.5-8.5',
 };
 
 export function Icone({ nome, tam = 20 }) {

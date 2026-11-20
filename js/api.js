@@ -6,6 +6,7 @@
 import { apiDemo } from './demo.js';
 
 const CFG = window.CONFIG || {};
+const COLUNAS = { operadores: 'id, nome, ativo, criado_em' };   // a senha do padeiro nunca é lida pela tela
 
 function criarApiSupabase() {
   if (!window.supabase || !CFG.SUPABASE_URL || !CFG.SUPABASE_CHAVE_PUBLICAVEL) {
@@ -76,14 +77,15 @@ function criarApiSupabase() {
       let de = 0;
       const todos = [];
       for (;;) {
-        let q = sb.from(tabela).select('*');
+        let q = sb.from(tabela).select(o.colunas || COLUNAS[tabela] || '*');
         const campo = o.campoData || 'data_hora';
         if (o.desde) q = q.gte(campo, o.desde);
         if (o.ate) q = q.lt(campo, o.ate);
         if (o.eq) for (const [k, v] of Object.entries(o.eq)) q = q.eq(k, v);
         if (o.em) for (const [k, v] of Object.entries(o.em)) q = q.in(k, v);
         if (o.ordem) q = q.order(o.ordem[0], { ascending: o.ordem[1] !== 'desc' });
-        else q = q.order(tabela === 'perfis' ? 'usuario' : tabela === 'parametros' ? 'chave' : 'id', { ascending: true });
+        else if (tabela === 'estoque_local') q = q.order('produto_id').order('local_id');
+        else q = q.order(tabela === 'perfis' ? 'usuario' : tabela === 'parametros' ? 'chave' : tabela === 'batelada_custos' ? 'batelada_id' : 'id', { ascending: true });
         const ate = o.limite ? Math.min(de + tamanho, o.limite) - 1 : de + tamanho - 1;
         const { data, error } = await q.range(de, ate);
         falhou(error);
@@ -97,6 +99,13 @@ function criarApiSupabase() {
       const { data, error } = await sb.rpc(nome, args);
       falhou(error);
       return data;
+    },
+    // TEMPO REAL: avisa a tela quando alguém muda algo nas tabelas (sem ficar consultando o banco)
+    aoMudar(tabelas, f) {
+      const canal = sb.channel('mudancas-' + Math.random().toString(36).slice(2));
+      tabelas.forEach((t) => canal.on('postgres_changes', { event: '*', schema: 'public', table: t }, () => f([t])));
+      canal.subscribe();
+      return () => { try { sb.removeChannel(canal); } catch { /* ignora */ } };
     },
   };
 }

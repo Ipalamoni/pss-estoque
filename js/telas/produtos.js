@@ -1,6 +1,6 @@
 // Cadastro de produtos (matérias-primas, embalagens e outros)
 import { html, useState, useMemo, useApp, Tabela, Modal, Campo, Numero, Escolher, Busca, Etiqueta, Cabecalho, useAcao, confirmar, n } from '../ui.js';
-import { CATEGORIAS, UNIDADES_ESTOQUE, UNIDADES_COMPRA, contem, qtdDupla, num, moeda, qu, pl, hojeISO } from '../util.js';
+import { CATEGORIAS, CATEGORIAS_CADASTRO, UNIDADES_ESTOQUE, UNIDADES_COMPRA, contem, qtdDupla, num, moeda, qu, pl, hojeISO } from '../util.js';
 import { Icone } from '../icones.js';
 import { UltimaAlteracao, HistoricoAuditoria } from '../historico.js';
 import { Exportar } from '../exportar.js';
@@ -71,6 +71,12 @@ function FormProduto({ produto, aoFechar, somenteLeitura }) {
     unidade_compra: produto.unidade_compra || '', fator_compra: produto.fator_compra ? String(produto.fator_compra).replace('.', ',') : '1',
     estoque_minimo: produto.estoque_minimo ?? '', prazo_entrega_dias: produto.prazo_entrega_dias ?? '',
     fornecedor_padrao_id: produto.fornecedor_padrao_id || null, observacao: produto.observacao || '', ativo: produto.ativo !== false,
+    controla_estoque: produto.controla_estoque !== false,
+    baixa_producao: produto.baixa_producao ?? ((produto.categoria || 'materia_prima') === 'materia_prima'),
+    baixa_requisicao: produto.baixa_requisicao ?? ((produto.categoria || 'materia_prima') !== 'materia_prima'),
+    usado_na: produto.usado_na || ((produto.categoria || 'materia_prima') === 'materia_prima' ? 'pesagem' : ''),
+    local_padrao_id: produto.local_padrao_id || null, unidade2: produto.unidade2 || '',
+    peso_embalagem_g: produto.peso_embalagem_g != null ? String(Number(produto.peso_embalagem_g)).replace('.', ',') : '',
   }));
   const [ocupado, executar] = useAcao();
   const set = (k) => (v) => setF((x) => ({ ...x, [k]: v?.target ? v.target.value : v }));
@@ -78,7 +84,12 @@ function FormProduto({ produto, aoFechar, somenteLeitura }) {
   const minNum = n(f.estoque_minimo);
   const sugestao = sugerirCodigo(dados.produtos, f.categoria);
   const montar = (extra = {}) => ({ ...f, ...extra, codigo: f.codigo.trim() || sugestao, id: produto.id || null, fator_compra: temCompra ? n(f.fator_compra) : 1,
-    estoque_minimo: n(f.estoque_minimo), prazo_entrega_dias: n(f.prazo_entrega_dias) });
+    estoque_minimo: n(f.estoque_minimo), prazo_entrega_dias: n(f.prazo_entrega_dias), peso_embalagem_g: n(f.peso_embalagem_g),
+    usado_na: f.categoria === 'materia_prima' ? f.usado_na || 'pesagem' : null, unidade2: f.unidade2 || null,
+    baixa_producao: f.controla_estoque ? f.baixa_producao : false, baixa_requisicao: f.controla_estoque ? f.baixa_requisicao : false,
+    ficha_id: produto.ficha_id || null });
+  const sistema = ['intermediario', 'produto_acabado'].includes(f.categoria);
+  const pesoObrig = f.categoria === 'embalagem' && f.controla_estoque && ['kg', 'g'].includes(f.unidade_estoque.toLowerCase());
 
   async function salvar() {
     const ok = await executar(() => api.rpc('salvar_produto', { p: montar() }), 'Produto salvo.');
@@ -106,8 +117,9 @@ function FormProduto({ produto, aoFechar, somenteLeitura }) {
       <${Campo} rotulo="Código no ERP" ajuda="Opcional: o código do mesmo item no ERP, para conciliar."><input class="entrada" value=${f.codigo_erp} onInput=${set('codigo_erp')} /></${Campo}>
       <${Campo} rotulo="Descrição" obrigatorio classe="larga"><input class="entrada" value=${f.descricao} onInput=${set('descricao')} placeholder="ex.: Farinha de trigo tipo A Coamo" /></${Campo}>
       <${Campo} rotulo="Categoria" obrigatorio>
-        <select class="entrada" value=${f.categoria} onChange=${set('categoria')}>
-          ${Object.entries(CATEGORIAS).map(([k, v]) => html`<option value=${k}>${v}</option>`)}
+        <select class="entrada" value=${f.categoria} disabled=${sistema} onChange=${(e) => { const c = e.target.value; setF((x) => ({ ...x, categoria: c,
+          ...(produto.id ? {} : { baixa_producao: c === 'materia_prima', baixa_requisicao: c !== 'materia_prima', usado_na: c === 'materia_prima' ? 'pesagem' : '' }) })); }}>
+          ${(sistema ? [f.categoria] : CATEGORIAS_CADASTRO).map((k) => html`<option value=${k}>${CATEGORIAS[k]}</option>`)}
         </select></${Campo}>
       <${Campo} rotulo="Grupo" ajuda="Agrupa produtos parecidos: Farinha, Fermento, Melhorador, Bobina…">
         <input class="entrada" list="grupos" value=${f.grupo} onInput=${set('grupo')} />${dl('grupos', distintos(dados.produtos, 'grupo'))}</${Campo}>
@@ -136,6 +148,32 @@ function FormProduto({ produto, aoFechar, somenteLeitura }) {
       <${Campo} rotulo="Fornecedor principal">
         <${Escolher} itens=${dados.fornecedores.filter((x) => x.ativo)} valor=${f.fornecedor_padrao_id} aoMudar=${set('fornecedor_padrao_id')}
           rotuloDe=${(x) => x.nome} /></${Campo}>
+      <div class="larga bloco-opcoes">
+        <h4>Estoque e baixa</h4>
+        <div class="opcoes-linha">
+          <span>Controla estoque?</span>
+          <div class="seg"><button type="button" class=${f.controla_estoque ? 'ativo' : ''} onClick=${() => set('controla_estoque')(true)}>Sim</button>
+            <button type="button" class=${!f.controla_estoque ? 'ativo' : ''} onClick=${() => set('controla_estoque')(false)}>Não</button></div>
+        </div>
+        ${f.controla_estoque ? html`<div class="opcoes-linha"><span>Como sai do estoque (pelo menos uma)</span>
+            <label class="check"><input type="checkbox" checked=${f.baixa_producao} onChange=${(e) => set('baixa_producao')(e.target.checked)} /> Pela produção (ficha técnica)</label>
+            <label class="check"><input type="checkbox" checked=${f.baixa_requisicao} onChange=${(e) => set('baixa_requisicao')(e.target.checked)} /> Por requisição / consumo no setor</label></div>
+          ${!f.baixa_producao && !f.baixa_requisicao && html`<div class="alerta">Marque pelo menos uma forma de baixa.</div>`}
+          ${f.categoria === 'embalagem' && f.baixa_producao && html`<p class="nota">Embalagem com baixa pela produção: ao finalizar a batelada, o sistema baixa pela ficha (nº de embalagens × peso médio).</p>`}`
+          : html`<p class="nota">Não controla estoque: aparece no pedido e no recebimento, mas não tem saldo nem baixa.</p>`}
+        <div class="grade">
+          ${f.categoria === 'materia_prima' && html`<${Campo} rotulo="Usado na" ajuda="Pós vão para a pesagem. Farinha e fermento são usados direto na maceira.">
+            <select class="entrada" value=${f.usado_na} onChange=${set('usado_na')}><option value="pesagem">Pesagem (pós)</option><option value="maceira">Maceira (farinha, fermento)</option></select></${Campo}>`}
+          <${Campo} rotulo="Local padrão" ajuda="Onde o produto entra no recebimento. Vazio = automático (pesados → Depósito Produção, pós → Pesagem, resto → Almoxarifado).">
+            <select class="entrada" value=${f.local_padrao_id || ''} onChange=${(e) => set('local_padrao_id')(e.target.value ? Number(e.target.value) : null)}>
+              <option value="">Automático</option>${dados.locais.filter((l) => l.ativo).map((l) => html`<option value=${l.id}>${l.nome}</option>`)}</select></${Campo}>
+          <${Campo} rotulo="Conta também por volume? (opcional)" ajuda="Ex.: bobina. Assim o estoque mostra kg e quantas bobinas.">
+            <input class="entrada" list="u2" value=${f.unidade2} onInput=${set('unidade2')} placeholder="ex.: bobina" />${dl('u2', ['bobina', 'rolo', 'saco', 'caixa', 'fardo'])}</${Campo}>
+          ${f.categoria === 'embalagem' && html`<${Campo} rotulo="Peso médio de 1 embalagem (g)" obrigatorio=${pesoObrig}
+            ajuda="Ex.: 12 g por saquinho. Usado para converter as embalagens da ficha em kg (custo e baixa).">
+            <${Numero} valor=${f.peso_embalagem_g} aoMudar=${set('peso_embalagem_g')} /></${Campo}>`}
+        </div>
+      </div>
       <${Campo} rotulo="Observação" classe="larga"><textarea class="entrada" rows="2" value=${f.observacao} onInput=${set('observacao')}></textarea></${Campo}>
     </fieldset>
     ${produto.id && html`<p class="nota">Saldo atual: <b>${qtdDupla(produto, produto.saldo)}</b> · Custo médio: <b>${moeda(produto.custo_medio)}/${produto.unidade_estoque}</b>.

@@ -10,6 +10,7 @@
 import { html, useState, useEffect, useMemo, useApp, Tabela, Modal, Cartao, Cabecalho, Etiqueta, Busca, Abas, Carregando, avisar } from '../ui.js';
 import { CATEGORIAS, data, dataHora, hojeISO, num, qtd, moeda, pl, contem, numeroPedido, mensagemErro } from '../util.js';
 import { Exportar } from '../exportar.js';
+import { CustoProdutoAcabado, EstoqueValorizado, AvulsasPerdas } from './custos-producao.js';
 
 const m4 = (v) => (v === null || v === undefined ? '–' : 'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 }));
 const sing = (u) => String(u || 'un').replace(/ães$/, 'ão').replace(/es$/, (m, i, t) => (/(r|z)es$/.test(t) ? '' : 'es')).replace(/s$/, '');
@@ -31,9 +32,11 @@ export function TelaCustos() {
   const [aba, setAba] = useState('produtos');
   const ult = useCustos();
   return html`
-    <${Cabecalho} titulo="Gestão de custos" sub="Último custo e custo médio dos produtos; custo das receitas e do produto acabado" />
-    <${Abas} abas=${[{ id: 'produtos', titulo: 'Produtos · custos' }, { id: 'fichas', titulo: 'Fichas / custo' }]} ativa=${aba} aoMudar=${setAba} />
-    ${!ult ? html`<${Carregando} />` : aba === 'produtos' ? html`<${CustosProdutos} ult=${ult} />` : html`<${CustosFichas} ult=${ult} />`}`;
+    <${Cabecalho} titulo="Central de Custos" sub="Matéria-prima, receitas, produto acabado, estoque valorizado e perdas. Visível só para a controladoria e a diretoria." />
+    <${Abas} abas=${[{ id: 'produtos', titulo: 'Matéria-prima' }, { id: 'fichas', titulo: 'Receitas (padrão)' }, { id: 'acabado', titulo: 'Produto acabado' },
+      { id: 'valorizado', titulo: 'Estoque valorizado' }, { id: 'perdas', titulo: 'Avulsas e perdas' }]} ativa=${aba} aoMudar=${setAba} />
+    ${aba === 'acabado' ? html`<${CustoProdutoAcabado} />` : aba === 'valorizado' ? html`<${EstoqueValorizado} />` : aba === 'perdas' ? html`<${AvulsasPerdas} />`
+      : !ult ? html`<${Carregando} />` : aba === 'produtos' ? html`<${CustosProdutos} ult=${ult} />` : html`<${CustosFichas} ult=${ult} />`}`;
 }
 
 // ------------------------------- PRODUTOS ----------------------------
@@ -106,7 +109,9 @@ export function custoDaFicha(ficha, dados, ult) {
     const u = ult.get(i.produto_id);
     const cm = Number(p?.custo_medio || 0);
     const uc = u ? Number(u.ultimo_custo) : null;
-    const q = Number(i.quantidade);
+    // embalagem na ficha = nº por unidade produzida → converte para a unidade de estoque da receita inteira
+    const pe = p?.categoria === 'embalagem' ? (String(p.unidade_estoque).toLowerCase() === 'kg' ? Number(p.peso_embalagem_g || 0) / 1000 : String(p.unidade_estoque).toLowerCase() === 'g' ? Number(p.peso_embalagem_g || 0) : 1) * Number(ficha.rendimento_qtd || 0) : 1;
+    const q = Number(i.quantidade) * pe;
     return { ...i, p, q, uc, cm, semUlt: uc === null, tUlt: q * (uc ?? cm), tMed: q * cm };
   });
   const tUlt = itens.reduce((s, i) => s + i.tUlt, 0), tMed = itens.reduce((s, i) => s + i.tMed, 0);

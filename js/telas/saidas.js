@@ -1,6 +1,7 @@
 // Saídas: por receita (ficha técnica), avulsa de matéria-prima e do almoxarifado
 import { html, useState, useMemo, useEffect, useApp, Campo, Numero, Escolher, QtdUnidade, Busca, Etiqueta, Cabecalho, Abas, Vazio, Tabela, useAcao, confirmar, avisar, n } from '../ui.js';
 import { qtd, num, moeda, contem, fator, qtdDupla, hojeISO, dataHora, TIPOS_MOV, DESTINOS, mensagemErro, qu, plural, pl, nomeUsuario } from '../util.js';
+import { SeletorLocal, useLocalInicial, saldoLocal } from '../producao-util.js';
 import { CorrigirMovimento } from './movimentos.js';
 import { useProducoes } from './producao.js';
 
@@ -144,6 +145,7 @@ function SaidaReceita({ fichaInicial, aoConcluir }) {
 const MOTIVOS_RAPIDOS = ['Massa caiu / perdeu', 'Teste de receita', 'Reprocesso', 'Ajuste de massa', 'Amostra'];
 function SaidaAvulsa({ aoConcluir }) {
   const { dados, recarregar, api } = useApp();
+  const [loc, setLoc] = useLocalInicial('pesagem');
   const [prodId, setProdId] = useState(null);
   const [q, setQ] = useState('');
   const [un, setUn] = useState(null);
@@ -153,15 +155,16 @@ function SaidaAvulsa({ aoConcluir }) {
   async function registrar() {
     if (!prodId || !(n(q) > 0)) return avisar('Escolha a matéria-prima e a quantidade.', 'erro');
     if (!obs.trim()) return avisar('Escreva a justificativa da saída avulsa.', 'erro');
-    const r = await executar(() => api.rpc('registrar_saida', { p: { tipo: 'saida_avulsa', observacao: obs, itens: [{ produto_id: prodId, quantidade: n(q), unidade: un }] } }), 'Saída avulsa registrada.');
+    const r = await executar(() => api.rpc('registrar_saida', { p: { tipo: 'saida_avulsa', observacao: obs, local_id: loc, itens: [{ produto_id: prodId, quantidade: n(q), unidade: un }] } }), 'Saída avulsa registrada.');
     if (r) { await recarregar(); setQ(''); setObs(''); setProdId(null); aoConcluir(); }
   }
   return html`<section class="painel">
-    <p class="nota">Use para saída de uma matéria-prima fora da receita (ex.: massa que caiu). A justificativa é obrigatória.</p>
+    <p class="nota">Use para saída de uma matéria-prima fora da receita (ex.: massa que caiu). A justificativa é obrigatória. Não entra no custo do produto.</p>
+    <div class="filtros"><${SeletorLocal} valor=${loc} aoMudar=${setLoc} rotulo="Sai de" /></div>
     <div class="grade">
       <${Campo} rotulo="Matéria-prima" obrigatorio classe="larga"><${Escolher} itens=${dados.produtos.filter((x) => x.ativo && x.categoria === 'materia_prima')} valor=${prodId}
         rotuloDe=${(x) => `${x.codigo} · ${x.descricao}`} aoMudar=${(id, pr) => { setProdId(id); setUn(pr.unidade_estoque); }} /></${Campo}>
-      <${Campo} rotulo="Quantidade" obrigatorio ajuda=${p ? `Saldo: ${qtdDupla(p, p.saldo)}` : ''}><${QtdUnidade} produto=${p} valor=${q} unidade=${un} desabilitado=${!p} aoMudar=${(v, u) => { setQ(v); setUn(u); }} /></${Campo}>
+      <${Campo} rotulo="Quantidade" obrigatorio ajuda=${p ? `Neste local: ${qtdDupla(p, saldoLocal(dados, p.id, loc).disponivel)}` : ''}><${QtdUnidade} produto=${p} valor=${q} unidade=${un} desabilitado=${!p} aoMudar=${(v, u) => { setQ(v); setUn(u); }} /></${Campo}>
       <${Campo} rotulo="Justificativa" obrigatorio classe="larga">
         <div class="chips">${MOTIVOS_RAPIDOS.map((t) => html`<button type="button" class=${'chip' + (obs === t ? ' ativo' : '')} onClick=${() => setObs(t)}>${t}</button>`)}</div>
         <input class="entrada" value=${obs} onInput=${(e) => setObs(e.target.value)} placeholder="Descreva o motivo" /></${Campo}>
@@ -173,6 +176,7 @@ function SaidaAvulsa({ aoConcluir }) {
 // ------------------------------ ALMOXARIFADO -------------------------
 function SaidaAlmox({ aoConcluir }) {
   const { dados, recarregar, api } = useApp();
+  const [loc, setLoc] = useLocalInicial('almoxarifado');
   const [destino, setDestino] = useState(DESTINOS[1]);
   const [obs, setObs] = useState('');
   const [linhas, setLinhas] = useState([{ k: 1, produto_id: null, quantidade: '', unidade: null }]);
@@ -181,20 +185,21 @@ function SaidaAlmox({ aoConcluir }) {
   async function registrar() {
     const its = linhas.filter((l) => l.produto_id && n(l.quantidade) > 0);
     if (!its.length) return avisar('Escolha pelo menos 1 item e a quantidade.', 'erro');
-    const r = await executar(() => api.rpc('registrar_saida', { p: { tipo: 'saida_almox', destino, observacao: obs,
+    const r = await executar(() => api.rpc('registrar_saida', { p: { tipo: 'saida_almox', destino, observacao: obs, local_id: loc,
       itens: its.map((l) => ({ produto_id: l.produto_id, quantidade: n(l.quantidade), unidade: l.unidade })) } }), `Saída registrada (${pl(its.length, 'item', 'itens')}).`);
     if (r) { await recarregar(); setLinhas([{ k: Math.random(), produto_id: null, quantidade: '', unidade: null }]); setObs(''); aoConcluir(); }
   }
   return html`<section class="painel">
-    <p class="nota">Embalagens (bobinas inteiras), material de escritório, limpeza e outros. A quantidade já vem na unidade de compra (ex.: bobina).</p>
+    <p class="nota">Material de escritório, limpeza e outros entregues a um setor. Embalagem para a produção vai por <b>Requisições</b> (o PCP pede, o almoxarifado envia).</p>
     <div class="grade">
+      <${Campo} rotulo="Sai de"><${SeletorLocal} valor=${loc} aoMudar=${setLoc} rotulo="" /></${Campo}>
       <${Campo} rotulo="Destino"><select class="entrada" value=${destino} onChange=${(e) => setDestino(e.target.value)}>${DESTINOS.map((d) => html`<option>${d}</option>`)}</select></${Campo}>
       <${Campo} rotulo="Observação"><input class="entrada" value=${obs} onInput=${(e) => setObs(e.target.value)} /></${Campo}>
     </div>
     <div class="linhas-itens">${linhas.map((l) => { const p = dados.mapa.ind.get(l.produto_id); return html`<div class="linha-item linha-pedido" key=${l.k}>
       <div class="li-prod"><${Escolher} itens=${dados.produtos.filter((x) => x.ativo)} valor=${l.produto_id} rotuloDe=${(x) => `${x.codigo} · ${x.descricao}`}
         aoMudar=${(id, pr) => mudar(l.k, { produto_id: id, unidade: pr.unidade_compra || pr.unidade_estoque })} placeholder="Produto…" />
-        ${p && html`<small class="dica">Saldo: ${qtdDupla(p, p.saldo)}</small>`}</div>
+        ${p && html`<small class="dica">Neste local: ${qtdDupla(p, saldoLocal(dados, p.id, loc).disponivel)}</small>`}</div>
       <${QtdUnidade} produto=${p} valor=${l.quantidade} unidade=${l.unidade} desabilitado=${!p} aoMudar=${(v, u) => mudar(l.k, { quantidade: v, unidade: u })} />
       <button class="btn-icone" onClick=${() => setLinhas((x) => x.filter((y) => y.k !== l.k))}>✕</button></div>`; })}</div>
     <button class="btn btn-sec" onClick=${() => setLinhas((x) => [...x, { k: Math.random(), produto_id: null, quantidade: '', unidade: null }])}>+ Item</button>

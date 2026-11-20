@@ -77,8 +77,17 @@ const PERIODOS = [
   { id: 'livre', t: 'Escolher período' },
 ];
 
+const pctProd = (l) => (l.previsto > 0 ? (Number(l.produzido || 0) / Number(l.previsto)) * 100 : null);
+function Progresso({ l }) {
+  const p = pctProd(l);
+  if (p === null) return html`<small class="texto-cinza">–</small>`;
+  return html`<span class="prog-mini" title=${`${num(p, 0)}%`}><i style=${`width:${Math.min(p, 100)}%`} class=${p >= 98 ? 'ok' : ''}></i></span>`;
+}
+
 export function TelaPrevisao() {
   const hoje = hojeISO();
+  const { papeis } = useApp();
+  const reduzido = !(papeis || []).some((p) => ['admin', 'engenharia', 'diretoria'].includes(p));   // faturamento/financeiro: só hoje e amanhã
   const [per, setPer] = useState('hoje');
   const [de, setDe] = useState(hoje);
   const [ate, setAte] = useState(hoje);
@@ -95,7 +104,7 @@ export function TelaPrevisao() {
     for (const l of linhas) {
       const k = `${nomeProduto(l)}|${unid(l)}|${l.ficha_id}`;
       const a = m.get(k) || { chave: k, codigo: l.codigo, nome: l.nome, produto_final: l.produto_final, rendimento_unidade: l.rendimento_unidade, rendimento_qtd: l.rendimento_qtd, receitas: 0, previsto: 0, semRend: false, dias: new Set() };
-      a.receitas += Number(l.receitas); a.dias.add(l.data);
+      a.receitas += Number(l.receitas); a.dias.add(l.data); a.produzido = (a.produzido || 0) + Number(l.produzido || 0);
       if (l.previsto === null) a.semRend = true; else a.previsto += Number(l.previsto);
       m.set(k, a);
     }
@@ -110,6 +119,7 @@ export function TelaPrevisao() {
     { titulo: 'Receitas programadas', valor: (l) => Number(l.receitas), num: true },
     { titulo: 'Rende por receita', valor: (l) => (l.rendimento_qtd ? Number(l.rendimento_qtd) : ''), num: true },
     { titulo: 'Previsão', valor: (l) => (l.previsto === null ? '' : Number(l.previsto)), texto: (l) => (l.previsto === null ? 'sem rendimento' : num(l.previsto, 0)), num: true },
+    { titulo: 'Produzido', valor: (l) => Number(l.produzido || 0), num: true },
     { titulo: 'Unidade', valor: unid },
     { titulo: 'Situação', valor: (l) => situacaoLinha(l, hoje).t },
   ];
@@ -122,13 +132,13 @@ export function TelaPrevisao() {
   ];
 
   return html`
-    <${Cabecalho} titulo="Previsão de produção" sub="Receitas programadas pela engenharia × rendimento de cada receita">
+    <${Cabecalho} titulo="Programado × produzido" sub=${reduzido ? 'O que está programado e quanto já foi produzido, hoje e amanhã' : 'Receitas programadas × rendimento de cada receita, e o que já foi produzido (bateladas finalizadas)'}>
       <${Exportar} titulo="Previsão de produção" filtros=${periodoTxt} arquivo=${`previsao-producao-${de}${umDia ? '' : '-a-' + ate}`}
         colunas=${aba === 'dia' ? colDia : colProd} linhas=${aba === 'dia' ? linhas : porProduto}
         abas=${() => [{ nome: 'Dia a dia', colunas: colDia, linhas }, { nome: 'Por produto', colunas: colProd, linhas: porProduto }]} />
     </${Cabecalho}>
     <div class="chips">
-      ${PERIODOS.map((p) => html`<button class=${'chip' + (per === p.id ? ' ativo' : '')} onClick=${() => escolher(p.id)}>${p.t}</button>`)}
+      ${PERIODOS.filter((p) => !reduzido || ['hoje', 'amanha'].includes(p.id)).map((p) => html`<button class=${'chip' + (per === p.id ? ' ativo' : '')} onClick=${() => escolher(p.id)}>${p.t}</button>`)}
     </div>
     ${per === 'livre' && html`<div class="filtros">
       <label class="campo-inline">De <input class="entrada" type="date" value=${de} onChange=${(e) => { setDe(e.target.value); if (e.target.value > ate) setAte(e.target.value); }} /></label>
@@ -137,6 +147,7 @@ export function TelaPrevisao() {
     ${!lista ? html`<${Carregando} />` : html`
       <div class="cartoes">
         <${Cartao} titulo=${umDia ? `Previsto · ${rotuloDiaPrev(de)}` : 'Previsto no período'} valor=${totalPorUnidade(linhas)} />
+        <${Cartao} titulo="Produzido" valor=${totalPorUnidade(linhas.map((l) => ({ ...l, previsto: Number(l.produzido || 0) })))} sub=${(() => { const pv = linhas.reduce((s, l) => s + Number(l.previsto || 0), 0); const pd = linhas.reduce((s, l) => s + Number(l.produzido || 0), 0); return pv > 0 ? `${num((pd / pv) * 100, 0)}% do previsto` : ''; })()} />
         <${Cartao} titulo="Receitas programadas" valor=${num(receitasTot, 1)} sub=${periodoTxt} />
         <${Cartao} titulo="Produtos" valor=${porProduto.length} sub=${umDia ? '' : pl(new Set(linhas.map((l) => l.data)).size, 'dia com produção', 'dias com produção')} />
       </div>
@@ -150,16 +161,18 @@ export function TelaPrevisao() {
           { chave: 'rendimento_qtd', titulo: 'Rende por receita', num: true, valor: (l) => Number(l.rendimento_qtd || 0),
             render: (l) => (l.rendimento_qtd ? `${num(l.rendimento_qtd, 0)} ${unid(l)}` : html`<${Etiqueta} cor="vermelho">sem rendimento</${Etiqueta}>`) },
           { chave: 'previsto', titulo: 'Previsão', num: true, valor: (l) => Number(l.previsto || 0), render: (l) => (l.previsto === null ? '–' : html`<b>${num(l.previsto, 0)} ${unid(l)}</b>`) },
+          { chave: 'produzido', titulo: 'Produzido', num: true, valor: (l) => Number(l.produzido || 0), render: (l) => html`${num(l.produzido || 0, 0)} <${Progresso} l=${l} />` },
           { chave: 'sit', titulo: 'Situação', valor: (l) => situacaoLinha(l, hoje).t, render: (l) => { const s = situacaoLinha(l, hoje); return html`<${Etiqueta} cor=${s.cor}>${s.t}</${Etiqueta}>`; } },
         ]}
-        rodape=${linhas.length > 0 && html`<tr><td colspan="2"><b>Total</b></td><td class="n"><b>${num(receitasTot, 1)}</b></td><td></td><td class="n"><b>${totalPorUnidade(linhas)}</b></td><td></td></tr>`} />`
+        rodape=${linhas.length > 0 && html`<tr><td colspan="2"><b>Total</b></td><td class="n"><b>${num(receitasTot, 1)}</b></td><td></td><td class="n"><b>${totalPorUnidade(linhas)}</b></td><td class="n"><b>${num(linhas.reduce((s, l) => s + Number(l.produzido || 0), 0), 0)}</b></td><td></td></tr>`} />`
       : html`<${Tabela} linhas=${porProduto} chave="chave" vazio="Nada programado neste período."
         colunas=${[
           { chave: 'nome', titulo: 'Produto', valor: nomeProduto, render: (a) => html`<b>${nomeProduto(a)}</b><br /><small>${a.codigo} · ${a.nome}</small>` },
           { chave: 'ndias', titulo: 'Dias', num: true },
+          { chave: 'produzido', titulo: 'Produzido', num: true, valor: (a) => a.produzido || 0, render: (a) => num(a.produzido || 0, 0) },
           { chave: 'receitas', titulo: 'Receitas', num: true, render: (a) => num(a.receitas, 1) },
           { chave: 'previsto', titulo: 'Previsão', num: true, valor: (a) => a.previsto || 0, render: (a) => (a.previsto === null ? html`<${Etiqueta} cor="vermelho">sem rendimento</${Etiqueta}>` : html`<b>${num(a.previsto, 0)} ${unid(a)}</b>`) },
         ]}
-        rodape=${porProduto.length > 0 && html`<tr><td colspan="2"><b>Total</b></td><td class="n"><b>${num(receitasTot, 1)}</b></td><td class="n"><b>${totalPorUnidade(linhas)}</b></td></tr>`} />`}
-      <p class="nota">Previsão = receitas programadas × quanto cada receita rende (cadastro da ficha técnica). Receitas canceladas não entram.</p>`}`;
+        rodape=${porProduto.length > 0 && html`<tr><td colspan="2"><b>Total</b></td><td class="n"><b>${num(linhas.reduce((s, l) => s + Number(l.produzido || 0), 0), 0)}</b></td><td class="n"><b>${num(receitasTot, 1)}</b></td><td class="n"><b>${totalPorUnidade(linhas)}</b></td></tr>`} />`}
+      <p class="nota">Previsão = receitas programadas × quanto cada receita rende (ficha técnica). Produzido = soma das bateladas finalizadas pela engenharia. Receitas canceladas não entram.</p>`}`;
 }

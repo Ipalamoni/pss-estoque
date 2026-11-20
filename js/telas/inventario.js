@@ -2,6 +2,7 @@
 import { html, useState, useMemo, useEffect, useApp, Modal, Campo, QtdUnidade, Busca, Etiqueta, Cabecalho, Abas, Tabela, Carregando, useAcao, confirmar, avisar, n } from '../ui.js';
 import { CATEGORIAS, MOTIVOS_INVENTARIO, qtd, moeda, num, contem, fator, qtdDupla, dataHora, mensagemErro, qu, plural, pl, nomeUsuario, hojeISO } from '../util.js';
 import { Exportar } from '../exportar.js';
+import { SeletorLocal, useLocalInicial } from '../producao-util.js';
 
 export function TelaInventario() {
   const [aba, setAba] = useState('contagem');
@@ -19,10 +20,14 @@ function Contagem({ aoConcluir }) {
   const [cont, setCont] = useState({});   // produto_id -> { q, un, motivo, obs }
   const [obsGeral, setObsGeral] = useState('');
   const [ocupado, executar] = useAcao();
-  const mp = dados.mapa.ind;
+  const [loc, setLoc] = useLocalInicial('almoxarifado');
+  const mpBase = dados.mapa.ind;
+  // saldo físico NO LOCAL (disponível + separado) — o inventário é por local
+  const aqui = (p) => { const e = dados.estoqueLocal.find((x) => x.produto_id === p.id && x.local_id === loc); return e ? Number(e.disponivel) + Number(e.separado) : 0; };
+  const mp = useMemo(() => new Map([...mpBase].map(([id, p]) => [id, { ...p, saldo: loc ? aqui(p) : p.saldo }])), [dados, loc]);
 
-  const itens = useMemo(() => dados.ind.filter((p) => p.ativo && cats.has(p.categoria) && contem(`${p.codigo} ${p.descricao}`, busca)
-    && (!so || cont[p.id]?.q)).sort((a, b) => a.descricao.localeCompare(b.descricao)), [dados, cats, busca, so, cont]);
+  const itens = useMemo(() => [...mp.values()].filter((p) => p.ativo && p.controla_estoque !== false && cats.has(p.categoria) && contem(`${p.codigo} ${p.descricao}`, busca)
+    && (!so || cont[p.id]?.q)).sort((a, b) => a.descricao.localeCompare(b.descricao)), [mp, cats, busca, so, cont]);
   const mudar = (id, ch) => setCont((c) => ({ ...c, [id]: { un: mp.get(id).unidade_compra || mp.get(id).unidade_estoque, ...c[id], ...ch } }));
   const dif = (p) => { const c = cont[p.id]; if (!c || c.q === '' || c.q === undefined || n(c.q) === null) return null; return Math.round((n(c.q) * fator(p, c.un) - p.saldo) * 10000) / 10000; };
   const contados = Object.entries(cont).filter(([, c]) => c.q !== '' && c.q !== undefined && n(c.q) !== null);
@@ -40,12 +45,13 @@ function Contagem({ aoConcluir }) {
         <p>Valor das diferenças: <b>${moeda(valorDif)}</b></p>`}
       <p class="nota">As diferenças viram lançamentos de “Ajuste de inventário”, com seu usuário, data e hora.</p>` });
     if (!ok) return;
-    const r = await executar(() => api.rpc('registrar_inventario', { p: { observacao: obsGeral, itens: contados.map(([id, c]) => ({ produto_id: Number(id), contado: n(c.q), unidade: c.un, motivo: c.motivo || null, observacao: c.obs || null })) } }),
+    const r = await executar(() => api.rpc('registrar_inventario', { p: { observacao: obsGeral, local_id: loc, itens: contados.map(([id, c]) => ({ produto_id: Number(id), contado: n(c.q), unidade: c.un, motivo: c.motivo || null, observacao: c.obs || null })) } }),
       'Inventário registrado e estoque ajustado.');
     if (r) { await recarregar(); setCont({}); aoConcluir(); }
   }
 
   return html`
+    <div class="filtros"><${SeletorLocal} valor=${loc} aoMudar=${(v) => { setLoc(v); setCont({}); }} rotulo="Contando o local" /></div>
     <div class="filtros">
       ${Object.entries(CATEGORIAS).map(([k, v]) => html`<label class="check"><input type="checkbox" checked=${cats.has(k)} onChange=${() => alternar(k)} /> ${v}</label>`)}
     </div>

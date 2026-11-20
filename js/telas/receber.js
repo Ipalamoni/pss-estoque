@@ -3,6 +3,20 @@ import { html, useState, useMemo, useEffect, useApp, Campo, Numero, Escolher, Qt
 import { numeroPedido, data, qtd, moeda, contem, fator, qu, pl, plural } from '../util.js';
 import { resumoPedido, PrazoEtiqueta } from './pedidos.js';
 
+// Para onde vai (local) e, se o produto conta por volume (ex.: bobina), quantos volumes
+const localPadrao = (dados, p) => p?.local_padrao_id || dados.locais.find((l) => l.tipo === 'almoxarifado' && l.ativo)?.id || null;
+function Destino({ p, l, aoMudar }) {
+  const { dados } = useApp();
+  if (!p || p.controla_estoque === false) return null;
+  const locais = dados.locais.filter((x) => x.ativo);
+  return html`<div class="conf-destino">
+    ${locais.length > 1 && html`<label class="campo-inline">Guardar em <select class="entrada" value=${l.local_id ?? localPadrao(dados, p) ?? ''} onChange=${(e) => aoMudar({ local_id: Number(e.target.value) })}>
+      ${locais.map((x) => html`<option value=${x.id}>${x.nome}</option>`)}</select></label>`}
+    ${p.unidade2 && html`<label class="campo-inline">Quantas ${p.unidade2}s? <${Numero} valor=${l.qtd2 || ''} aoMudar=${(v) => aoMudar({ qtd2: v })} placeholder="0" /></label>`}
+  </div>`;
+}
+const extraDestino = (dados, l, p) => ({ local_id: l.local_id ?? localPadrao(dados, p), qtd2: l.qtd2 === undefined || l.qtd2 === '' ? null : n(l.qtd2) });
+
 const virg = (v) => String(Math.round(v * 1000) / 1000).replace('.', ',');
 
 export function TelaReceber() {
@@ -86,7 +100,7 @@ function ConferirPedido({ pedido, aoVoltar }) {
         const it = l.pedido_item_id ? item(l) : null; const p = dados.mapa.produto.get(l.produto_id);
         // preço da nota é digitado por unidade do pedido; envia na unidade da quantidade
         const precoNota = it && l.mudarPreco ? (n(l.preco) || 0) * fator(p, l.unidade) / fator(p, it.unidade) : null;
-        return { produto_id: l.produto_id, pedido_item_id: l.pedido_item_id || null, quantidade: n(l.quantidade) || 0, unidade: l.unidade, preco_nota: precoNota };
+        return { produto_id: l.produto_id, pedido_item_id: l.pedido_item_id || null, quantidade: n(l.quantidade) || 0, unidade: l.unidade, preco_nota: precoNota, ...extraDestino(dados, l, p) };
       }) } }), temDiv ? 'Recebido com divergência. O comprador vai ver o aviso no sistema.' : 'Recebimento registrado. Estoque atualizado!');
     if (res) { await recarregar(); aoVoltar(); }
   }
@@ -108,6 +122,7 @@ function ConferirPedido({ pedido, aoVoltar }) {
               ? { unidade: u, quantidade: virg((n(v) || 0) * fator(p, l.unidade) / fator(p, u)), falta: l.falta * fator(p, l.unidade) / fator(p, u) } : { quantidade: v })} />
             <button class=${'btn ' + (l.conferido ? 'btn-ok' : 'btn-sec')} onClick=${() => mudar(l.k, { conferido: !l.conferido })}>${l.conferido ? '✓ Conferido' : 'Conferir'}</button>
           </div>
+          <${Destino} p=${p} l=${l} aoMudar=${(ch) => mudar(l.k, ch)} />
           ${Math.abs(dif) > 0.0005 && html`<div class="conf-dif">${dif < 0 ? `Faltando ${qu(-dif, l.unidade)}` : `Veio ${qu(dif, l.unidade)} a mais`}</div>`}
           <label class="check"><input type="checkbox" checked=${l.mudarPreco} onChange=${(e) => mudar(l.k, { mudarPreco: e.target.checked })} /> Preço da nota diferente do pedido</label>
           ${l.mudarPreco && html`<${Campo} rotulo=${`Preço na nota (por ${it.unidade})`}><${Numero} valor=${l.preco} aoMudar=${(v) => mudar(l.k, { preco: v })} /></${Campo}>`}
@@ -118,7 +133,8 @@ function ConferirPedido({ pedido, aoVoltar }) {
       <${Escolher} itens=${dados.produtos.filter((x) => x.ativo)} valor=${e.produto_id} rotuloDe=${(x) => `${x.codigo} · ${x.descricao}`}
         aoMudar=${(id, pr) => mudarExtra(e.k, { produto_id: id, unidade: pr.unidade_compra || pr.unidade_estoque })} />
       <${QtdUnidade} produto=${p} valor=${e.quantidade} unidade=${e.unidade} desabilitado=${!p} aoMudar=${(v, u) => mudarExtra(e.k, { quantidade: v, unidade: u })} />
-      <button class="btn-icone btn-remover" onClick=${() => setExtras((x) => x.filter((y) => y.k !== e.k))}>✕</button></div>`; })}</div>
+      <button class="btn-icone btn-remover" onClick=${() => setExtras((x) => x.filter((y) => y.k !== e.k))}>✕</button>
+      <${Destino} p=${p} l=${e} aoMudar=${(ch) => mudarExtra(e.k, ch)} /></div>`; })}</div>
     <button class="btn btn-sec btn-bloco-cel" onClick=${() => setExtras((x) => [...x, { k: Math.random(), produto_id: null, quantidade: '', unidade: null }])}>+ Item fora do pedido</button>
 
     ${analise.falta && html`<div class="painel opcoes">
@@ -161,7 +177,7 @@ function ReceberSemPedido({ aoVoltar }) {
       <div class="alerta">Entra no estoque agora e fica marcado como <b>recebido sem pedido</b> até o comprador dar ciência no sistema.</div>` });
     if (!ok) return;
     const res = await executar(() => api.rpc('registrar_recebimento', { p: { fornecedor_id: forn, nota_fiscal: nf, observacao: obs, comprador_avisado: avisado,
-      itens: its.map((l) => ({ produto_id: l.produto_id, quantidade: n(l.quantidade), unidade: l.unidade, custo_unitario: n(l.custo) })) } }), 'Recebido sem pedido. O comprador vai ver o aviso no sistema.');
+      itens: its.map((l) => ({ produto_id: l.produto_id, quantidade: n(l.quantidade), unidade: l.unidade, custo_unitario: n(l.custo), ...extraDestino(dados, l, dados.mapa.produto.get(l.produto_id)) })) } }), 'Recebido sem pedido. O comprador vai ver o aviso no sistema.');
     if (res) { await recarregar(); aoVoltar(); }
   }
   return html`
@@ -178,6 +194,7 @@ function ReceberSemPedido({ aoVoltar }) {
         <${QtdUnidade} produto=${p} valor=${l.quantidade} unidade=${l.unidade} desabilitado=${!p} aoMudar=${(v, u) => mudar(l.k, { quantidade: v, unidade: u })} />
         <div class="li-preco"><small>Preço por ${l.unidade || 'unidade'} (opcional)</small><${Numero} valor=${l.custo} aoMudar=${(v) => mudar(l.k, { custo: v })} placeholder="0,00" /></div>
         <button class="btn-icone btn-remover" onClick=${() => setLinhas((x) => x.filter((y) => y.k !== l.k))}>✕</button>
+        <${Destino} p=${p} l=${l} aoMudar=${(ch) => mudar(l.k, ch)} />
       </div>`; })}
     </div>
     <button class="btn btn-sec btn-bloco-cel" onClick=${() => setLinhas((x) => [...x, { k: Math.random(), produto_id: null, quantidade: '', unidade: null, custo: '' }])}>+ Item</button>

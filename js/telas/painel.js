@@ -155,7 +155,7 @@ export function TelaPainel() {
 
 // ---------------------------------------------------------------------
 function calcEstoque(dados) {
-  const lista = dados.ind.filter((p) => p.ativo);
+  const lista = dados.ind.filter((p) => p.ativo && p.controla_estoque !== false && !['intermediario', 'produto_acabado'].includes(p.categoria));
   const comSaldo = lista.filter((p) => p.saldo > 0);
   const total = comSaldo.reduce((s, p) => s + p.valor, 0);
   const cats = Object.entries(CATEGORIAS).map(([id, rotulo]) => {

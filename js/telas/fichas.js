@@ -6,7 +6,8 @@ import { UltimaAlteracao } from '../historico.js';
 import { Icone } from '../icones.js';
 
 export function custoFicha(itens, mapaProduto) {
-  return itens.reduce((s, it) => s + Number(it.quantidade) * Number(mapaProduto.get(it.produto_id)?.custo_medio || 0), 0);
+  // só os ingredientes (a embalagem é por unidade produzida e entra no custo da batelada)
+  return itens.filter((it) => mapaProduto.get(it.produto_id)?.categoria !== 'embalagem').reduce((s, it) => s + Number(it.quantidade) * Number(mapaProduto.get(it.produto_id)?.custo_medio || 0), 0);
 }
 
 export function TelaFichas() {
@@ -52,29 +53,40 @@ export function TelaFichas() {
 }
 
 function pesoKg(itens, mp) {
-  return itens.reduce((s, it) => s + (String(mp.get(it.produto_id)?.unidade_estoque).toLowerCase() === 'kg' ? Number(it.quantidade) : 0), 0);
+  return itens.reduce((s, it) => s + (mp.get(it.produto_id)?.categoria !== 'embalagem' && String(mp.get(it.produto_id)?.unidade_estoque).toLowerCase() === 'kg' ? Number(it.quantidade) : 0), 0);
 }
 
 function FormFicha({ ficha, itens, aoFechar, somenteLeitura, aoUsar }) {
   const { dados, recarregar, api, podeFazer } = useApp();
   const mps = dados.produtos.filter((p) => p.categoria === 'materia_prima' && p.ativo);
+  const embs = dados.produtos.filter((p) => p.categoria === 'embalagem' && p.ativo);
+  const ehEmb = (id) => dados.mapa.produto.get(id)?.categoria === 'embalagem';
   const [f, setF] = useState({ codigo: ficha.codigo || '', nome: ficha.nome || '', produto_final: ficha.produto_final || '', rendimento: ficha.rendimento || '',
     rendimento_qtd: ficha.rendimento_qtd ? String(Number(ficha.rendimento_qtd)).replace('.', ',') : '', rendimento_unidade: ficha.rendimento_unidade || 'pacotes',
-    observacao: ficha.observacao || '', ativo: ficha.ativo !== false });
+    observacao: ficha.observacao || '', ativo: ficha.ativo !== false, linha_id: ficha.linha_id || null,
+    tempo_batelada_min: ficha.tempo_batelada_min ? String(ficha.tempo_batelada_min) : '' });
+  const [embLinhas, setEmbLinhas] = useState(() => itens.filter((i) => ehEmb(i.produto_id)).map((i) => ({ k: Math.random(), produto_id: i.produto_id, quantidade: String(Number(i.quantidade)).replace('.', ',') })));
+  const mudarEmb = (k, ch) => setEmbLinhas((l) => l.map((x) => (x.k === k ? { ...x, ...ch } : x)));
+  itens = itens.filter((i) => !ehEmb(i.produto_id));
   const [linhas, setLinhas] = useState(() => itens.length ? itens.map((i) => ({ k: Math.random(), produto_id: i.produto_id, quantidade: String(i.quantidade).replace('.', ','), unidade: dados.mapa.produto.get(i.produto_id)?.unidade_estoque }))
     : [{ k: Math.random(), produto_id: null, quantidade: '', unidade: null }]);
   const [ocupado, executar] = useAcao();
   const set = (k) => (e) => setF((x) => ({ ...x, [k]: e?.target ? e.target.value : e }));
   const mudar = (k, ch) => setLinhas((l) => l.map((x) => (x.k === k ? { ...x, ...ch } : x)));
+  const custoEmbUn = (p, q) => { const pg = Number(p.peso_embalagem_g || 0); const u = String(p.unidade_estoque).toLowerCase();
+    return (q || 0) * (u === 'kg' ? pg / 1000 : u === 'g' ? pg : 1) * Number(p.custo_medio || 0); };
   const custo = linhas.reduce((s, l) => { const p = dados.mapa.produto.get(l.produto_id); return s + (p ? (n(l.quantidade) || 0) * fator(p, l.unidade) * p.custo_medio : 0); }, 0);
+  const custoEmb = embLinhas.reduce((s, l) => { const p = dados.mapa.produto.get(l.produto_id); return s + (p ? custoEmbUn(p, n(l.quantidade)) : 0); }, 0) * (n(f.rendimento_qtd) || 0);
 
   async function salvar() {
-    const its = linhas.filter((l) => l.produto_id && n(l.quantidade) > 0).map((l) => ({ produto_id: l.produto_id, quantidade: n(l.quantidade), unidade: l.unidade }));
+    const its = [...linhas.filter((l) => l.produto_id && n(l.quantidade) > 0).map((l) => ({ produto_id: l.produto_id, quantidade: n(l.quantidade), unidade: l.unidade })),
+      ...embLinhas.filter((l) => l.produto_id && n(l.quantidade) > 0).map((l) => ({ produto_id: l.produto_id, quantidade: n(l.quantidade), unidade: dados.mapa.produto.get(l.produto_id).unidade_estoque }))];
+    if (embLinhas.some((l) => l.produto_id && n(l.quantidade) > 0) && !(n(f.rendimento_qtd) > 0)) return avisar('Com embalagem na ficha, informe quanto 1 receita rende (para saber quantas embalagens usa).', 'erro');
     const rq = n(f.rendimento_qtd);
     if (f.rendimento_qtd && !(rq > 0)) return avisar('O rendimento por receita precisa ser um número maior que zero.', 'erro');
     const rend = rq > 0 ? { rendimento_qtd: rq, rendimento_unidade: String(f.rendimento_unidade || 'un').trim(), rendimento: `${String(f.rendimento_qtd).trim()} ${String(f.rendimento_unidade || 'un').trim()}` }
       : { rendimento_qtd: null, rendimento_unidade: null };
-    const ok = await executar(() => api.rpc('salvar_ficha', { p: { ...f, ...rend, id: ficha.id || null, itens: its } }), 'Ficha técnica salva.');
+    const ok = await executar(() => api.rpc('salvar_ficha', { p: { ...f, ...rend, id: ficha.id || null, itens: its, tempo_batelada_min: f.tempo_batelada_min ? Math.round(n(f.tempo_batelada_min)) : null } }), 'Ficha técnica salva.');
     if (ok) { await recarregar(); aoFechar(); }
   }
   async function alternarAtivo() {
@@ -82,7 +94,7 @@ function FormFicha({ ficha, itens, aoFechar, somenteLeitura, aoUsar }) {
     const ok = await confirmar({ titulo: desativar ? 'Desativar receita' : 'Reativar receita', perigo: desativar, ok: desativar ? 'Desativar' : 'Reativar',
       mensagem: desativar ? `"${ficha.nome}" deixa de aparecer para a pesagem. O histórico das produções continua guardado.` : `"${ficha.nome}" volta a aparecer para a pesagem.` });
     if (!ok) return;
-    const its = itens.map((i) => ({ produto_id: i.produto_id, quantidade: i.quantidade, unidade: dados.mapa.produto.get(i.produto_id)?.unidade_estoque }));
+    const its = [...itens, ...embLinhas.map((l) => ({ produto_id: l.produto_id, quantidade: n(l.quantidade) }))].map((i) => ({ produto_id: i.produto_id, quantidade: i.quantidade, unidade: dados.mapa.produto.get(i.produto_id)?.unidade_estoque }));
     if (await executar(() => api.rpc('salvar_ficha', { p: { ...ficha, ativo: !desativar, itens: its } }), desativar ? 'Receita desativada.' : 'Receita reativada.')) { await recarregar(); aoFechar(); }
   }
   return html`<${Modal} titulo=${ficha.id ? `${ficha.codigo} · ${ficha.nome}${ficha.ativo === false ? ' (inativa)' : ''}` : 'Nova ficha técnica'} aoFechar=${aoFechar} largo
@@ -101,6 +113,11 @@ function FormFicha({ ficha, itens, aoFechar, somenteLeitura, aoUsar }) {
         <div class="linha-campo"><input class="entrada" inputmode="decimal" placeholder="ex.: 180" value=${f.rendimento_qtd} onInput=${set('rendimento_qtd')} />
           <input class="entrada" list="unidades-rendimento" placeholder="pacotes" value=${f.rendimento_unidade} onInput=${set('rendimento_unidade')} />
           <datalist id="unidades-rendimento"><option value="pacotes" /><option value="unidades" /><option value="pães" /><option value="kg" /><option value="caixas" /></datalist></div></${Campo}>
+      <${Campo} rotulo="Linha de produção" ajuda="Ajuda a sugerir a maceira na programação.">
+        <select class="entrada" value=${f.linha_id || ''} onChange=${(e) => set('linha_id')(e.target.value ? Number(e.target.value) : null)}>
+          <option value="">–</option>${dados.linhas.filter((l) => l.ativo || l.id === f.linha_id).map((l) => html`<option value=${l.id}>${l.nome}</option>`)}</select></${Campo}>
+      <${Campo} rotulo="Tempo médio de 1 batelada (min)" ajuda=${`Usado no semáforo das maceiras. Vazio = padrão (${dados.params.producao_tempo_padrao_min || 20} min).`}>
+        <input class="entrada" inputmode="numeric" value=${f.tempo_batelada_min} onInput=${set('tempo_batelada_min')} placeholder=${String(dados.params.producao_tempo_padrao_min || 20)} /></${Campo}>
       <${Campo} rotulo="Observação" classe="larga"><textarea class="entrada" rows="2" value=${f.observacao} onInput=${set('observacao')}></textarea></${Campo}>
     </fieldset>
     <h3>Ingredientes (quantidade para 1 receita)</h3>
@@ -115,7 +132,17 @@ function FormFicha({ ficha, itens, aoFechar, somenteLeitura, aoUsar }) {
       </div>`; })}
     </div>
     ${!somenteLeitura && html`<button class="btn btn-sec" onClick=${() => setLinhas((x) => [...x, { k: Math.random(), produto_id: null, quantidade: '', unidade: null }])}>+ Ingrediente</button>`}
-    ${podeFazer('custos') && html`<p class="nota">Custo estimado de 1 receita: <b>${moeda(custo)}</b>.</p>`}
+    <h3>Embalagem (só para o custo)</h3>
+    <p class="nota">Quantas embalagens por <b>1 unidade produzida</b> (ex.: 1 saquinho por pacote). Não baixa o estoque aqui: a embalagem sai por requisição. Quando a embalagem for marcada como “baixa pela produção”, ela passa a baixar ao finalizar a batelada.</p>
+    <div class="linhas-itens">${embLinhas.map((l) => { const p = dados.mapa.produto.get(l.produto_id); return html`<div class="linha-item" key=${l.k}>
+      <${Escolher} itens=${embs} valor=${l.produto_id} desabilitado=${somenteLeitura} rotuloDe=${(x) => `${x.codigo} · ${x.descricao}`}
+        detalheDe=${(x) => (x.peso_embalagem_g ? `${x.peso_embalagem_g} g cada` : 'sem peso médio')} aoMudar=${(id) => mudarEmb(l.k, { produto_id: id })} placeholder="Embalagem…" />
+      <div class="qtd-un"><input class="entrada" inputmode="decimal" value=${l.quantidade} disabled=${somenteLeitura || !p} onInput=${(e) => mudarEmb(l.k, { quantidade: e.target.value })} /><span>por ${f.rendimento_unidade ? f.rendimento_unidade.replace(/s$/, '') : 'unidade'}</span></div>
+      ${!somenteLeitura && html`<button class="btn-icone" title="Remover" onClick=${() => setEmbLinhas((x) => x.filter((y) => y.k !== l.k))}>✕</button>`}
+      ${p && !p.peso_embalagem_g && ['kg', 'g'].includes(String(p.unidade_estoque).toLowerCase()) && html`<small class="larga texto-vermelho">Esta embalagem não tem peso médio no cadastro: o custo fica zerado.</small>`}
+    </div>`; })}</div>
+    ${!somenteLeitura && html`<button class="btn btn-sec btn-peq" onClick=${() => setEmbLinhas((x) => [...x, { k: Math.random(), produto_id: null, quantidade: '1' }])}>+ Embalagem</button>`}
+    ${podeFazer('custos') && html`<p class="nota">Custo estimado de 1 receita: <b>${moeda(custo)}</b>${custoEmb > 0 ? html` + embalagem <b>${moeda(custoEmb)}</b> = <b>${moeda(custo + custoEmb)}</b>` : ''}.</p>`}
     ${ficha.id && html`<${UltimaAlteracao} reg=${ficha} /><${HistoricoFicha} fichaId=${ficha.id} />`}
   </${Modal}>`;
 }

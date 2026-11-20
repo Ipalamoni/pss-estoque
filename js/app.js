@@ -3,7 +3,7 @@
 // =====================================================================
 import { html, render, useState, useEffect, useRef, Ctx, Avisos, HostConfirmacao, avisar, Carregando, Modal, Campo } from './ui.js';
 import { api } from './api.js';
-import { PAPEIS, pode, porId, mensagemErro, papeisTexto } from './util.js';
+import { PAPEIS, pode, porId, mensagemErro, papeisTexto, operaLocal, pl } from './util.js';
 import { indicadores } from './calc.js';
 import { Icone } from './icones.js';
 
@@ -27,55 +27,123 @@ import { TelaFinanceiro } from './telas/financeiro.js';
 import { TelaPrevisao } from './telas/previsao.js';
 import { TelaCustos } from './telas/custos.js';
 import { TelaContagemInicial } from './telas/contagem.js';
+import { TelaEstoqueLocal } from './telas/estoque-local.js';
+import { TelaTransferencias } from './telas/transferencias.js';
+import { TelaRequisicoes } from './telas/requisicoes.js';
+import { TelaMaceiras } from './telas/maceiras.js';
+import { TelaFinalizar } from './telas/finalizar.js';
+import { TelaPainelProducao } from './telas/painel-producao.js';
+import { TelaCadastrosProducao } from './telas/cadastros-producao.js';
 
 const CFG = window.CONFIG || {};
-const TODOS = Object.keys(PAPEIS).filter((p) => !['financeiro', 'faturamento'].includes(p));   // financeiro: só pedidos/pagamentos e previsão; faturamento: só previsão
+const TODOS = Object.keys(PAPEIS).filter((p) => !['financeiro', 'faturamento', 'padeiro'].includes(p));   // financeiro: só pedidos/pagamentos e previsão; faturamento: só previsão; padeiro: só a produção
+const GESTAO = ['admin', 'diretoria', 'engenharia'];
 
 // Menu: quem vê cada tela (as gravações são conferidas de novo no banco)
 const MENU = [
-  { id: 'inicio', titulo: 'Início', papeis: [...TODOS, 'financeiro', 'faturamento'], tela: TelaInicio },
+  { id: 'inicio', titulo: 'Início', papeis: [...TODOS, 'financeiro', 'faturamento', 'padeiro'], tela: TelaInicio },
+  { id: 'painel-producao', titulo: 'Painel de Produção', papeis: GESTAO, tela: TelaPainelProducao, aoVivo: true },
+  { id: 'custos', titulo: 'Central de Custos', papeis: ['admin', 'diretoria'], tela: TelaCustos },
   { id: 'financeiro', titulo: 'Financeiro · pedidos a pagar', papeis: ['admin', 'financeiro', 'diretoria'], tela: TelaFinanceiro },
-  { id: 'previsao', titulo: 'Previsão de produção', papeis: ['admin', 'engenharia', 'diretoria', 'financeiro', 'faturamento'], tela: TelaPrevisao },
-  { id: 'custos', titulo: 'Gestão de custos', papeis: ['admin'], tela: TelaCustos },
-  { id: 'painel', titulo: 'Resumo (indicadores)', papeis: ['admin', 'diretoria', 'comprador', 'almoxarifado', 'engenharia'], tela: TelaPainel },
-  { grupo: 'Operação' },
+  { id: 'previsao', titulo: 'Programado × produzido', papeis: ['admin', 'engenharia', 'diretoria', 'financeiro', 'faturamento'], tela: TelaPrevisao, aoVivo: true },
+  { id: 'painel', titulo: 'Resumo de compras e estoque', papeis: ['admin', 'diretoria', 'comprador', 'almoxarifado', 'engenharia'], tela: TelaPainel },
+  { grupo: 'Produção' },
+  { id: 'maceiras', titulo: 'Produção Maceiras', papeis: ['admin', 'padeiro', 'engenharia', 'diretoria'], tela: TelaMaceiras, aoVivo: true },
+  { id: 'programacao', titulo: 'Programação e pesagem', papeis: ['admin', 'engenharia', 'pesagem', 'diretoria'], tela: TelaProgramacao, aoVivo: true },
+  { id: 'finalizar', titulo: 'Finalizar produção', papeis: ['admin', 'engenharia', 'diretoria'], tela: TelaFinalizar, aoVivo: true },
+  { id: 'saidas-producao', titulo: 'Consumo da produção', papeis: ['admin', 'engenharia', 'pesagem', 'almoxarifado', 'diretoria'], tela: TelaSaidasProducao },
+  { grupo: 'Estoque' },
+  { id: 'estoque-local', titulo: 'Estoque por local', papeis: [...TODOS, 'padeiro'], tela: TelaEstoqueLocal, aoVivo: true },
+  { id: 'transferencias', titulo: 'Transferências', papeis: ['admin', 'almoxarifado', 'recebimento', 'pesagem', 'engenharia', 'diretoria', 'padeiro'], tela: TelaTransferencias, aoVivo: true },
+  { id: 'requisicoes', titulo: 'Requisições e consumo', papeis: ['admin', 'engenharia', 'almoxarifado', 'recebimento', 'diretoria'], tela: TelaRequisicoes, aoVivo: true },
   { id: 'receber', titulo: 'Receber mercadoria', papeis: ['admin', 'almoxarifado', 'recebimento'], tela: TelaReceber },
   { id: 'saidas', titulo: 'Saídas', papeis: ['admin', 'pesagem', 'almoxarifado', 'recebimento'], tela: TelaSaidas },
   { id: 'inventario', titulo: 'Inventário', papeis: ['admin', 'almoxarifado', 'recebimento'], tela: TelaInventario },
   { id: 'contagem', titulo: 'Contagem inicial (saldo)', papeis: ['admin', 'almoxarifado'], tela: TelaContagemInicial },
-  { grupo: 'Produção' },
-  { id: 'programacao', titulo: 'Programação de produção', papeis: ['admin', 'engenharia', 'pesagem', 'diretoria'], tela: TelaProgramacao },
-  { id: 'saidas-producao', titulo: 'Saídas da produção', papeis: ['admin', 'engenharia', 'pesagem', 'almoxarifado', 'diretoria'], tela: TelaSaidasProducao },
-  { grupo: 'Compras e estoque' },
+  { grupo: 'Compras' },
   { id: 'pedidos', titulo: 'Pedidos de compra', papeis: ['admin', 'comprador', 'almoxarifado', 'recebimento', 'diretoria'], tela: TelaPedidos },
-  { id: 'estoque', titulo: 'Posição de estoque', papeis: TODOS, tela: TelaEstoque },
-  { id: 'movimentos', titulo: 'Movimentações', papeis: TODOS, tela: TelaMovimentos },
+  { id: 'estoque', titulo: 'Posição de estoque (compras)', papeis: TODOS, tela: TelaEstoque, aoVivo: true },
+  { id: 'movimentos', titulo: 'Movimentações (kardex)', papeis: TODOS, tela: TelaMovimentos },
   { id: 'relatorios', titulo: 'Relatórios', papeis: ['admin', 'comprador', 'almoxarifado', 'diretoria'], tela: TelaRelatorios },
   { grupo: 'Cadastros' },
   { id: 'produtos', titulo: 'Produtos', papeis: TODOS, tela: TelaProdutos },
   { id: 'fornecedores', titulo: 'Fornecedores', papeis: ['admin', 'comprador', 'almoxarifado', 'recebimento', 'diretoria'], tela: TelaFornecedores },
   { id: 'fichas', titulo: 'Fichas técnicas', papeis: ['admin', 'engenharia', 'pesagem', 'almoxarifado', 'diretoria'], tela: TelaFichas },
+  { id: 'cadastros-producao', titulo: 'Maceiras, linhas e padeiros', papeis: ['admin', 'engenharia', 'diretoria'], tela: TelaCadastrosProducao },
   { grupo: 'Administração', papeis: ['admin', 'diretoria'] },
   { id: 'usuarios', titulo: 'Usuários e acessos', papeis: ['admin'], tela: TelaUsuarios },
-  { id: 'configuracoes', titulo: 'Configurações', papeis: ['admin'], tela: TelaConfiguracoes },
+  { id: 'configuracoes', titulo: 'Configurações e locais', papeis: ['admin'], tela: TelaConfiguracoes },
   { id: 'auditoria', titulo: 'Auditoria (log)', papeis: ['admin', 'diretoria'], tela: TelaAuditoria },
 ];
+// tabelas que, quando mudam, atualizam as telas abertas (tempo real)
+const TABELAS_AO_VIVO = ['movimentos', 'estoque_local', 'transferencias', 'requisicoes', 'bateladas', 'programacoes', 'producoes'];
+
 
 // ------------------------- Carregamento dos dados comuns ------------
-async function carregarDados() {
+async function carregarDados(anterior) {
   const parametros = await api.listar('parametros');
   const params = Object.fromEntries(parametros.map((p) => [p.chave, p.valor]));
-  const [produtos, fornecedores, fichas, fichaItens, pedidos, pedidoItens, perfis, recebimentos, programacoes, stats] = await Promise.all([
+  const seguro = (pr) => pr.catch(() => []);   // papéis restritos (financeiro/faturamento) não leem tudo
+  const [produtos, fornecedores, fichas, fichaItens, pedidos, pedidoItens, perfis, recebimentos, programacoes, stats,
+    unidades, locais, estoqueLocal, linhas, maceiras, operadores, transferencias, requisicoes] = await Promise.all([
     api.listar('produtos'), api.listar('fornecedores'), api.listar('fichas_tecnicas'), api.listar('ficha_itens'),
     api.listar('pedidos'), api.listar('pedido_itens'), api.listar('perfis'), api.listar('recebimentos'), api.listar('programacoes'),
-    api.rpc('estatisticas_estoque', { p_janela: Number(params.janela_consumo_dias || 90) }),
+    anterior ? Promise.resolve(anterior.stats) : api.rpc('estatisticas_estoque', { p_janela: Number(params.janela_consumo_dias || 90) }),
+    seguro(api.listar('unidades')), seguro(api.listar('locais')), seguro(api.listar('estoque_local')), seguro(api.listar('linhas_producao')),
+    seguro(api.listar('maceiras')), seguro(api.listar('operadores')),
+    seguro(api.listar('transferencias', { em: { situacao: ['separada', 'enviada'] } })),
+    seguro(api.listar('requisicoes', { em: { situacao: ['pendente', 'parcial'] } })),
   ]);
-  const ind = indicadores(produtos, stats, params, fornecedores);
+  const [transfItens, reqItens] = await Promise.all([
+    transferencias.length ? seguro(api.listar('transferencia_itens', { em: { transferencia_id: transferencias.map((t) => t.id) } })) : [],
+    requisicoes.length ? seguro(api.listar('requisicao_itens', { em: { requisicao_id: requisicoes.map((t) => t.id) } })) : [],
+  ]);
+  const ind = indicadores(produtos, stats || [], params, fornecedores);
   return {
     produtos, fornecedores, fichas, fichaItens, pedidos, pedidoItens, perfis, recebimentos, programacoes, parametros, params, stats, ind,
-    mapa: { produto: porId(produtos), fornecedor: porId(fornecedores), ficha: porId(fichas), perfil: porId(perfis), ind: porId(ind) },
+    unidades, locais: [...locais].sort((a, b) => a.ordem - b.ordem || a.id - b.id), estoqueLocal, linhas, maceiras: [...maceiras].sort((a, b) => a.ordem - b.ordem || a.id - b.id), operadores,
+    transferencias, transfItens, requisicoes, reqItens,
+    mapa: { produto: porId(produtos), fornecedor: porId(fornecedores), ficha: porId(fichas), perfil: porId(perfis), ind: porId(ind),
+      local: porId(locais), unidade: porId(unidades), maceira: porId(maceiras), operador: porId(operadores), linha: porId(linhas) },
     carregadoEm: new Date(),
   };
+}
+
+// Sininho: requisições para atender e transferências chegando nos locais que a pessoa opera
+function pendencias(dados, papeis) {
+  if (!dados) return [];
+  const meus = new Set(dados.locais.filter((l) => operaLocal(papeis, l) && (!(papeis || []).includes('admin') || l.papeis.length)).map((l) => l.id));
+  const admin = (papeis || []).includes('admin');
+  const itens = [];
+  dados.requisicoes.filter((r) => admin || meus.has(r.origem_id)).forEach((r) => itens.push({ tipo: 'req', id: r.id, rota: 'requisicoes',
+    texto: `Requisição nº ${r.id} para atender`, sub: `${dados.mapa.local.get(r.destino_id)?.nome || ''} · ${dados.mapa.perfil.get(r.solicitante_id)?.nome || ''}`, quando: r.criado_em }));
+  dados.transferencias.filter((t) => t.situacao === 'enviada' && (admin || meus.has(t.destino_id))).forEach((t) => itens.push({ tipo: 'tr', id: t.id, rota: 'transferencias',
+    texto: `Transferência nº ${t.id} chegando`, sub: `de ${dados.mapa.local.get(t.origem_id)?.nome || ''} para ${dados.mapa.local.get(t.destino_id)?.nome || ''}`, quando: t.enviado_em }));
+  return itens.sort((a, b) => String(b.quando).localeCompare(String(a.quando)));
+}
+
+function Sininho({ dados, papeis, ir }) {
+  const [aberto, setAberto] = useState(false);
+  const itens = pendencias(dados, papeis);
+  const ant = useRef(null);
+  useEffect(() => {   // aviso do aparelho quando chega algo novo (se a pessoa ativou)
+    const n = itens.length;
+    if (ant.current !== null && n > ant.current && 'Notification' in window && Notification.permission === 'granted') {
+      try { new Notification('Compras & Estoque PSS', { body: itens[0]?.texto || 'Nova pendência', icon: 'icons/icon-192.png', tag: 'pss-pendencias' }); } catch { /* ignora */ }
+    }
+    ant.current = n;
+  }, [itens.length]);
+  const podeAvisar = 'Notification' in window && Notification.permission === 'default';
+  return html`<div class="sininho">
+    <button class="btn-icone" title=${itens.length ? `${itens.length} pendência(s)` : 'Sem pendências'} aria-label="Avisos" onClick=${() => setAberto(!aberto)}>
+      <${Icone} nome="sino" />${itens.length > 0 && html`<span class="sino-num">${itens.length > 99 ? '99+' : itens.length}</span>`}</button>
+    ${aberto && html`<div class="menu-fundo transparente" onClick=${() => setAberto(false)}></div><div class="sino-caixa">
+      <b>${itens.length ? `Você tem ${pl(itens.length, 'pendência', 'pendências')}` : 'Nenhuma pendência agora'}</b>
+      ${itens.slice(0, 12).map((i) => html`<button class="sino-item" onClick=${() => { setAberto(false); ir(i.rota, { abrir: i }); }}>
+        <span class=${'sino-ico ' + i.tipo}>${i.tipo === 'req' ? '📋' : '🚚'}</span><span><b>${i.texto}</b><small>${i.sub}</small></span></button>`)}
+      ${podeAvisar && html`<button class="btn btn-sec btn-peq" onClick=${() => Notification.requestPermission()}>Ativar avisos neste aparelho</button>`}
+    </div>`}
+  </div>`;
 }
 
 // ------------------------- Login ------------------------------------
@@ -249,10 +317,24 @@ function App() {
     return () => { clearInterval(t); ['click', 'keydown', 'touchstart'].forEach((ev) => document.removeEventListener(ev, marcar)); };
   }, [usuario?.user_id]);
 
-  async function recarregar() {
-    try { setDados(await carregarDados()); }
-    catch (e) { avisar(mensagemErro(e), 'erro'); }
+  const dadosRef = useRef(null);
+  dadosRef.current = dados;
+  async function recarregar(silencioso) {
+    try { setDados(await carregarDados(silencioso === true ? dadosRef.current : null)); }
+    catch (e) { if (silencioso !== true) avisar(mensagemErro(e), 'erro'); }
   }
+  // TEMPO REAL: quando alguém muda algo, a tela aberta se atualiza sozinha
+  // (aviso instantâneo do banco + conferência a cada 30 s só nas telas "ao vivo" e só com a aba visível)
+  const rotaViva = useRef(false);
+  useEffect(() => {
+    if (!usuario || !api.aoMudar) return;
+    let t = null;
+    const desligar = api.aoMudar(TABELAS_AO_VIVO, () => { clearTimeout(t); t = setTimeout(() => { if (!document.hidden) recarregar(true); }, 1200); });
+    const ciclo = setInterval(() => { if (!document.hidden && rotaViva.current) recarregar(true); }, 30000);
+    const visivel = () => { if (!document.hidden && rotaViva.current) recarregar(true); };
+    document.addEventListener('visibilitychange', visivel);
+    return () => { clearTimeout(t); clearInterval(ciclo); desligar && desligar(); document.removeEventListener('visibilitychange', visivel); };
+  }, [usuario?.user_id]);
   async function sair() {
     await api.rpc('registrar_acesso', { p_evento: 'saida', p_detalhe: null, p_agente: navigator.userAgent }).catch(() => {});
     await api.sair(); setUsuario(null); setVisao(null); setDados(null); location.hash = '#inicio';
@@ -275,7 +357,9 @@ function App() {
   const papeis = atual.papeis || [];
   const visiveis = MENU.filter((m) => !m.papeis || m.papeis.some((x) => papeis.includes(x)))
     .filter((m, i, l) => !m.grupo || (l[i + 1] && !l[i + 1].grupo));   // esconde grupo vazio
-  const itemAtual = visiveis.find((m) => m.id === rota) || visiveis[0];
+  const padrao = papeis.length === 1 && papeis[0] === 'padeiro' ? visiveis.find((m) => m.id === 'maceiras') : null;
+  const itemAtual = (rota === 'inicio' && padrao) || visiveis.find((m) => m.id === rota) || visiveis[0];
+  rotaViva.current = !!itemAtual.aoVivo;
   const Tela = itemAtual.tela;
   const ctx = { usuario: atual, real, vendoComo: !!visao, verComo: escolherVisao, papeis, dados, recarregar, ir, voltar, rota: itemAtual.id, estadoRota, setEstadoRota, podeFazer: (a) => pode(papeis, a), api };
 
@@ -291,6 +375,7 @@ function App() {
       </a>
       <div class="topo-usuario">
         <span class="so-tela"><strong>${atual.nome}</strong><small>${atual.funcao || papeisTexto(papeis)}</small></span>
+        ${dados && html`<${Sininho} dados=${dados} papeis=${papeis} ir=${ir} />`}
         ${(real.papeis || []).includes('admin') && html`<button class="btn-icone" title="Entrar como / ver como outra pessoa" onClick=${() => setEscolher(true)}><${Icone} nome="usuarios" /></button>`}
         <img class="selo-palamoni" src="icons/logo-palamoni-vertical.png" alt="Palamoni Consultoria" title="Produto Palamoni Consultoria Empresarial" />
         ${api.modo !== 'demo' && html`<button class="btn-icone" title="Trocar senha" onClick=${() => setSenha(true)}><${Icone} nome="chave" /></button>`}

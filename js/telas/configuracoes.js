@@ -3,15 +3,17 @@ import { html, useState, useMemo, useApp, Campo, Numero, QtdUnidade, Busca, Cabe
 import { lerPlanilha, planilhaDoCadastro } from '../importacao.js';
 import { CATEGORIAS, qtd, moeda, contem, qtdDupla, fator, pl, hojeISO, mensagemErro, qu, dataHora, nomeUsuario, mascaraDoc, docLimpo, problemaDoc } from '../util.js';
 import { useContagens } from './contagem.js';
+import { UnidadesLocais } from './locais.js';
 
 export function TelaConfiguracoes() {
   const { estadoRota, setEstadoRota } = useApp();
   const [aba, setAba] = useState(estadoRota?.aba || 'parametros');
   if (estadoRota) setTimeout(() => setEstadoRota(null), 0);
   return html`
-    <${Cabecalho} titulo="Configurações" />
-    <${Abas} abas=${[{ id: 'parametros', titulo: 'Parâmetros' }, { id: 'importar', titulo: 'Importar planilha' }, { id: 'implantacao', titulo: 'Implantação de saldo' }]} ativa=${aba} aoMudar=${setAba} />
+    <${Cabecalho} titulo="Configurações e locais" />
+    <${Abas} abas=${[{ id: 'parametros', titulo: 'Parâmetros' }, { id: 'locais', titulo: 'Unidades e locais' }, { id: 'importar', titulo: 'Importar planilha' }, { id: 'implantacao', titulo: 'Implantação de saldo' }]} ativa=${aba} aoMudar=${setAba} />
     ${aba === 'parametros' && html`<${Parametros} />`}
+    ${aba === 'locais' && html`<${UnidadesLocais} />`}
     ${aba === 'importar' && html`<${Importar} />`}
     ${aba === 'implantacao' && html`<${Implantacao} />`}`;
 }
