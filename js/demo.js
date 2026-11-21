@@ -139,6 +139,7 @@ export const apiDemo = {
       if (!v.length) { cond.push('false'); continue; }
       args.push(v); cond.push(`${col(k)} = any($${args.length})`);
     }
+    if (o.nulo) for (const k of o.nulo) cond.push(`${col(k)} is null`);
     const ordem = o.ordem ? `${col(o.ordem[0])} ${o.ordem[1] === 'desc' ? 'desc' : 'asc'}`
       : tabela === 'perfis' ? 'usuario' : tabela === 'parametros' ? 'chave' : tabela === 'estoque_local' ? 'produto_id, local_id'
         : tabela === 'batelada_custos' ? 'batelada_id' : 'id';

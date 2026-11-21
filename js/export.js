@@ -8,6 +8,22 @@ const CFG = window.CONFIG || {};
 const COR = CFG.COR_PDF || [2, 110, 87]; // cor principal no PDF (R, G, B)
 const cacheLogo = {};
 
+// As bibliotecas de PDF e Excel são pesadas (~600 KB): só são baixadas na primeira vez que alguém exporta.
+const _scripts = {};
+function carregarScript(src) {
+  if (!_scripts[src]) _scripts[src] = new Promise((ok, erro) => {
+    const s = document.createElement('script'); s.src = src; s.async = true;
+    s.onload = () => ok(); s.onerror = () => { delete _scripts[src]; erro(new Error('Não consegui carregar ' + src + '. Confira a internet e tente de novo.')); };
+    document.head.appendChild(s);
+  });
+  return _scripts[src];
+}
+export async function carregarPDF() {
+  if (!window.jspdf) await carregarScript('js/vendor/jspdf.umd.min.js');
+  if (!(window.jspdf && window.jspdf.jsPDF && window.jspdf.jsPDF.API && window.jspdf.jsPDF.API.autoTable)) await carregarScript('js/vendor/jspdf.plugin.autotable.min.js');
+}
+export async function carregarExcel() { if (!window.XLSX) await carregarScript('js/vendor/xlsx.mini.min.js'); return window.XLSX; }
+
 async function logo(caminho) {
   if (caminho in cacheLogo) return cacheLogo[caminho];
   try {
@@ -54,6 +70,7 @@ async function topo(doc, params, titulo, subtitulo) {
 
 // ------------------------- PEDIDO DE COMPRA -------------------------
 export async function pdfPedido({ pedido, itens, fornecedor, produtos, params, comprador }) {
+  await carregarPDF();
   const doc = novoDoc();
   const w = doc.internal.pageSize.getWidth();
   let y = await topo(doc, params, 'PEDIDO DE COMPRA', numeroPedido(pedido.id));
@@ -109,6 +126,7 @@ export async function pdfPedido({ pedido, itens, fornecedor, produtos, params, c
 // ------------------------- RELATÓRIO EM TABELA ----------------------
 // colunas: [{ titulo, valor:(l)=>texto, num:true }]
 export async function pdfTabela({ titulo, filtros, colunas, linhas, paisagem = true, totais, params = {} }) {
+  await carregarPDF();
   const doc = novoDoc(paisagem);
   const y = await topo(doc, params, titulo, filtros);
   doc.autoTable({
@@ -149,8 +167,9 @@ function livroExcel(abas) {
   }
   return wb;
 }
-export function excel(nomeArquivo, abas) { window.XLSX.writeFile(livroExcel(abas), nomeArquivo); }
-export function excelBlob(abas) {
+export async function excel(nomeArquivo, abas) { await carregarExcel(); window.XLSX.writeFile(livroExcel(abas), nomeArquivo); }
+export async function excelBlob(abas) {
+  await carregarExcel();
   const dados = window.XLSX.write(livroExcel(abas), { bookType: 'xlsx', type: 'array' });
   return new Blob([dados], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
 }

@@ -4,7 +4,7 @@
 //  - marca "lançado no sistema" / "pendente"
 //  - comprador ou financeiro ajustam a previsão de pagamento (com motivo)
 // =====================================================================
-import { html, useState, useMemo, useEffect, useApp, Tabela, Cartao, Cabecalho, Etiqueta, Busca, useAcao, avisar } from '../ui.js';
+import { html, useState, useMemo, useEffect, useApp, Tabela, Cartao, Cabecalho, Etiqueta, Busca, useAcao, avisar, useHistorico } from '../ui.js';
 import { STATUS_PEDIDO, numeroPedido, data, dataHora, hojeISO, somarDias, diasEntre, diaLocal, moeda, pl, contem, nomeUsuario, formatarDoc } from '../util.js';
 import { resumoPedido, PedidoDetalhe, AjustarPagamento } from './pedidos.js';
 import { Exportar } from '../exportar.js';
@@ -73,6 +73,7 @@ export function TelaFinanceiro() {
   const [ent, setEnt] = useState('');
   const [aberto, setAberto] = useState(null);
   const [ajustar, setAjustar] = useState(null);
+  useHistorico([somarDias(hoje, -180), pedDe].filter(Boolean).sort()[0]);   // pagamentos podem vencer bem depois da compra
   const [ocupado, executar] = useAcao();
   useEffect(() => { if (estadoRota) setEstadoRota(null); }, []);
   const marca = podeFazer('financeiro');

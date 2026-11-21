@@ -1,5 +1,5 @@
 // Pedidos de compra: lista, cadastro, detalhe, divergências, PDF / Excel / impressão
-import { html, useState, useMemo, useEffect, useApp, Tabela, Modal, Campo, Numero, Escolher, QtdUnidade, Busca, Etiqueta, Cabecalho, useAcao, confirmar, avisar, n } from '../ui.js';
+import { html, useState, useMemo, useEffect, useApp, Tabela, Modal, Campo, Numero, Escolher, QtdUnidade, Busca, Etiqueta, Cabecalho, useAcao, confirmar, avisar, n, useHistorico } from '../ui.js';
 import { STATUS_PEDIDO, numeroPedido, data, dataHora, hojeISO, somarDias, diasEntre, moeda, qtd, num, contem, fator, qu, pl, plural, nomeUsuario, mensagemErro } from '../util.js';
 import { pdfPedido, pdfTabela, salvarPDF, imprimirPDF, excel, pdfBlob, compartilhar } from '../export.js';
 import { Exportar } from '../exportar.js';
@@ -43,6 +43,7 @@ export function TelaPedidos() {
   const [busca, setBusca] = useState('');
   const [filtro, setFiltro] = useState(estadoRota?.filtro || 'pendentes');
   const [de, setDe] = useState('');
+  useHistorico(de);
   const [ate, setAte] = useState('');
   const [forn, setForn] = useState(null);
   const [aberto, setAberto] = useState(estadoRota?.abrir || null);
@@ -180,9 +181,9 @@ export function PedidoDetalhe({ pedido, aoFechar, aoEditar }) {
       } else if (tipo === 'pdf') salvarPDF(doc, `${numeroPedido(pedido.id)}.pdf`); else imprimirPDF(doc);
     } catch (e) { avisar(mensagemErro(e), 'erro'); }
   }
-  function gerarExcel() {
+  async function gerarExcel() {
     try {
-      excel(`${numeroPedido(pedido.id)}.xlsx`, [{ nome: numeroPedido(pedido.id), linhas: r.itens, colunas: [
+      await excel(`${numeroPedido(pedido.id)}.xlsx`, [{ nome: numeroPedido(pedido.id), linhas: r.itens, colunas: [
         { titulo: 'Código', valor: (i) => dados.mapa.produto.get(i.produto_id)?.codigo },
         { titulo: 'Descrição', valor: (i) => dados.mapa.produto.get(i.produto_id)?.descricao, largura: 40 },
         { titulo: 'Quantidade', valor: (i) => Number(i.quantidade) }, { titulo: 'Unidade', valor: (i) => i.unidade },
@@ -286,6 +287,7 @@ const virgula = (v) => (v === null || v === undefined ? '' : String(Math.round(v
 
 function FormPedido({ pedido, aoFechar }) {
   const { dados, recarregar, api } = useApp();
+  useHistorico(somarDias(hojeISO(), -365));   // último preço de itens comprados há mais tempo
   const novo = !pedido.id;
   const hoje = hojeISO();
   const itensAtuais = novo ? [] : dados.pedidoItens.filter((i) => i.pedido_id === pedido.id);
@@ -416,6 +418,7 @@ function DicaUltimaCompra({ produtoId, fornecedorId, pedidoId, aoVer }) {
 
 export function UltimasCompras({ aoFechar, produtoInicial, fornecedorInicial }) {
   const { dados } = useApp();
+  useHistorico(somarDias(hojeISO(), -365));
   const [prod, setProd] = useState(produtoInicial || null);
   const [forn, setForn] = useState(fornecedorInicial || null);
   const [so, setSo] = useState(!produtoInicial);   // só a última de cada produto × fornecedor

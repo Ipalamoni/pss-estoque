@@ -8,32 +8,57 @@ import { indicadores } from './calc.js';
 import { Icone } from './icones.js';
 
 import { TelaInicio } from './telas/inicio.js';
-import { TelaReceber } from './telas/receber.js';
-import { TelaSaidas } from './telas/saidas.js';
-import { TelaInventario } from './telas/inventario.js';
-import { TelaPedidos } from './telas/pedidos.js';
-import { TelaEstoque } from './telas/estoque.js';
-import { TelaMovimentos } from './telas/movimentos.js';
-import { TelaRelatorios } from './telas/relatorios.js';
-import { TelaProdutos } from './telas/produtos.js';
-import { TelaFornecedores } from './telas/fornecedores.js';
-import { TelaFichas } from './telas/fichas.js';
-import { TelaUsuarios } from './telas/usuarios.js';
-import { TelaConfiguracoes } from './telas/configuracoes.js';
-import { TelaAuditoria } from './telas/auditoria.js';
-import { TelaProgramacao, TelaSaidasProducao } from './telas/producao.js';
-import { TelaPainel } from './telas/painel.js';
-import { TelaFinanceiro } from './telas/financeiro.js';
-import { TelaPrevisao } from './telas/previsao.js';
-import { TelaCustos } from './telas/custos.js';
-import { TelaContagemInicial } from './telas/contagem.js';
-import { TelaEstoqueLocal } from './telas/estoque-local.js';
-import { TelaTransferencias } from './telas/transferencias.js';
-import { TelaRequisicoes } from './telas/requisicoes.js';
-import { TelaMaceiras } from './telas/maceiras.js';
-import { TelaFinalizar } from './telas/finalizar.js';
-import { TelaPainelProducao } from './telas/painel-producao.js';
-import { TelaCadastrosProducao } from './telas/cadastros-producao.js';
+
+
+// Telas carregadas sob demanda: o celular só baixa/lê a tela quando ela é aberta
+// (e, com o app parado, adianta as telas que a pessoa pode usar).
+function preguicosa(carregar, nome) {
+  let Comp = null; let prom = null;
+  const buscar = () => {
+    // se o sistema foi atualizado com o app aberto, a tela nova pode não combinar com a versão em uso: recarrega
+    if (!prom && window.__versaoTrocou) { location.reload(); return new Promise(() => {}); }
+    return (prom = prom || carregar().then((m) => { Comp = m[nome]; }).catch((e) => { prom = null; throw e; }));
+  };
+  function Tela(props) {
+    const [, forcar] = useState(0);
+    useEffect(() => {
+      if (Comp) return undefined;
+      let vivo = true;
+      buscar().then(() => { if (vivo) forcar(1); }).catch(() => { if (vivo) avisar('Não consegui abrir esta tela. Confira a internet e tente de novo.', 'erro'); });
+      return () => { vivo = false; };
+    }, []);
+    return Comp ? html`<${Comp} ...${props} />` : html`<${Carregando} texto="Abrindo…" />`;
+  }
+  Tela.precarregar = () => (window.__versaoTrocou ? Promise.resolve() : buscar().catch(() => {}));
+  return Tela;
+}
+const TelaReceber = preguicosa(() => import('./telas/receber.js'), 'TelaReceber');
+const TelaSaidas = preguicosa(() => import('./telas/saidas.js'), 'TelaSaidas');
+const TelaInventario = preguicosa(() => import('./telas/inventario.js'), 'TelaInventario');
+const TelaPedidos = preguicosa(() => import('./telas/pedidos.js'), 'TelaPedidos');
+const TelaEstoque = preguicosa(() => import('./telas/estoque.js'), 'TelaEstoque');
+const TelaMovimentos = preguicosa(() => import('./telas/movimentos.js'), 'TelaMovimentos');
+const TelaRelatorios = preguicosa(() => import('./telas/relatorios.js'), 'TelaRelatorios');
+const TelaProdutos = preguicosa(() => import('./telas/produtos.js'), 'TelaProdutos');
+const TelaFornecedores = preguicosa(() => import('./telas/fornecedores.js'), 'TelaFornecedores');
+const TelaFichas = preguicosa(() => import('./telas/fichas.js'), 'TelaFichas');
+const TelaUsuarios = preguicosa(() => import('./telas/usuarios.js'), 'TelaUsuarios');
+const TelaConfiguracoes = preguicosa(() => import('./telas/configuracoes.js'), 'TelaConfiguracoes');
+const TelaAuditoria = preguicosa(() => import('./telas/auditoria.js'), 'TelaAuditoria');
+const TelaProgramacao = preguicosa(() => import('./telas/producao.js'), 'TelaProgramacao');
+const TelaSaidasProducao = preguicosa(() => import('./telas/producao.js'), 'TelaSaidasProducao');
+const TelaPainel = preguicosa(() => import('./telas/painel.js'), 'TelaPainel');
+const TelaFinanceiro = preguicosa(() => import('./telas/financeiro.js'), 'TelaFinanceiro');
+const TelaPrevisao = preguicosa(() => import('./telas/previsao.js'), 'TelaPrevisao');
+const TelaCustos = preguicosa(() => import('./telas/custos.js'), 'TelaCustos');
+const TelaContagemInicial = preguicosa(() => import('./telas/contagem.js'), 'TelaContagemInicial');
+const TelaEstoqueLocal = preguicosa(() => import('./telas/estoque-local.js'), 'TelaEstoqueLocal');
+const TelaTransferencias = preguicosa(() => import('./telas/transferencias.js'), 'TelaTransferencias');
+const TelaRequisicoes = preguicosa(() => import('./telas/requisicoes.js'), 'TelaRequisicoes');
+const TelaMaceiras = preguicosa(() => import('./telas/maceiras.js'), 'TelaMaceiras');
+const TelaFinalizar = preguicosa(() => import('./telas/finalizar.js'), 'TelaFinalizar');
+const TelaPainelProducao = preguicosa(() => import('./telas/painel-producao.js'), 'TelaPainelProducao');
+const TelaCadastrosProducao = preguicosa(() => import('./telas/cadastros-producao.js'), 'TelaCadastrosProducao');
 
 const CFG = window.CONFIG || {};
 const TODOS = Object.keys(PAPEIS).filter((p) => !['financeiro', 'faturamento', 'padeiro'].includes(p));   // financeiro: só pedidos/pagamentos e previsão; faturamento: só previsão; padeiro: só a produção
@@ -81,29 +106,60 @@ const TABELAS_AO_VIVO = ['movimentos', 'estoque_local', 'transferencias', 'requi
 
 
 // ------------------------- Carregamento dos dados comuns ------------
-async function carregarDados(anterior) {
-  const parametros = await api.listar('parametros');
-  const params = Object.fromEntries(parametros.map((p) => [p.chave, p.valor]));
+// Histórico: ao entrar, só os últimos HISTORICO_DIAS dias (+ tudo que está em aberto). Período mais antigo
+// é buscado quando alguém pesquisa (useHistorico). A atualização automática é "leve": só o que muda na operação.
+const HISTORICO_DIAS = 60;
+const hojeMenos = (d) => { const x = new Date(); x.setDate(x.getDate() - d); return x.toISOString().slice(0, 10); };
+const unir = (...listas) => { const m = new Map(); listas.flat().forEach((x) => m.set(x.id, x)); return [...m.values()].sort((a, b) => a.id - b.id); };
+async function porIds(tabela, campo, ids, seguro) {
+  const partes = []; for (let i = 0; i < ids.length; i += 150) partes.push(ids.slice(i, i + 150));
+  const r = await Promise.all(partes.map((p) => seguro(api.listar(tabela, { em: { [campo]: p } }))));
+  return r.flat();
+}
+async function carregarDados(anterior, opcoes = {}) {
   const seguro = (pr) => pr.catch(() => []);   // papéis restritos (financeiro/faturamento) não leem tudo
-  const [produtos, fornecedores, fichas, fichaItens, pedidos, pedidoItens, perfis, recebimentos, programacoes, stats,
-    unidades, locais, estoqueLocal, linhas, maceiras, operadores, transferencias, requisicoes] = await Promise.all([
-    api.listar('produtos'), api.listar('fornecedores'), api.listar('fichas_tecnicas'), api.listar('ficha_itens'),
-    api.listar('pedidos'), api.listar('pedido_itens'), api.listar('perfis'), api.listar('recebimentos'), api.listar('programacoes'),
-    anterior ? Promise.resolve(anterior.stats) : api.rpc('estatisticas_estoque', { p_janela: Number(params.janela_consumo_dias || 90) }),
-    seguro(api.listar('unidades')), seguro(api.listar('locais')), seguro(api.listar('estoque_local')), seguro(api.listar('linhas_producao')),
-    seguro(api.listar('maceiras')), seguro(api.listar('operadores')),
+  const leve = !!(opcoes.leve && anterior);
+  const desde = opcoes.desde || anterior?.historicoDesde || hojeMenos(HISTORICO_DIAS);
+  const ini = new Date(desde + 'T00:00:00').toISOString();
+  const operacao = () => Promise.all([
+    api.listar('produtos'), seguro(api.listar('estoque_local')),
     seguro(api.listar('transferencias', { em: { situacao: ['separada', 'enviada'] } })),
     seguro(api.listar('requisicoes', { em: { situacao: ['pendente', 'parcial'] } })),
+    Promise.all([api.listar('programacoes', { campoData: 'data', desde }), api.listar('programacoes', { eq: { situacao: 'ativa' }, nulo: ['finalizada_em'] })]).then((x) => unir(...x)),
   ]);
+  let base;
+  if (leve) {
+    base = anterior;
+  } else {
+    const parametros = await api.listar('parametros');
+    const params = Object.fromEntries(parametros.map((p) => [p.chave, p.valor]));
+    const [fornecedores, fichas, fichaItens, pedidos, perfis, stats, unidades, locais, linhas, maceiras, operadores] = await Promise.all([
+      api.listar('fornecedores'), api.listar('fichas_tecnicas'), api.listar('ficha_itens'),
+      Promise.all([api.listar('pedidos', { campoData: 'data_pedido', desde }), api.listar('pedidos', { em: { status: ['aberto', 'parcial'] } })]).then((x) => unir(...x)),
+      api.listar('perfis'),
+      anterior ? Promise.resolve(anterior.stats) : api.rpc('estatisticas_estoque', { p_janela: Number(params.janela_consumo_dias || 90) }),
+      seguro(api.listar('unidades')), seguro(api.listar('locais')), seguro(api.listar('linhas_producao')),
+      seguro(api.listar('maceiras')), seguro(api.listar('operadores')),
+    ]);
+    const ids = pedidos.map((p) => p.id);
+    const [pedidoItens, recebimentos] = await Promise.all([
+      porIds('pedido_itens', 'pedido_id', ids, seguro),
+      Promise.all([api.listar('recebimentos', { desde: ini }), porIds('recebimentos', 'pedido_id', ids, seguro),
+        seguro(api.listar('recebimentos', { eq: { divergencia: true }, nulo: ['ciente_por'] }))]).then((x) => unir(...x)),
+    ]);
+    base = { parametros, params, fornecedores, fichas, fichaItens, pedidos, pedidoItens, perfis, recebimentos, stats, unidades, locais, linhas, maceiras, operadores };
+  }
+  const [produtos, estoqueLocal, transferencias, requisicoes, programacoes] = await operacao();
   const [transfItens, reqItens] = await Promise.all([
-    transferencias.length ? seguro(api.listar('transferencia_itens', { em: { transferencia_id: transferencias.map((t) => t.id) } })) : [],
-    requisicoes.length ? seguro(api.listar('requisicao_itens', { em: { requisicao_id: requisicoes.map((t) => t.id) } })) : [],
+    transferencias.length ? porIds('transferencia_itens', 'transferencia_id', transferencias.map((t) => t.id), seguro) : [],
+    requisicoes.length ? porIds('requisicao_itens', 'requisicao_id', requisicoes.map((t) => t.id), seguro) : [],
   ]);
+  const { parametros, params, fornecedores, fichas, fichaItens, pedidos, pedidoItens, perfis, recebimentos, stats, unidades, locais, linhas, maceiras, operadores } = base;
   const ind = indicadores(produtos, stats || [], params, fornecedores);
   return {
     produtos, fornecedores, fichas, fichaItens, pedidos, pedidoItens, perfis, recebimentos, programacoes, parametros, params, stats, ind,
     unidades, locais: [...locais].sort((a, b) => a.ordem - b.ordem || a.id - b.id), estoqueLocal, linhas, maceiras: [...maceiras].sort((a, b) => a.ordem - b.ordem || a.id - b.id), operadores,
-    transferencias, transfItens, requisicoes, reqItens,
+    transferencias, transfItens, requisicoes, reqItens, historicoDesde: desde,
     mapa: { produto: porId(produtos), fornecedor: porId(fornecedores), ficha: porId(fichas), perfil: porId(perfis), ind: porId(ind),
       local: porId(locais), unidade: porId(unidades), maceira: porId(maceiras), operador: porId(operadores), linha: porId(linhas) },
     carregadoEm: new Date(),
@@ -310,7 +366,7 @@ function App() {
   useEffect(() => {   // aviso de versão nova (o service worker trocou os arquivos)
     if (!('serviceWorker' in navigator)) return;
     let tinha = !!navigator.serviceWorker.controller;
-    const f = () => { if (tinha) setNovaVersao(true); tinha = true; };
+    const f = () => { if (tinha) { setNovaVersao(true); window.__versaoTrocou = true; } tinha = true; };
     navigator.serviceWorker.addEventListener('controllerchange', f);
     return () => navigator.serviceWorker.removeEventListener('controllerchange', f);
   }, []);            // perfil que o administrador está vendo
@@ -372,15 +428,27 @@ function App() {
     try { setDados(await carregarDados(silencioso === true ? dadosRef.current : null)); }
     catch (e) { if (silencioso !== true) avisar(mensagemErro(e), 'erro'); }
   }
+  // atualização automática: só o que muda na operação (saldos, transferências, requisições, programação)
+  async function recarregarLeve() {
+    if (!dadosRef.current) return recarregar(true);
+    try { setDados(await carregarDados(dadosRef.current, { leve: true })); } catch { /* tenta de novo na próxima */ }
+  }
+  // pesquisa de período antigo: busca o histórico que falta (uma vez) e mantém
+  const buscandoHist = useRef(null);
+  async function garantirHistorico(de) {
+    const atual = dadosRef.current; if (!atual || !de || de >= atual.historicoDesde || buscandoHist.current === de) return;
+    buscandoHist.current = de;
+    try { setDados(await carregarDados(atual, { desde: de })); } catch (e) { avisar(mensagemErro(e), 'erro'); } finally { buscandoHist.current = null; }
+  }
   // TEMPO REAL: quando alguém muda algo, a tela aberta se atualiza sozinha
   // (aviso instantâneo do banco + conferência a cada 30 s só nas telas "ao vivo" e só com a aba visível)
   const rotaViva = useRef(false);
   useEffect(() => {
     if (!usuario || !api.aoMudar) return;
     let t = null;
-    const desligar = api.aoMudar(TABELAS_AO_VIVO, () => { clearTimeout(t); t = setTimeout(() => { if (!document.hidden) recarregar(true); }, 1200); });
-    const ciclo = setInterval(() => { if (!document.hidden && rotaViva.current) recarregar(true); }, 30000);
-    const visivel = () => { if (!document.hidden && rotaViva.current) recarregar(true); };
+    const desligar = api.aoMudar(TABELAS_AO_VIVO, () => { clearTimeout(t); t = setTimeout(() => { if (!document.hidden) recarregarLeve(); }, 1200); });
+    const ciclo = setInterval(() => { if (!document.hidden && rotaViva.current) recarregarLeve(); }, 30000);
+    const visivel = () => { if (!document.hidden && rotaViva.current) recarregarLeve(); };
     document.addEventListener('visibilitychange', visivel);
     return () => { clearTimeout(t); clearInterval(ciclo); desligar && desligar(); document.removeEventListener('visibilitychange', visivel); };
   }, [usuario?.user_id]);
@@ -396,6 +464,16 @@ function App() {
   }
   function ir(destino, estado = null) { setEstadoRota(estado); if (location.hash.slice(1) === destino) setRota(destino); else location.hash = '#' + destino; window.scrollTo(0, 0); }
 
+  const telasRef = useRef(null);
+  useEffect(() => {   // com o app parado, adianta as telas que esta pessoa pode abrir
+    if (!dados) return undefined;
+    const ociosa = window.requestIdleCallback || ((f) => setTimeout(f, 1500));
+    let i = 0; const lista = (telasRef.current || []).filter((m) => m.tela && m.tela.precarregar);
+    let cancelado = false;
+    const proxima = () => { if (cancelado || i >= lista.length) return; lista[i++].tela.precarregar().then(() => ociosa(proxima)); };
+    const t = setTimeout(() => ociosa(proxima), 2500);
+    return () => { cancelado = true; clearTimeout(t); };
+  }, [!!dados, !!usuario]);
   if (usuario === undefined) return html`<${Carregando} />`;
   if (!usuario) return html`<${Login} aoEntrar=${setUsuario} /><${Avisos} />`;
   if (usuario.trocar_senha && api.modo !== 'demo') return html`<div class="login"><${TrocarSenha} obrigatoria usuario=${usuario}
@@ -412,7 +490,8 @@ function App() {
   const grupoDe = (g) => g;
   const grupoAtual = (() => { let g = null; for (const m of visiveis) { if (m.grupo) g = m.grupo; else if (m.id === itemAtual.id) return g; } return null; })();
   const Tela = itemAtual.tela;
-  const ctx = { usuario: atual, real, vendoComo: !!visao, verComo: escolherVisao, papeis, dados, recarregar, ir, voltar, rota: itemAtual.id, trilha: { grupo: grupoAtual, titulo: itemAtual.titulo }, estadoRota, setEstadoRota, podeFazer: (a) => pode(papeis, a), api };
+  telasRef.current = visiveis;
+  const ctx = { usuario: atual, real, vendoComo: !!visao, verComo: escolherVisao, papeis, dados, recarregar, ir, voltar, rota: itemAtual.id, garantirHistorico, trilha: { grupo: grupoAtual, titulo: itemAtual.titulo }, estadoRota, setEstadoRota, podeFazer: (a) => pode(papeis, a), api };
 
   return html`<${Ctx.Provider} value=${ctx}>
     ${api.modo === 'demo' && html`<div class="faixa-demo">MODO DEMONSTRAÇÃO · dados fictícios

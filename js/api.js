@@ -83,6 +83,7 @@ function criarApiSupabase() {
         if (o.ate) q = q.lt(campo, o.ate);
         if (o.eq) for (const [k, v] of Object.entries(o.eq)) q = q.eq(k, v);
         if (o.em) for (const [k, v] of Object.entries(o.em)) q = q.in(k, v);
+        if (o.nulo) for (const k of o.nulo) q = q.is(k, null);
         if (o.ordem) q = q.order(o.ordem[0], { ascending: o.ordem[1] !== 'desc' });
         else if (tabela === 'estoque_local') q = q.order('produto_id').order('local_id');
         else q = q.order(tabela === 'perfis' ? 'usuario' : tabela === 'parametros' ? 'chave' : tabela === 'batelada_custos' ? 'batelada_id' : 'id', { ascending: true });

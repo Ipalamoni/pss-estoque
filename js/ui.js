@@ -267,3 +267,9 @@ export function useAcao() {
 
 export const n = lerNumero;
 export const fmtQtd = qtd;
+
+// Telas com período: se a data inicial for mais antiga que o histórico carregado (60 dias), busca o que falta.
+export function useHistorico(de) {
+  const app = useApp();
+  useEffect(() => { if (de && app && app.garantirHistorico) app.garantirHistorico(de); }, [de]);
+}

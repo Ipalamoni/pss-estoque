@@ -3,7 +3,7 @@
 //           e SAÍDAS DA PRODUÇÃO (o que a pesagem tirou do estoque)
 // =====================================================================
 import { html, useState, useMemo, useEffect, useApp, Campo, Numero, Escolher, QtdUnidade, Etiqueta, Cabecalho, Abas, Vazio, Tabela, Cartao,
-  Carregando, Modal, useAcao, confirmar, avisar, n } from '../ui.js';
+  Carregando, Modal, useAcao, confirmar, avisar, n, useHistorico } from '../ui.js';
 import { qtd, num, moeda, data, dataHora, hojeISO, somarDias, fator, qu, pl, nomeUsuario, mensagemErro, contem, diaLocal } from '../util.js';
 import { Exportar } from '../exportar.js';
 import { UltimaAlteracao, HistoricoAuditoria } from '../historico.js';
@@ -481,6 +481,7 @@ function ProgramacaoPeriodo({ aoAbrirDia }) {
   const { dados } = useApp();
   const h = hojeISO();
   const [de, setDe] = useState(h);
+  useHistorico(de);
   const [ate, setAte] = useState(somarDias(h, 1));
   const progs = dados.programacoes.filter((p) => p.data >= de && p.data <= ate && p.situacao === 'ativa');
   const prods = useProducoes(de, ate, progs.map((p) => p.id));
@@ -529,6 +530,7 @@ export function TelaSaidasProducao() {
   const { dados, api } = useApp();
   const h = hojeISO();
   const [de, setDe] = useState(h);
+  useHistorico(de);
   const [ate, setAte] = useState(h);
   const [aba, setAba] = useState('resumo');
   const [movs, setMovs] = useState(null);

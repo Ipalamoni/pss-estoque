@@ -4,6 +4,7 @@ import { lerPlanilha, planilhaDoCadastro } from '../importacao.js';
 import { CATEGORIAS, qtd, moeda, contem, qtdDupla, fator, pl, hojeISO, mensagemErro, qu, dataHora, nomeUsuario, mascaraDoc, docLimpo, problemaDoc } from '../util.js';
 import { useContagens } from './contagem.js';
 import { UnidadesLocais } from './locais.js';
+import { carregarExcel } from '../export.js';
 
 export function TelaConfiguracoes() {
   const { estadoRota, setEstadoRota } = useApp();
@@ -103,7 +104,7 @@ function Importar() {
   async function abrir(e) {
     const f = e.target.files?.[0]; if (!f) return;
     setResultado(null); setArquivo(f.name);
-    try { setLido(lerPlanilha(window.XLSX, await f.arrayBuffer())); }
+    try { const X = await carregarExcel(); setLido(lerPlanilha(X, await f.arrayBuffer())); }
     catch (err) { avisar('Não consegui ler a planilha: ' + mensagemErro(err), 'erro'); setLido(null); }
     e.target.value = '';
   }
@@ -116,8 +117,8 @@ function Importar() {
       setTimeout(() => URL.revokeObjectURL(url), 5000);
     } catch (err) { avisar('Não consegui baixar a planilha-modelo: ' + mensagemErro(err), 'erro'); }
   }
-  function baixarAtual() {
-    try { window.XLSX.writeFile(planilhaDoCadastro(window.XLSX, dados), `cadastro-atual-${hojeISO()}.xlsx`); }
+  async function baixarAtual() {
+    try { const X = await carregarExcel(); X.writeFile(planilhaDoCadastro(X, dados), `cadastro-atual-${hojeISO()}.xlsx`); }
     catch (err) { avisar(mensagemErro(err), 'erro'); }
   }
   async function importar() {

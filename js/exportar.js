@@ -33,7 +33,7 @@ export function Exportar(props) {
     if (tipo === 'excel') {
       const abas = props.abas ? props.abas() : [{ nome: props.titulo, linhas: props.linhas,
         colunas: props.colunas.map((c) => ({ titulo: c.titulo, valor: c.valor, largura: c.largura })) }];
-      return { blob: excelBlob(abas), nome: `${nome}.xlsx` };
+      return { blob: await excelBlob(abas), nome: `${nome}.xlsx` };
     }
     const doc = props.pdf ? await props.pdf(dados.params)
       : await pdfTabela({ titulo: props.titulo, filtros: props.filtros, colunas: props.colunas, linhas: props.linhas,

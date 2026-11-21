@@ -1,5 +1,5 @@
 // Relatórios: pedidos, compras por produto, consumo do período, ajustes e correções
-import { html, useState, useMemo, useEffect, useApp, Escolher, Busca, Etiqueta, Cabecalho, Abas, Tabela, Cartao, Carregando, Modal, avisar } from '../ui.js';
+import { html, useState, useMemo, useEffect, useApp, Escolher, Busca, Etiqueta, Cabecalho, Abas, Tabela, Cartao, Carregando, Modal, avisar, useHistorico } from '../ui.js';
 import { CATEGORIAS, STATUS_PEDIDO, TIPOS_MOV, MOTIVOS_INVENTARIO, qtd, num, moeda, data, dataHora, hojeISO, somarDias, diasEntre, numeroPedido, contem, fator, qu, pl, plural, nomeUsuario, mensagemErro } from '../util.js';
 import { Exportar } from '../exportar.js';
 import { resumoPedido, PrazoEtiqueta, PedidoDetalhe, COR_STATUS } from './pedidos.js';
@@ -11,6 +11,7 @@ const inicioDia = (iso) => new Date(iso + 'T00:00:00').toISOString();
 export function TelaRelatorios() {
   const [aba, setAba] = useState('pedidos');
   const [de, setDe] = useState(somarDias(hojeISO(), -30));
+  useHistorico(de);
   const [ate, setAte] = useState(hojeISO());
   const periodo = { de, ate };
   return html`
