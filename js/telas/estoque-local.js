@@ -5,7 +5,7 @@
 // somado; numa unidade/local, soma no destino ("chegando") e na origem
 // aparece só como aviso ("saindo").
 // =====================================================================
-import { html, useState, useMemo, useApp, Cabecalho, Abas, Busca, Tabela, Etiqueta, Vazio } from '../ui.js';
+import { html, useState, useMemo, useApp, Cabecalho, Abas, Busca, Tabela, Etiqueta, Vazio, Filtros } from '../ui.js';
 import { num, qu, moeda, contem, TIPOS_PRODUTO, tipoProduto, operaLocal, ehGestao, dataHora, pl, SITUACAO_TRANSF } from '../util.js';
 import { Exportar } from '../exportar.js';
 import { nomeLocal, minutos, tempoTexto } from '../producao-util.js';
@@ -65,17 +65,17 @@ export function TelaEstoqueLocal() {
     return { id: p.id, p, c, disp, sep, transito: c.transito, chegando: c.chegando, saindo: c.saindo, total, q2, valor: total * Number(p.custo_medio || 0) };
   }).filter((l) => (!soSaldo || Math.abs(l.total) > 0.0001 || l.saindo > 0) && (!soMov || l.sep > 0 || l.transito > 0 || l.chegando > 0 || l.saindo > 0));
 
-  const filtros = html`<div class="filtros">
+  const nFiltros = [unid, loc, tipo, !soSaldo, soMov].filter(Boolean).length;
+  const filtros = html`<${Filtros} ativos=${nFiltros} fixo=${html`<div class="busca"><${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Buscar produto, grupo, marca" /></div>`}>
     ${multi && html`<select class="entrada" value=${unid} onChange=${(e) => { setUnid(e.target.value); setLoc(''); }}><option value="">Todas as unidades</option>
       ${dados.unidades.filter((u) => u.ativa).map((u) => html`<option value=${String(u.id)}>${u.nome}</option>`)}</select>`}
     <select class="entrada" value=${loc} onChange=${(e) => setLoc(e.target.value)}><option value="">${gestao ? 'Todos os locais' : 'Todos os meus locais'}</option>
       ${permitidos.filter((l) => !unid || String(l.unidade_id) === unid).map((l) => html`<option value=${String(l.id)}>${nomeLocal(dados, l.id)}</option>`)}</select>
     <select class="entrada" value=${tipo} onChange=${(e) => setTipo(e.target.value)}><option value="">Todos os tipos</option>
       ${Object.entries(TIPOS_PRODUTO).map(([k, v]) => html`<option value=${k}>${v}</option>`)}</select>
-    <div class="busca"><${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Buscar produto, grupo, marca" /></div>
     <label class="check"><input type="checkbox" checked=${soSaldo} onChange=${(e) => setSoSaldo(e.target.checked)} /> só com saldo</label>
     <label class="check"><input type="checkbox" checked=${soMov} onChange=${(e) => setSoMov(e.target.checked)} /> só com separado ou trânsito</label>
-  </div>`;
+  </${Filtros}>`;
   const rotuloEscopo = tudo ? 'Empresa toda' : [unid && dados.mapa.unidade.get(Number(unid))?.nome, loc ? nomeLocal(dados, Number(loc)) : (gestao ? 'todos os locais' : 'meus locais')].filter(Boolean).join(' · ');
   const un = (l, v) => qu(v, l.p.unidade_estoque);
 

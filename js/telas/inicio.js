@@ -83,7 +83,7 @@ function InicioOperacao() {
     podeFazer('custos') && { t: 'Central de Custos', i: 'custos', f: () => ir('custos') },
     podeFazer('contagem_inicial') && !dados.produtos.some((p) => Number(p.saldo) !== 0) && { t: 'Contagem inicial (saldo)', i: 'contagem', f: () => ir('contagem') },
     podeFazer('previsao_producao') && !gestao && { t: 'Programado × produzido', i: 'previsao', f: () => ir('previsao') },
-    papeis.some((x) => ['admin', 'diretoria'].includes(x)) && { t: 'Financeiro · a pagar', i: 'financeiro', f: () => ir('financeiro') },
+    papeis.some((x) => ['admin', 'diretoria'].includes(x)) && { t: 'Pedidos a pagar', i: 'financeiro', f: () => ir('financeiro') },
     podeFazer('programacao') ? { t: 'Programar produção', i: 'programacao', f: () => ir('programacao') }
       : verProg && podeFazer('saida_receita') && { t: 'Pesagem de hoje', i: 'programacao', f: () => ir('programacao') },
     podeFazer('recebimento') && { t: 'Receber mercadoria', i: 'receber', f: () => ir('receber') },
@@ -94,6 +94,12 @@ function InicioOperacao() {
     papeis.some((x) => ['engenharia', 'pesagem'].includes(x)) && { t: 'Saídas da produção', i: 'saidas-producao', f: () => ir('saidas-producao') },
     { t: 'Estoque por local', i: 'estoque-local', f: () => ir('estoque-local') },
     { t: 'Posição de estoque', i: 'estoque', f: () => ir('estoque') },
+  ].filter(Boolean);
+  const verPed = papeis.some((x) => ['admin', 'comprador', 'almoxarifado', 'recebimento', 'diretoria'].includes(x));
+  const agora = [
+    ...atalhos.filter((a) => a.n > 0),
+    verPed && atrasados.length > 0 && { t: 'Pedidos de compra atrasados', i: 'pedidos', n: atrasados.length, f: () => ir('pedidos', { filtro: 'atrasados' }) },
+    podeFazer('pedido') && conta('zerado') + conta('critico') > 0 && { t: 'Itens zerados ou críticos', i: 'estoque', n: conta('zerado') + conta('critico'), f: () => ir('estoque', { status: conta('zerado') ? 'zerado' : 'critico' }) },
   ].filter(Boolean);
   const progHoje = (dados.programacoes || []).filter((p) => p.situacao === 'ativa' && p.data === hoje);
   const pendFinal = (dados.programacoes || []).filter((p) => p.situacao === 'ativa' && !p.finalizada_em && p.data < hoje);
@@ -106,9 +112,11 @@ function InicioOperacao() {
   return html`
     <${Cabecalho} titulo=${`${saudacao}, ${usuario.nome.split(' ')[0]}!`} sub="O que você precisa fazer agora?" />
     ${podeFazer('programacao') && pendFinal.length > 0 && html`<${AvisoFinalizar} progs=${pendFinal} aoAbrir=${() => ir('programacao')} />`}
-    <div class="atalhos">
-      ${atalhos.map((a) => html`<button class=${'atalho' + (a.destaque ? ' atalho-destaque' : '') + (a.n ? ' atalho-alerta' : '')} onClick=${a.f}><${Icone} nome=${a.i} tam=${26} /><span>${a.t}</span>${a.n ? html`<b class="atalho-num">${a.n}</b>` : ''}</button>`)}
-    </div>
+    ${agora.length > 0 && html`<section class="agora" aria-label="Para fazer agora">
+      <h2 class="titulo-bloco">Para fazer agora</h2>
+      <div class="agora-lista">${agora.map((a) => html`<button class="tarefa" onClick=${a.f}>
+        <span class="tarefa-num">${a.n}</span><span class="tarefa-txt">${a.t}</span><${Icone} nome=${a.i} tam=${20} /></button>`)}</div>
+    </section>`}
 
     <div class="cartoes">
       <${Cartao} titulo="Valor em estoque" valor=${moeda(valorEstoque)} sub=${pl(ativos.length, 'item ativo', 'itens ativos')} aoClicar=${() => ir('estoque')} />
@@ -121,6 +129,11 @@ function InicioOperacao() {
       ${verPedidos && html`<${Cartao} titulo="Chegam em 7 dias" valor=${proximos.length} aoClicar=${() => ir('pedidos', { filtro: 'pendentes' })} />`}
       ${verPedidos && html`<${Cartao} titulo="Recebidos com divergência ou sem pedido" valor=${divPend.length} cor=${divPend.length ? 'c-laranja' : ''}
         sub=${divPend.length ? 'aguardando ciência do comprador' : 'nenhuma pendente'} aoClicar=${() => ir('pedidos', { pendencias: true })} />`}
+    </div>
+
+    <h2 class="titulo-bloco">Atalhos</h2>
+    <div class="atalhos">
+      ${atalhos.filter((a) => !a.n).map((a) => html`<button class=${'atalho' + (a.destaque ? ' atalho-destaque' : '')} onClick=${a.f}><${Icone} nome=${a.i} tam=${22} /><span>${a.t}</span></button>`)}
     </div>
 
     ${podeFazer('previsao_producao') && html`<${ResumoPrevisao} dia=${hoje} aoAbrir=${() => ir('previsao')} />`}

@@ -1,5 +1,5 @@
 // Posição de estoque: saldo, valor, consumo médio, cobertura, mínimos, sugestão de compra
-import { html, useState, useMemo, useEffect, useApp, Modal, Busca, Etiqueta, Cabecalho, Tabela, avisar } from '../ui.js';
+import { html, useState, useMemo, useEffect, useApp, Modal, Busca, Etiqueta, Cabecalho, Tabela, avisar, Filtros } from '../ui.js';
 import { STATUS_ESTOQUE } from '../calc.js';
 import { CATEGORIAS, qtd, num, moeda, contem, qtdDupla, dataHora, hojeISO, mensagemErro, qu, plural, pl } from '../util.js';
 import { pdfTabela } from '../export.js';
@@ -98,8 +98,7 @@ export function TelaEstoque() {
     <div class="filtros">
       ${Object.entries(CATEGORIAS).map(([k, t]) => html`<label class="check"><input type="checkbox" checked=${cats.has(k)} onChange=${() => alternar(k)} /> ${t}</label>`)}
     </div>
-    <div class="filtros">
-      <${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Buscar produto" />
+    <${Filtros} ativos=${[status, grupo, classif].filter(Boolean).length} fixo=${html`<${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Buscar produto" />`}>
       <select class="entrada" value=${status} onChange=${(e) => setStatus(e.target.value)}>
         <option value="">Todas as situações</option>
         ${Object.entries(STATUS_ESTOQUE).map(([k, s]) => html`<option value=${k}>${s.rotulo}</option>`)}
@@ -108,7 +107,7 @@ export function TelaEstoque() {
         <option value="">Todos os grupos</option>${grupos.map((g) => html`<option>${g}</option>`)}</select>
       <select class="entrada" value=${classif} onChange=${(e) => setClassif(e.target.value)}>
         <option value="">Todas as classificações</option>${classifs.map((c) => html`<option value=${c}>Classificação ${c}</option>`)}</select>
-    </div>
+    </${Filtros}>
     <div class="filtros">
       <div class="alternador">
         <button class=${'btn ' + (!agrupar ? 'btn-pri' : 'btn-sec')} onClick=${() => setAgrupar(false)}>Por produto (marca)</button>

@@ -1,5 +1,5 @@
 // Movimentações (extrato do estoque) e correção de lançamentos
-import { html, useState, useMemo, useEffect, useApp, Modal, Campo, Escolher, QtdUnidade, Etiqueta, Cabecalho, Tabela, Carregando, Cartao, useAcao, avisar, n } from '../ui.js';
+import { html, useState, useMemo, useEffect, useApp, Modal, Campo, Escolher, QtdUnidade, Etiqueta, Cabecalho, Tabela, Carregando, Cartao, useAcao, avisar, n, Filtros } from '../ui.js';
 import { TIPOS_MOV, ETAPAS_TRANSF, MOTIVOS_INVENTARIO, qtd, moeda, data, dataHora, hojeISO, somarDias, fator, numeroPedido, mensagemErro, diaLocal, qu, plural, pl, nomeUsuario } from '../util.js';
 import { Exportar } from '../exportar.js';
 import { Icone } from '../icones.js';
@@ -80,11 +80,10 @@ export function TelaMovimentos() {
     <${Cabecalho} titulo="Movimentações (kardex)" sub="Extrato de tudo que entrou e saiu, com o saldo depois de cada lançamento. Escolha um produto para ver a ficha dele. Nenhuma linha é apagada: erro se corrige com nova linha.">
       ${movs && html`<${Exportar} titulo=${titulo} filtros=${filtrosTxt} arquivo=${`${pr ? 'kardex-' + pr.codigo : 'movimentacoes'}-${de}-a-${ate}`} colunas=${colExp} linhas=${linhasExp} />`}
     </${Cabecalho}>
-    <div class="filtros">
+    <${Filtros} ativos=${[tipo, usu, loc, semTransf].filter(Boolean).length} fixo=${html`<div class="filtro-escolher"><${Escolher} itens=${dados.produtos} valor=${prod} aoMudar=${setProd} rotuloDe=${(x) => `${x.codigo} · ${x.descricao}`} placeholder="Produto (todos)" /></div>
+      ${prod && html`<button class="btn-link" onClick=${() => setProd(null)}>limpar</button>`}`}>
       <label class="campo-inline">De <input class="entrada" type="date" value=${de} onChange=${(e) => setDe(e.target.value)} /></label>
       <label class="campo-inline">até <input class="entrada" type="date" value=${ate} onChange=${(e) => setAte(e.target.value)} /></label>
-      <div class="filtro-escolher"><${Escolher} itens=${dados.produtos} valor=${prod} aoMudar=${setProd} rotuloDe=${(x) => `${x.codigo} · ${x.descricao}`} placeholder="Produto (todos)" /></div>
-      ${prod && html`<button class="btn-link" onClick=${() => setProd(null)}>limpar</button>`}
       <select class="entrada" value=${tipo} onChange=${(e) => setTipo(e.target.value)}><option value="">Todos os tipos</option>
         ${Object.entries(TIPOS_MOV).map(([k, v]) => html`<option value=${k}>${v}</option>`)}</select>
       <select class="entrada" value=${usu} onChange=${(e) => setUsu(e.target.value)}><option value="">Todos os usuários</option>
@@ -92,7 +91,7 @@ export function TelaMovimentos() {
       ${dados.locais.length > 1 && html`<select class="entrada" value=${loc} onChange=${(e) => setLoc(e.target.value)}><option value="">Empresa toda (todos os locais)</option>
         ${dados.locais.map((l) => html`<option value=${l.id}>${nomeLocal(dados, l.id)}</option>`)}</select>`}
       <label class="check"><input type="checkbox" checked=${semTransf} onChange=${(e) => setSemTransf(e.target.checked)} /> Esconder transferências</label>
-    </div>
+    </${Filtros}>
     ${kardex && html`<div class="cartoes">
       <${Cartao} titulo=${kardex.local ? 'No local, no início' : 'Saldo no início do período'} valor=${qu(kardex.ini, pr.unidade_estoque)} />
       <${Cartao} titulo="Entradas" valor=${qu(kardex.ent, pr.unidade_estoque)} />

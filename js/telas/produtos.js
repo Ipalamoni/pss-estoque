@@ -1,5 +1,5 @@
 // Cadastro de produtos (matérias-primas, embalagens e outros)
-import { html, useState, useMemo, useApp, Tabela, Modal, Campo, Numero, Escolher, Busca, Etiqueta, Cabecalho, useAcao, confirmar, n } from '../ui.js';
+import { html, useState, useMemo, useApp, Tabela, Modal, Campo, Numero, Escolher, Busca, Etiqueta, Cabecalho, useAcao, confirmar, n, Filtros } from '../ui.js';
 import { CATEGORIAS, CATEGORIAS_CADASTRO, UNIDADES_ESTOQUE, UNIDADES_COMPRA, contem, qtdDupla, num, moeda, qu, pl, hojeISO } from '../util.js';
 import { Icone } from '../icones.js';
 import { UltimaAlteracao, HistoricoAuditoria } from '../historico.js';
@@ -34,8 +34,7 @@ export function TelaProdutos() {
         { titulo: 'Fornecedor principal', valor: (p) => dados.mapa.fornecedor.get(p.fornecedor_padrao_id)?.nome }, { titulo: 'Ativo', valor: (p) => (p.ativo ? 'sim' : 'não') }]} />
       ${pode && html`<button class="btn btn-pri" onClick=${() => setEditando({})}><${Icone} nome="mais" tam=${18} /> Novo produto</button>`}
     </${Cabecalho}>
-    <div class="filtros">
-      <${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Buscar por código, descrição ou marca" />
+    <${Filtros} ativos=${[cat, grupo, classif].filter(Boolean).length} fixo=${html`<${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Buscar por código, descrição ou marca" />`}>
       <select class="entrada" value=${cat} onChange=${(e) => setCat(e.target.value)}>
         <option value="">Todas as categorias</option>
         ${Object.entries(CATEGORIAS).map(([k, v]) => html`<option value=${k}>${v}</option>`)}
@@ -45,7 +44,7 @@ export function TelaProdutos() {
       <select class="entrada" value=${classif} onChange=${(e) => setClassif(e.target.value)}>
         <option value="">Todas as classificações</option>${classifs.map((c) => html`<option value=${c}>Classificação ${c}</option>`)}</select>
       <label class="check"><input type="checkbox" checked=${inativos} onChange=${(e) => setInativos(e.target.checked)} /> Mostrar inativos</label>
-    </div>
+    </${Filtros}>
     <${Tabela} linhas=${linhas} aoClicar=${(p) => setEditando(p)} ordemInicial=${{ chave: 'codigo', dir: 1 }}
       colunas=${[
         { chave: 'codigo', titulo: 'Código', render: (p) => html`<b>${p.codigo}</b>` },

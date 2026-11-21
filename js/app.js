@@ -42,11 +42,12 @@ const GESTAO = ['admin', 'diretoria', 'engenharia'];
 // Menu: quem vê cada tela (as gravações são conferidas de novo no banco)
 const MENU = [
   { id: 'inicio', titulo: 'Início', papeis: [...TODOS, 'financeiro', 'faturamento', 'padeiro'], tela: TelaInicio },
+  { grupo: 'Gestão' },
   { id: 'painel-producao', titulo: 'Painel de Produção', papeis: GESTAO, tela: TelaPainelProducao, aoVivo: true },
   { id: 'custos', titulo: 'Central de Custos', papeis: ['admin', 'diretoria'], tela: TelaCustos },
-  { id: 'financeiro', titulo: 'Financeiro · pedidos a pagar', papeis: ['admin', 'financeiro', 'diretoria'], tela: TelaFinanceiro },
+  { id: 'financeiro', titulo: 'Pedidos a pagar', papeis: ['admin', 'financeiro', 'diretoria'], tela: TelaFinanceiro },
   { id: 'previsao', titulo: 'Programado × produzido', papeis: ['admin', 'engenharia', 'diretoria', 'financeiro', 'faturamento'], tela: TelaPrevisao, aoVivo: true },
-  { id: 'painel', titulo: 'Resumo de compras e estoque', papeis: ['admin', 'diretoria', 'comprador', 'almoxarifado', 'engenharia'], tela: TelaPainel },
+  { id: 'painel', titulo: 'Resumo e indicadores', papeis: ['admin', 'diretoria', 'comprador', 'almoxarifado', 'engenharia'], tela: TelaPainel },
   { grupo: 'Produção' },
   { id: 'maceiras', titulo: 'Produção Maceiras', papeis: ['admin', 'padeiro', 'engenharia', 'diretoria'], tela: TelaMaceiras, aoVivo: true },
   { id: 'programacao', titulo: 'Programação e pesagem', papeis: ['admin', 'engenharia', 'pesagem', 'diretoria'], tela: TelaProgramacao, aoVivo: true },
@@ -59,17 +60,17 @@ const MENU = [
   { id: 'receber', titulo: 'Receber mercadoria', papeis: ['admin', 'almoxarifado', 'recebimento'], tela: TelaReceber },
   { id: 'saidas', titulo: 'Saídas', papeis: ['admin', 'pesagem', 'almoxarifado', 'recebimento'], tela: TelaSaidas },
   { id: 'inventario', titulo: 'Inventário', papeis: ['admin', 'almoxarifado', 'recebimento'], tela: TelaInventario },
-  { id: 'contagem', titulo: 'Contagem inicial (saldo)', papeis: ['admin', 'almoxarifado'], tela: TelaContagemInicial },
+  { id: 'contagem', titulo: 'Contagem inicial', papeis: ['admin', 'almoxarifado'], tela: TelaContagemInicial },
   { grupo: 'Compras' },
   { id: 'pedidos', titulo: 'Pedidos de compra', papeis: ['admin', 'comprador', 'almoxarifado', 'recebimento', 'diretoria'], tela: TelaPedidos },
-  { id: 'estoque', titulo: 'Posição de estoque (compras)', papeis: TODOS, tela: TelaEstoque, aoVivo: true },
-  { id: 'movimentos', titulo: 'Movimentações (kardex)', papeis: TODOS, tela: TelaMovimentos },
+  { id: 'estoque', titulo: 'Posição para compras', papeis: TODOS, tela: TelaEstoque, aoVivo: true },
+  { id: 'movimentos', titulo: 'Kardex (movimentações)', papeis: TODOS, tela: TelaMovimentos },
   { id: 'relatorios', titulo: 'Relatórios', papeis: ['admin', 'comprador', 'almoxarifado', 'diretoria'], tela: TelaRelatorios },
   { grupo: 'Cadastros' },
   { id: 'produtos', titulo: 'Produtos', papeis: TODOS, tela: TelaProdutos },
   { id: 'fornecedores', titulo: 'Fornecedores', papeis: ['admin', 'comprador', 'almoxarifado', 'recebimento', 'diretoria'], tela: TelaFornecedores },
   { id: 'fichas', titulo: 'Fichas técnicas', papeis: ['admin', 'engenharia', 'pesagem', 'almoxarifado', 'diretoria'], tela: TelaFichas },
-  { id: 'cadastros-producao', titulo: 'Maceiras, linhas e padeiros', papeis: ['admin', 'engenharia', 'diretoria'], tela: TelaCadastrosProducao },
+  { id: 'cadastros-producao', titulo: 'Maceiras e padeiros', papeis: ['admin', 'engenharia', 'diretoria'], tela: TelaCadastrosProducao },
   { grupo: 'Administração', papeis: ['admin', 'diretoria'] },
   { id: 'usuarios', titulo: 'Usuários e acessos', papeis: ['admin'], tela: TelaUsuarios },
   { id: 'configuracoes', titulo: 'Configurações e locais', papeis: ['admin'], tela: TelaConfiguracoes },
@@ -171,6 +172,7 @@ function Login({ aoEntrar }) {
     } finally { setOcupado(false); setSenha(''); }
   }
   return html`<div class="login">
+    <div class="login-tema"><${BotaoTema} /></div>
     <div class="login-caixa">
       <div class="login-marca">
         <img src="icons/logo-pss.png" alt="Pães São Sebastião" />
@@ -200,10 +202,52 @@ const ANO = new Date().getFullYear();
 function Assinatura() {
   return html`<div class="assinatura">
     <img src="icons/logo-palamoni.png" alt="Palamoni Consultoria Empresarial" />
-    <p>Compras & Estoque · versão ${window.VERSAO_APP || ''}<br />
-      Software de propriedade da <b>Palamoni Consultoria Empresarial</b>, licenciado para Indústria e Comércio de Pães São Sebastião.
-      © ${ANO} Palamoni Consultoria. Todos os direitos reservados.</p>
+    <p>Compras & Estoque ${window.VERSAO_APP || ''} · licenciado para Pães São Sebastião · © ${ANO} Palamoni Consultoria Empresarial</p>
   </div>`;
+}
+
+// Botão do tema (claro / escuro), no topo
+function BotaoTema() {
+  const [tema, setTema] = useState(() => document.documentElement.getAttribute('data-tema') || 'claro');
+  useEffect(() => { const f = (e) => setTema(e.detail); window.addEventListener('pss-tema', f); return () => window.removeEventListener('pss-tema', f); }, []);
+  function trocar() {
+    const t = tema === 'escuro' ? 'claro' : 'escuro';
+    try { localStorage.setItem('pss-tema', t); } catch { /* sem armazenamento */ }
+    if (window.PSS_TEMA) window.PSS_TEMA.aplicar(t); else document.documentElement.setAttribute('data-tema', t);
+    setTema(t);
+  }
+  const escuro = tema === 'escuro';
+  return html`<button class="botao-tema" onClick=${trocar} aria-pressed=${escuro} title=${escuro ? 'Mudar para o tema claro' : 'Mudar para o tema escuro (descansa a vista)'}
+    aria-label=${escuro ? 'Mudar para o tema claro' : 'Mudar para o tema escuro'}>
+    <span class="bt-trilho"><span class="bt-bola">${escuro
+      ? html`<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M20.5 14.3A8.5 8.5 0 0 1 9.7 3.5a8.5 8.5 0 1 0 10.8 10.8Z" /></svg>`
+      : html`<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="4.2" fill="currentColor" stroke="none" /><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4" /></svg>`}</span></span>
+    <span class="bt-txt">${escuro ? 'Escuro' : 'Claro'}</span></button>`;
+}
+
+// Barra de baixo no celular: 4 atalhos do papel da pessoa + Menu (ao alcance do polegar)
+function BarraInferior({ papeis, visiveis, atual, dados, abrirMenu, menuAberto }) {
+  const tem = (id) => visiveis.some((m) => m.id === id);
+  const um = (...ids) => ids.find(tem);
+  const admin = papeis.includes('admin');
+  const meus = new Set((dados?.locais || []).filter((l) => operaLocal(papeis, l)).map((l) => l.id));
+  const nTransf = (dados?.transferencias || []).filter((t) => (t.situacao === 'enviada' && (admin || meus.has(t.destino_id))) || (t.situacao === 'separada' && (admin || meus.has(t.origem_id)))).length;
+  const nReq = (dados?.requisicoes || []).filter((r) => admin || meus.has(r.origem_id)).length;
+  const itens = [
+    { id: um('inicio'), t: 'Início', i: 'inicio' },
+    { id: um('painel-producao', 'maceiras', 'programacao', 'previsao'), t: 'Produção' },
+    { id: um('estoque-local', 'estoque'), t: 'Estoque' },
+    { id: papeis.some((p) => ['almoxarifado', 'recebimento'].includes(p)) ? um('requisicoes', 'receber') : papeis.includes('comprador') ? um('pedidos') : um('transferencias', 'custos', 'financeiro'),
+      t: null },
+  ].filter((x) => x.id).filter((x, i, l) => l.findIndex((y) => y.id === x.id) === i).slice(0, 4);
+  const nome = (id) => ({ 'painel-producao': 'Produção', maceiras: 'Maceiras', programacao: 'Pesagem', previsao: 'Produção', 'estoque-local': 'Estoque', estoque: 'Estoque',
+    requisicoes: 'Requisições', receber: 'Receber', pedidos: 'Pedidos', transferencias: 'Transferir', custos: 'Custos', financeiro: 'A pagar', inicio: 'Início' })[id];
+  const conta = (id) => (id === 'requisicoes' ? nReq : id === 'transferencias' ? nTransf : 0);
+  return html`<nav class="barra-inferior" aria-label="Atalhos">
+    ${itens.map((x) => html`<a href=${'#' + x.id} class=${'bi-item' + (atual === x.id && !menuAberto ? ' ativo' : '')} aria-current=${atual === x.id ? 'page' : null}>
+      <span class="bi-ico"><${Icone} nome=${x.id} tam=${22} />${conta(x.id) > 0 && html`<b class="bi-num">${conta(x.id)}</b>`}</span><span>${nome(x.id)}</span></a>`)}
+    <button class=${'bi-item' + (menuAberto ? ' ativo' : '')} onClick=${abrirMenu} aria-label="Abrir o menu completo"><span class="bi-ico"><${Icone} nome="menu" tam=${22} /></span><span>Menu</span></button>
+  </nav>`;
 }
 
 // ------------------------- Trocar senha -----------------------------
@@ -275,6 +319,11 @@ function App() {
   const pilha = useRef([]);         // telas visitadas (para o botão "voltar")
   const voltando = useRef(false);
   const rotaAtual = useRef(rota);
+  const [gruposFechados, setGruposFechados] = useState(() => { try { return JSON.parse(localStorage.getItem('pss-menu-grupos') || '[]'); } catch { return []; } });
+  function alternarGrupo(g) {
+    const v = gruposFechados.includes(g) ? gruposFechados.filter((x) => x !== g) : [...gruposFechados, g];
+    setGruposFechados(v); try { localStorage.setItem('pss-menu-grupos', JSON.stringify(v)); } catch { /* sem armazenamento */ }
+  }
   function alternarMenu() {
     const v = !recolhido; setRecolhido(v);
     try { localStorage.setItem('pss-menu-recolhido', v ? '1' : '0'); } catch { /* sem armazenamento */ }
@@ -360,6 +409,8 @@ function App() {
   const padrao = papeis.length === 1 && papeis[0] === 'padeiro' ? visiveis.find((m) => m.id === 'maceiras') : null;
   const itemAtual = (rota === 'inicio' && padrao) || visiveis.find((m) => m.id === rota) || visiveis[0];
   rotaViva.current = !!itemAtual.aoVivo;
+  const grupoDe = (g) => g;
+  const grupoAtual = (() => { let g = null; for (const m of visiveis) { if (m.grupo) g = m.grupo; else if (m.id === itemAtual.id) return g; } return null; })();
   const Tela = itemAtual.tela;
   const ctx = { usuario: atual, real, vendoComo: !!visao, verComo: escolherVisao, papeis, dados, recarregar, ir, voltar, rota: itemAtual.id, estadoRota, setEstadoRota, podeFazer: (a) => pode(papeis, a), api };
 
@@ -367,6 +418,7 @@ function App() {
     ${api.modo === 'demo' && html`<div class="faixa-demo">MODO DEMONSTRAÇÃO · dados fictícios
       <button class="btn-link" onClick=${async () => { await api.reiniciarDemo(); location.reload(); }}>reiniciar dados</button>
       ${window.self !== window.top && html`<br /><small>Nesta prévia, PDF, Excel e Imprimir ficam bloqueados pelo visualizador; no endereço publicado funcionam normalmente.</small>`}</div>`}
+    <a class="pular" href="#conteudo" onClick=${(e) => { e.preventDefault(); document.getElementById('conteudo')?.focus(); }}>Pular para o conteúdo</a>
     <header class="topo">
       <button class="btn-icone so-celular" aria-label="Abrir menu" onClick=${() => setMenuAberto(!menuAberto)}><${Icone} nome="menu" /></button>
       <a class="marca" href="#inicio" title="Início">
@@ -375,11 +427,12 @@ function App() {
       </a>
       <div class="topo-usuario">
         <span class="so-tela"><strong>${atual.nome}</strong><small>${atual.funcao || papeisTexto(papeis)}</small></span>
+        <${BotaoTema} />
         ${dados && html`<${Sininho} dados=${dados} papeis=${papeis} ir=${ir} />`}
-        ${(real.papeis || []).includes('admin') && html`<button class="btn-icone" title="Entrar como / ver como outra pessoa" onClick=${() => setEscolher(true)}><${Icone} nome="usuarios" /></button>`}
-        <img class="selo-palamoni" src="icons/logo-palamoni-vertical.png" alt="Palamoni Consultoria" title="Produto Palamoni Consultoria Empresarial" />
-        ${api.modo !== 'demo' && html`<button class="btn-icone" title="Trocar senha" onClick=${() => setSenha(true)}><${Icone} nome="chave" /></button>`}
-        <button class="btn-icone" title="Sair" onClick=${sair}><${Icone} nome="sair" /></button>
+        ${(real.papeis || []).includes('admin') && html`<button class="btn-icone so-tela" title="Entrar como / ver como outra pessoa" aria-label="Ver como outra pessoa" onClick=${() => setEscolher(true)}><${Icone} nome="usuarios" /></button>`}
+        <img class="selo-palamoni so-tela" src="icons/logo-palamoni-vertical.png" alt="Palamoni Consultoria" title="Produto Palamoni Consultoria Empresarial" />
+        ${api.modo !== 'demo' && html`<button class="btn-icone so-tela" title="Trocar senha" aria-label="Trocar senha" onClick=${() => setSenha(true)}><${Icone} nome="chave" /></button>`}
+        <button class="btn-icone so-tela" title="Sair" aria-label="Sair" onClick=${sair}><${Icone} nome="sair" /></button>
       </div>
     </header>
     ${visao && html`<div class="faixa-vendo">👁 Vendo como <b>${visao.nome}</b> (${visao.funcao || papeisTexto(visao.papeis)}). O que você fizer fica registrado em seu nome (${real.nome}).
@@ -388,11 +441,19 @@ function App() {
       <nav class=${'menu' + (menuAberto ? ' aberto' : '') + (recolhido ? ' recolhido' : '')}>
         <button class="menu-recolher so-tela" title=${recolhido ? 'Mostrar o menu' : 'Esconder o menu (mais espaço na tela)'} onClick=${alternarMenu}>
           <${Icone} nome=${recolhido ? 'expandir' : 'recolher'} tam=${18} /></button>
-        <div class="menu-usuario so-celular"><strong>${atual.nome}</strong><small>${atual.funcao || papeisTexto(papeis)}</small></div>
-        ${visiveis.map((m) => m.grupo
-          ? html`<div class="menu-grupo">${m.grupo}</div>`
-          : html`<a href=${'#' + m.id} title=${m.titulo} class=${'menu-item' + (m.id === itemAtual.id ? ' ativo' : '')} onClick=${() => { setEstadoRota(null); setMenuAberto(false); }}>
-              <${Icone} nome=${m.id} /> <span>${m.titulo}</span></a>`)}
+        <div class="menu-usuario so-celular"><strong>${atual.nome}</strong><small>${atual.funcao || papeisTexto(papeis)}</small>
+          <div class="mu-acoes">
+            ${(real.papeis || []).includes('admin') && html`<button class="btn btn-sec btn-peq" onClick=${() => { setMenuAberto(false); setEscolher(true); }}><${Icone} nome="usuarios" tam=${16} /> Ver como</button>`}
+            ${api.modo !== 'demo' && html`<button class="btn btn-sec btn-peq" onClick=${() => { setMenuAberto(false); setSenha(true); }}><${Icone} nome="chave" tam=${16} /> Senha</button>`}
+            <button class="btn btn-sec btn-peq" onClick=${sair}><${Icone} nome="sair" tam=${16} /> Sair</button>
+          </div></div>
+        ${(() => { let g = null; return visiveis.map((m) => {
+          if (m.grupo) { g = m.grupo; const fechado = gruposFechados.includes(m.grupo) && grupoDe(m.grupo) !== grupoAtual;
+            return html`<button class=${'menu-grupo' + (fechado ? ' fechado' : '')} aria-expanded=${!fechado} onClick=${() => alternarGrupo(m.grupo)}>
+              <span>${m.grupo}</span><span class="mg-seta" aria-hidden="true">▾</span></button>`; }
+          if (g && gruposFechados.includes(g) && g !== grupoAtual) return null;
+          return html`<a href=${'#' + m.id} title=${m.titulo} class=${'menu-item' + (m.id === itemAtual.id ? ' ativo' : '')} aria-current=${m.id === itemAtual.id ? 'page' : null} onClick=${() => { setEstadoRota(null); setMenuAberto(false); }}>
+              <${Icone} nome=${m.id} /> <span>${m.titulo}</span></a>`; }); })()}
         <div class="menu-rodape">
           <small>Desenvolvido por</small>
           <img class="logo-cheio" src="icons/logo-palamoni.png" alt="Palamoni Consultoria Empresarial" />
@@ -401,11 +462,12 @@ function App() {
         </div>
       </nav>
       ${menuAberto && html`<div class="menu-fundo" onClick=${() => setMenuAberto(false)}></div>`}
-      <main class="conteudo">
-        ${dados ? html`<${Tela} key=${itemAtual.id} />` : html`<${Carregando} texto="Carregando dados…" />`}
+      <main class="conteudo" id="conteudo" tabindex="-1">
+        <div class="conteudo-miolo">${dados ? html`<${Tela} key=${itemAtual.id} />` : html`<${Carregando} texto="Carregando dados…" />`}</div>
         <footer class="rodape"><${Assinatura} /></footer>
       </main>
     </div>
+    <${BarraInferior} papeis=${papeis} visiveis=${visiveis} atual=${itemAtual.id} dados=${dados} menuAberto=${menuAberto} abrirMenu=${() => setMenuAberto(!menuAberto)} />
     ${senha && html`<${TrocarSenha} usuario=${real} aoFechar=${() => setSenha(false)} />`}
     ${escolher && html`<${EscolherVisao} admin=${real} aoEscolher=${escolherVisao} aoFechar=${() => escolherVisao(visao)} />`}
     ${novaVersao && html`<div class="faixa-versao">Há uma versão nova do sistema. <button class="btn btn-pri btn-peq" onClick=${() => location.reload()}>Atualizar agora</button></div>`}

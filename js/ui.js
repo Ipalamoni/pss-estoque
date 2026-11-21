@@ -133,10 +133,47 @@ export function Busca({ valor, aoMudar, placeholder = 'Buscar…' }) {
     onInput=${(e) => aoMudar(e.target.value)} />`;
 }
 
+// célula sem informação ("–", vazio): no celular não ocupa uma linha do cartão
+export function celulaVazia(v) {
+  if (v === null || v === undefined || v === false || v === '' || v === '–' || v === '-') return true;
+  if (typeof v === 'object' && v && v.props && !Array.isArray(v)) { const c = v.props.children; return c === '–' || (Array.isArray(c) && c.length === 1 && c[0] === '–'); }
+  return false;
+}
+
 export function Abas({ abas, ativa, aoMudar }) {
-  return html`<div class="abas" role="tablist">
-    ${abas.filter(Boolean).map((a) => html`<button role="tab" class=${'aba' + (a.id === ativa ? ' ativa' : '')}
+  const ref = useRef(null);
+  const [fim, setFim] = useState(true);
+  const medir = () => { const el = ref.current; if (el) setFim(el.scrollLeft + el.clientWidth >= el.scrollWidth - 4); };
+  useEffect(() => {
+    const el = ref.current; if (!el) return;
+    const at = el.querySelector('.aba.ativa'); if (at && at.scrollIntoView) at.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    medir();
+  }, [ativa, abas.length]);
+  return html`<div class=${'abas-caixa' + (fim ? '' : ' tem-mais')}><div class="abas" role="tablist" ref=${ref} onScroll=${medir}>
+    ${abas.filter(Boolean).map((a) => html`<button role="tab" aria-selected=${a.id === ativa} class=${'aba' + (a.id === ativa ? ' ativa' : '')}
       onClick=${() => aoMudar(a.id)}>${a.titulo}</button>`)}
+  </div></div>`;
+}
+
+// Filtros: no computador ficam abertos; no celular ficam num botão "Filtros (n)" que abre e fecha.
+// "fixo" (ex.: a busca) fica sempre visível.
+export function useCelular(px = 640) {
+  const q = typeof matchMedia === 'function' ? matchMedia(`(max-width: ${px}px)`) : null;
+  const [cel, setCel] = useState(q ? q.matches : false);
+  useEffect(() => { if (!q) return; const f = () => setCel(q.matches); q.addEventListener ? q.addEventListener('change', f) : q.addListener(f);
+    return () => (q.removeEventListener ? q.removeEventListener('change', f) : q.removeListener(f)); }, []);
+  return cel;
+}
+export function Filtros({ ativos = 0, fixo, children }) {
+  const cel = useCelular();
+  const [aberto, setAberto] = useState(false);
+  if (!cel) return html`<div class="filtros">${fixo}${children}</div>`;
+  return html`<div class="filtros filtros-cel">
+    ${fixo}
+    <button type="button" class=${'btn btn-sec btn-filtros' + (ativos ? ' com-filtro' : '')} aria-expanded=${aberto} onClick=${() => setAberto(!aberto)}>
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M7 12h10M10 18h4" /></svg>
+      Filtros${ativos ? ` (${ativos})` : ''} <span class="seta-filtros">${aberto ? '▲' : '▼'}</span></button>
+    ${aberto && html`<div class="filtros-gaveta">${children}</div>`}
   </div>`;
 }
 
@@ -190,8 +227,9 @@ export function Tabela({ colunas, linhas, aoClicar, vazio, rodape, ordemInicial,
       <tbody>
         ${mostrar.map((l) => html`<tr key=${l[chave]} class=${(aoClicar ? 'clicavel ' : '') + (classeLinha ? classeLinha(l) : '')}
           onClick=${aoClicar ? () => aoClicar(l) : null}>
-          ${colunas.map((c) => html`<td class=${(c.num ? 'n ' : '') + (c.classe || '')} data-rotulo=${c.titulo}>
-            <span class="td-v">${c.render ? c.render(l) : l[c.chave]}</span></td>`)}
+          ${colunas.map((c) => { const v = c.render ? c.render(l) : l[c.chave];
+            return html`<td class=${(c.num ? 'n ' : '') + (c.classe || '') + (celulaVazia(v) ? ' vazia' : '')} data-rotulo=${c.titulo}>
+            <span class="td-v">${v}</span></td>`; })}
         </tr>`)}
       </tbody>
       ${rodape && html`<tfoot>${rodape}</tfoot>`}
