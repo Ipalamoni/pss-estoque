@@ -412,7 +412,7 @@ function App() {
   const grupoDe = (g) => g;
   const grupoAtual = (() => { let g = null; for (const m of visiveis) { if (m.grupo) g = m.grupo; else if (m.id === itemAtual.id) return g; } return null; })();
   const Tela = itemAtual.tela;
-  const ctx = { usuario: atual, real, vendoComo: !!visao, verComo: escolherVisao, papeis, dados, recarregar, ir, voltar, rota: itemAtual.id, estadoRota, setEstadoRota, podeFazer: (a) => pode(papeis, a), api };
+  const ctx = { usuario: atual, real, vendoComo: !!visao, verComo: escolherVisao, papeis, dados, recarregar, ir, voltar, rota: itemAtual.id, trilha: { grupo: grupoAtual, titulo: itemAtual.titulo }, estadoRota, setEstadoRota, podeFazer: (a) => pode(papeis, a), api };
 
   return html`<${Ctx.Provider} value=${ctx}>
     ${api.modo === 'demo' && html`<div class="faixa-demo">MODO DEMONSTRAÇÃO · dados fictícios
@@ -421,7 +421,7 @@ function App() {
     <a class="pular" href="#conteudo" onClick=${(e) => { e.preventDefault(); document.getElementById('conteudo')?.focus(); }}>Pular para o conteúdo</a>
     <header class="topo">
       <button class="btn-icone so-celular" aria-label="Abrir menu" onClick=${() => setMenuAberto(!menuAberto)}><${Icone} nome="menu" /></button>
-      <a class="marca" href="#inicio" title="Início">
+      <a class="marca" href="#inicio" title="Ir para o Início" aria-label="Ir para o Início">
         <img src="icons/logo-pss.png" alt="Pães São Sebastião" />
         <span class="marca-titulo">Compras & Estoque</span>
       </a>

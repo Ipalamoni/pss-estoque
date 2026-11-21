@@ -4,7 +4,7 @@
 // receber misturas da pesagem, iniciar 1 batelada por vez, saída avulsa.
 // O padeiro se identifica com o nome + senha de 6 números (troca rápida).
 // =====================================================================
-import { html, useState, useEffect, useRef, useApp, Modal, Campo, Numero, Escolher, Etiqueta, Carregando, Vazio, useAcao, confirmar, avisar, n } from '../ui.js';
+import { html, useState, useEffect, useRef, useApp, Cabecalho, Modal, Campo, Numero, Escolher, Etiqueta, Carregando, Vazio, useAcao, confirmar, avisar, n } from '../ui.js';
 import { qtd, num, qu, hojeISO, pl, mensagemErro } from '../util.js';
 import { Icone } from '../icones.js';
 import { useFluxo, semaforo, saldoLocal, localTipo, misturaDaFicha, tempoTexto, useRelogio, somar, minutos } from '../producao-util.js';
@@ -14,7 +14,8 @@ const ehFarinha = (p) => /farinha/i.test(`${p?.grupo || ''} ${p?.descricao || ''
 const SAIR_APOS_MIN = 10;   // padeiro sem mexer no tablet: volta para a escolha de nome
 
 export function TelaMaceiras() {
-  const { dados, podeFazer } = useApp();
+  const { dados, podeFazer, papeis } = useApp();
+  const soPadeiro = (papeis || []).length === 1 && papeis[0] === 'padeiro';
   const opera = podeFazer('batelada');
   const [operador, setOperador] = useState(null);       // { id, nome, pin }
   const [trocar, setTrocar] = useState(false);
@@ -41,7 +42,8 @@ export function TelaMaceiras() {
   const hoje = fluxo.fluxo.filter((l) => l.data === hojeISO());
   const exigir = (f) => () => { if (!opera) return avisar('Só o padeiro (ou o PCP) opera esta tela.', 'aviso'); if (!operador) return setTrocar(true); f(); };
 
-  return html`<div class="maceiras-tela">
+  return html`<${Cabecalho} titulo="Produção Maceiras" semVoltar=${soPadeiro} semTrilha=${soPadeiro} />
+  <div class="maceiras-tela">
     <div class="mac-topo">
       <div class="mac-quem">
         ${opera ? html`<button class=${'mac-operador' + (operador ? '' : ' vazio')} onClick=${() => setTrocar(true)}>
