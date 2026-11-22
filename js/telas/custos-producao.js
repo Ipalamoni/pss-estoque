@@ -5,7 +5,7 @@
 //  - Estoque valorizado por local (inclui em trânsito)
 //  - Saídas avulsas e perdas valorizadas à parte (não entram no custo do produto)
 // =====================================================================
-import { html, useState, useEffect, useMemo, useApp, Tabela, Cartao, Etiqueta, Carregando, avisar } from '../ui.js';
+import { html, useState, useEffect, useMemo, useApp, Tabela, Cartao, Etiqueta, Carregando, avisar, useFiltroMudou } from '../ui.js';
 import { TIPOS_PRODUTO, tipoProduto, dataHora, hojeISO, somarDias, num, moeda, mensagemErro, contem } from '../util.js';
 import { Exportar } from '../exportar.js';
 import { nomeLocal } from '../producao-util.js';
@@ -32,8 +32,9 @@ export function CustoProdutoAcabado() {
   const [ate, setAte] = useState(hojeISO());
   const [vis, setVis] = useState('receita');
   const [lista, setLista] = useState(null);
+  const mudou = useFiltroMudou([de, ate]);
   useEffect(() => {
-    let vivo = true; setLista(null);
+    let vivo = true; if (mudou()) setLista(null);
     api.rpc('custos_bateladas', { p_de: de, p_ate: ate }).then((l) => { if (vivo) setLista((l || []).map((x) => ({ ...x,
       q: Number(x.quantidade_produzida || 0), mis: Number(x.custo_mistura || 0), mac: Number(x.custo_maceira || 0), emb: Number(x.custo_embalagem || 0),
       tot: Number(x.custo_total || 0), pad: Number(x.custo_padrao || 0) }))); })
@@ -150,8 +151,9 @@ export function AvulsasPerdas() {
   const [de, setDe] = useState(hojeISO().slice(0, 8) + '01');
   const [ate, setAte] = useState(hojeISO());
   const [movs, setMovs] = useState(null);
+  const mudou = useFiltroMudou([de, ate]);
   useEffect(() => {
-    let vivo = true; setMovs(null);
+    let vivo = true; if (mudou()) setMovs(null);
     api.listar('movimentos', { desde: inicioDia(de), ate: inicioDia(somarDias(ate, 1)), em: { tipo: ['saida_avulsa', 'perda'] }, ordem: ['id', 'desc'] })
       .then((l) => { if (vivo) setMovs(l); }).catch((e) => { avisar(mensagemErro(e), 'erro'); if (vivo) setMovs([]); });
     return () => { vivo = false; };

@@ -270,6 +270,14 @@ export const n = lerNumero;
 export const fmtQtd = qtd;
 
 // Telas com período: se a data inicial for mais antiga que o histórico carregado (60 dias), busca o que falta.
+// Atualização automática sem perder o que a pessoa está digitando: só volta para "carregando…"
+// quando o filtro (datas, produto, local...) muda; nas atualizações de 30 s / tempo real a tela fica como está.
+export function useFiltroMudou(chave) {
+  const ult = useRef(undefined);
+  const k = JSON.stringify(chave);
+  return () => { const m = ult.current !== k; ult.current = k; return m; };
+}
+
 export function useHistorico(de) {
   const app = useApp();
   useEffect(() => { if (de && app && app.garantirHistorico) app.garantirHistorico(de); }, [de]);

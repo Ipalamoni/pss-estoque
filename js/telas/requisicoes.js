@@ -2,7 +2,7 @@
 // REQUISIÇÕES (embalagens: o PCP pede em kg/bobinas, o almoxarifado separa e envia)
 // + CONSUMO NO SETOR (baixa manual por bobina ou por kg)
 // =====================================================================
-import { html, useState, useEffect, useApp, Cabecalho, Abas, Tabela, Etiqueta, Modal, Campo, Numero, Escolher, Vazio, Carregando, useAcao, confirmar, avisar, n } from '../ui.js';
+import { html, useState, useEffect, useApp, Cabecalho, Abas, Tabela, Etiqueta, Modal, Campo, Numero, Escolher, Vazio, Carregando, useAcao, confirmar, avisar, n, useFiltroMudou } from '../ui.js';
 import { num, qu, dataHora, hojeISO, somarDias, operaLocal, pode, SITUACAO_REQ, mensagemErro, contem } from '../util.js';
 import { Icone } from '../icones.js';
 import { nomeLocal, saldoLocal, localTipo, minutos, tempoTexto, horaDia } from '../producao-util.js';
@@ -186,8 +186,9 @@ function Historico() {
   const [ate, setAte] = useState(hojeISO());
   const [busca, setBusca] = useState('');
   const [r, setR] = useState(null);
+  const mudou = useFiltroMudou([de, ate]);
   useEffect(() => {
-    let vivo = true; setR(null);
+    let vivo = true; if (mudou()) setR(null);
     api.listar('requisicoes', { campoData: 'criado_em', desde: inicioDia(de), ate: inicioDia(somarDias(ate, 1)), ordem: ['id', 'desc'] })
       .then(async (rs) => { const its = rs.length ? await api.listar('requisicao_itens', { em: { requisicao_id: rs.map((x) => x.id) } }) : []; if (vivo) setR({ rs, its }); })
       .catch((e) => { avisar(mensagemErro(e), 'erro'); if (vivo) setR({ rs: [], its: [] }); });

@@ -1,5 +1,5 @@
 // Movimentações (extrato do estoque) e correção de lançamentos
-import { html, useState, useMemo, useEffect, useApp, Modal, Campo, Escolher, QtdUnidade, Etiqueta, Cabecalho, Tabela, Carregando, Cartao, useAcao, avisar, n, Filtros } from '../ui.js';
+import { html, useState, useMemo, useEffect, useApp, Modal, Campo, Escolher, QtdUnidade, Etiqueta, Cabecalho, Tabela, Carregando, Cartao, useAcao, avisar, n, Filtros, useFiltroMudou } from '../ui.js';
 import { TIPOS_MOV, ETAPAS_TRANSF, MOTIVOS_INVENTARIO, qtd, moeda, data, dataHora, hojeISO, somarDias, fator, numeroPedido, mensagemErro, diaLocal, qu, plural, pl, nomeUsuario } from '../util.js';
 import { Exportar } from '../exportar.js';
 import { Icone } from '../icones.js';
@@ -24,8 +24,9 @@ export function TelaMovimentos() {
   const [movs, setMovs] = useState(null);
   const [aberto, setAberto] = useState(null);
 
+  const mudou = useFiltroMudou([de, ate, prod, loc]);
   async function carregar() {
-    setMovs(null);
+    if (mudou()) setMovs(null);
     try { setMovs(await api.listar('movimentos', { desde: inicioDia(de), ate: inicioDia(somarDias(ate, 1)), ordem: ['id', 'desc'], eq: prod || loc ? { ...(prod ? { produto_id: prod } : {}), ...(loc ? { local_id: Number(loc) } : {}) } : undefined })); }
     catch (e) { avisar(mensagemErro(e), 'erro'); setMovs([]); }
   }

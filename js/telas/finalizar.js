@@ -2,7 +2,7 @@
 // FINALIZAR BATELADAS (engenharia, normalmente à tarde, todas juntas)
 // Lista na ordem de produção, rendimento editável na última coluna, finaliza 1, algumas ou todas.
 // =====================================================================
-import { html, useState, useEffect, useApp, Cabecalho, Abas, Tabela, Etiqueta, Campo, Numero, Vazio, Carregando, useAcao, confirmar, avisar, n } from '../ui.js';
+import { html, useState, useEffect, useApp, Cabecalho, Abas, Tabela, Etiqueta, Campo, Numero, Vazio, Carregando, useAcao, confirmar, avisar, n, useFiltroMudou } from '../ui.js';
 import { num, dataHora, hojeISO, somarDias, pode, mensagemErro } from '../util.js';
 import { Icone } from '../icones.js';
 import { minutos, tempoTexto, diaDe } from '../producao-util.js';
@@ -101,8 +101,9 @@ function Finalizadas() {
   const [de, setDe] = useState(hojeISO());
   const [ate, setAte] = useState(hojeISO());
   const [lista, setLista] = useState(null);
+  const mudou = useFiltroMudou([de, ate]);
   useEffect(() => {
-    let vivo = true; setLista(null);
+    let vivo = true; if (mudou()) setLista(null);
     api.listar('bateladas', { campoData: 'iniciada_em', desde: inicioDia(de), ate: inicioDia(somarDias(ate, 1)), ordem: ['iniciada_em', 'asc'] })
       .then((l) => { if (vivo) setLista(l.filter((b) => b.situacao !== 'em_producao')); })
       .catch((e) => { avisar(mensagemErro(e), 'erro'); if (vivo) setLista([]); });

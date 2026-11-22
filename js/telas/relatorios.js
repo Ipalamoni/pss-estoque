@@ -1,5 +1,5 @@
 // Relatórios: pedidos, compras por produto, consumo do período, ajustes e correções
-import { html, useState, useMemo, useEffect, useApp, Escolher, Busca, Etiqueta, Cabecalho, Abas, Tabela, Cartao, Carregando, Modal, avisar, useHistorico, Filtros } from '../ui.js';
+import { html, useState, useMemo, useEffect, useApp, Escolher, Busca, Etiqueta, Cabecalho, Abas, Tabela, Cartao, Carregando, Modal, avisar, useHistorico, Filtros, useFiltroMudou } from '../ui.js';
 import { CATEGORIAS, STATUS_PEDIDO, TIPOS_MOV, MOTIVOS_INVENTARIO, qtd, num, moeda, data, dataHora, hojeISO, somarDias, diasEntre, numeroPedido, contem, fator, qu, pl, plural, nomeUsuario, mensagemErro } from '../util.js';
 import { Exportar } from '../exportar.js';
 import { resumoPedido, PrazoEtiqueta, PedidoDetalhe, COR_STATUS } from './pedidos.js';
@@ -153,8 +153,9 @@ function RelComprasProduto({ de, ate }) {
 function useMovimentos(de, ate, tipos) {
   const { api, dados } = useApp();
   const [movs, setMovs] = useState(null);
+  const mudou = useFiltroMudou([de, ate]);
   useEffect(() => {
-    setMovs(null);
+    if (mudou()) setMovs(null);
     api.listar('movimentos', { desde: inicioDia(de), ate: inicioDia(somarDias(ate, 1)), em: tipos ? { tipo: tipos } : undefined })
       .then(setMovs).catch((e) => { avisar(mensagemErro(e), 'erro'); setMovs([]); });
   }, [de, ate, dados.carregadoEm]);
@@ -301,8 +302,9 @@ function RelProducoes({ de, ate }) {
   const [prods, setProds] = useState(null);
   const [aberta, setAberta] = useState(null);
   const movs = useMovimentos(de, ate, ['saida_receita']);
+  const mudou = useFiltroMudou([de, ate]);
   useEffect(() => {
-    setProds(null);
+    if (mudou()) setProds(null);
     api.listar('producoes', { desde: inicioDia(de), ate: inicioDia(somarDias(ate, 1)) }).then(setProds).catch((e) => { avisar(mensagemErro(e), 'erro'); setProds([]); });
   }, [de, ate, dados.carregadoEm]);
   if (!prods || !movs) return html`<${Carregando} />`;

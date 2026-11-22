@@ -3,7 +3,7 @@
 // Disponível → Separado → Em trânsito → Recebido (no destino)
 // Cancelar envio → volta para separado · cancelar separação → volta ao disponível
 // =====================================================================
-import { html, useState, useEffect, useApp, Cabecalho, Abas, Tabela, Etiqueta, Modal, Campo, Numero, Escolher, Vazio, Carregando, useAcao, confirmar, avisar, n } from '../ui.js';
+import { html, useState, useEffect, useApp, Cabecalho, Abas, Tabela, Etiqueta, Modal, Campo, Numero, Escolher, Vazio, Carregando, useAcao, confirmar, avisar, n, useFiltroMudou } from '../ui.js';
 import { num, qu, dataHora, hojeISO, somarDias, operaLocal, ehGestao, SITUACAO_TRANSF, pl, mensagemErro, contem } from '../util.js';
 import { Icone } from '../icones.js';
 import { nomeLocal, saldoLocal, minutos, tempoTexto, horaDia } from '../producao-util.js';
@@ -209,8 +209,9 @@ function Historico({ aoAbrir, meus, gestao }) {
   const [ate, setAte] = useState(hojeISO());
   const [busca, setBusca] = useState('');
   const [r, setR] = useState(null);
+  const mudou = useFiltroMudou([de, ate]);
   useEffect(() => {
-    let vivo = true; setR(null);
+    let vivo = true; if (mudou()) setR(null);
     api.listar('transferencias', { campoData: 'separado_em', desde: inicioDia(de), ate: inicioDia(somarDias(ate, 1)), ordem: ['id', 'desc'] })
       .then(async (ts) => { const its = ts.length ? await api.listar('transferencia_itens', { em: { transferencia_id: ts.map((t) => t.id) } }) : []; if (vivo) setR({ ts, its }); })
       .catch((e) => { avisar(mensagemErro(e), 'erro'); if (vivo) setR({ ts: [], its: [] }); });

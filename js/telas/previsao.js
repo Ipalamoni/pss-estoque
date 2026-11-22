@@ -4,7 +4,7 @@
 // Vem do banco já somada (função previsao_producao), sem ingredientes:
 // por isso faturamento e financeiro podem ver sem acessar as fichas.
 // =====================================================================
-import { html, useState, useEffect, useMemo, useApp, Tabela, Cartao, Cabecalho, Etiqueta, Abas, Carregando, avisar } from '../ui.js';
+import { html, useState, useEffect, useMemo, useApp, Tabela, Cartao, Cabecalho, Etiqueta, Abas, Carregando, avisar, useFiltroMudou } from '../ui.js';
 import { data, hojeISO, somarDias, num, pl, mensagemErro } from '../util.js';
 import { Exportar } from '../exportar.js';
 
@@ -35,9 +35,10 @@ function situacaoLinha(l, hoje) {
 export function usePrevisao(de, ate) {
   const { api, dados } = useApp();
   const [lista, setLista] = useState(null);
+  const mudou = useFiltroMudou([de, ate]);
   useEffect(() => {
     let vivo = true;
-    setLista(null);
+    if (mudou()) setLista(null);
     api.rpc('previsao_producao', { p_de: de, p_ate: ate })
       .then((l) => { if (vivo) setLista((l || []).map((x) => ({ ...x, chave: `${x.data}-${x.ficha_id}` }))); })
       .catch((e) => { avisar(mensagemErro(e), 'erro'); if (vivo) setLista([]); });

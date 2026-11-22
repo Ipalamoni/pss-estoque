@@ -1,7 +1,7 @@
 // =====================================================================
 // PAINEL GERENCIAL — visão de estoque, compras e consumo (controladoria e diretoria)
 // =====================================================================
-import { html, useState, useEffect, useMemo, useApp, Cabecalho, Cartao, Carregando, Etiqueta, Tabela, avisar, useHistorico } from '../ui.js';
+import { html, useState, useEffect, useMemo, useApp, Cabecalho, Cartao, Carregando, Etiqueta, Tabela, avisar, useHistorico, useFiltroMudou } from '../ui.js';
 import { STATUS_ESTOQUE } from '../calc.js';
 import { CATEGORIAS, plural, moeda, num, data, dataHora, hojeISO, somarDias, diasEntre, pl, qtdDupla, numeroPedido, mensagemErro, diaLocal } from '../util.js';
 import { BarrasH, Colunas, BarraParte } from '../graficos.js';
@@ -40,8 +40,9 @@ export function TelaPainel() {
   const seisMeses = `${new Date(a, m - 6, 1).getFullYear()}-${String(new Date(a, m - 6, 1).getMonth() + 1).padStart(2, '0')}-01`;
   const desde = [seisMeses, P.de, somarDias(h, -29)].sort()[0];
   useHistorico(desde);
+  const mudou = useFiltroMudou([desde]);
   useEffect(() => {
-    let vivo = true; setMovs(null);
+    let vivo = true; if (mudou()) setMovs(null);
     api.listar('movimentos', { desde: inicioDia(desde), ate: inicioDia(somarDias(h, 1)) })
       .then((l) => vivo && setMovs(l)).catch((e) => { avisar(mensagemErro(e), 'erro'); if (vivo) setMovs([]); });
     return () => { vivo = false; };

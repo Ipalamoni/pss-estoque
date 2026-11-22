@@ -3,7 +3,7 @@
 //           e SAÍDAS DA PRODUÇÃO (o que a pesagem tirou do estoque)
 // =====================================================================
 import { html, useState, useMemo, useEffect, useApp, Campo, Numero, Escolher, QtdUnidade, Etiqueta, Cabecalho, Abas, Vazio, Tabela, Cartao,
-  Carregando, Modal, useAcao, confirmar, avisar, n, useHistorico } from '../ui.js';
+  Carregando, Modal, useAcao, confirmar, avisar, n, useHistorico, useFiltroMudou } from '../ui.js';
 import { qtd, num, moeda, data, dataHora, hojeISO, somarDias, fator, qu, pl, nomeUsuario, mensagemErro, contem, diaLocal } from '../util.js';
 import { Exportar } from '../exportar.js';
 import { UltimaAlteracao, HistoricoAuditoria } from '../historico.js';
@@ -67,9 +67,10 @@ export function useProducoes(de, ate, progIds) {
   const { api, dados } = useApp();
   const [lista, setLista] = useState(null);
   const chave = (progIds || []).join(',');
+  const mudou = useFiltroMudou([de, ate]);   // programação nova de outra pessoa não pode apagar a tela
   useEffect(() => {
     let vivo = true;
-    setLista(null);
+    if (mudou()) setLista(null);
     Promise.all([
       api.listar('producoes', { desde: inicioDia(de), ate: inicioDia(somarDias(ate, 1)) }),
       progIds && progIds.length ? api.listar('producoes', { em: { programacao_id: progIds } }) : Promise.resolve([]),
@@ -537,8 +538,9 @@ export function TelaSaidasProducao() {
   const [aba, setAba] = useState('resumo');
   const [movs, setMovs] = useState(null);
   const prods = useProducoes(de, ate, null);
+  const mudou = useFiltroMudou([de, ate]);
   useEffect(() => {
-    let vivo = true; setMovs(null);
+    let vivo = true; if (mudou()) setMovs(null);
     api.listar('movimentos', { desde: inicioDia(de), ate: inicioDia(somarDias(ate, 1)), em: { tipo: ['saida_receita', 'saida_avulsa', 'correcao'] } })
       .then((l) => vivo && setMovs(l)).catch((e) => { avisar(mensagemErro(e), 'erro'); if (vivo) setMovs([]); });
     return () => { vivo = false; };
