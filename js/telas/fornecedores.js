@@ -1,5 +1,5 @@
 // Cadastro de fornecedores
-import { html, useState, useMemo, useApp, Tabela, Modal, Campo, Numero, Busca, Etiqueta, Cabecalho, useAcao, confirmar, n } from '../ui.js';
+import { html, useState, useMemo, useApp, Tabela, Modal, Campo, Numero, Busca, Etiqueta, Cabecalho, useAcao, confirmar, n, Filtros } from '../ui.js';
 import { contem, hojeISO, pl, formatarDoc, mascaraDoc, docLimpo, problemaDoc, rotuloDoc, TIPOS_PESSOA } from '../util.js';
 import { Exportar } from '../exportar.js';
 import { Icone } from '../icones.js';
@@ -25,10 +25,9 @@ export function TelaFornecedores() {
         { titulo: 'Ativo', valor: (f) => (f.ativo ? 'sim' : 'não') }]} />
       ${pode && html`<button class="btn btn-pri" onClick=${() => setEditando({})}><${Icone} nome="mais" tam=${18} /> Novo fornecedor</button>`}
     </${Cabecalho}>
-    <div class="filtros">
-      <${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Buscar por nome, CNPJ, CPF ou contato" />
+    <${Filtros} ativos=${inativos ? 1 : 0} fixo=${html`<${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Buscar por nome, CNPJ, CPF ou contato" />`}>
       <label class="check"><input type="checkbox" checked=${inativos} onChange=${(e) => setInativos(e.target.checked)} /> Mostrar inativos</label>
-    </div>
+    </${Filtros}>
     <${Tabela} linhas=${linhas} aoClicar=${setEditando} ordemInicial=${{ chave: 'nome', dir: 1 }}
       colunas=${[
         { chave: 'nome', titulo: 'Fornecedor', render: (f) => html`<b>${f.nome}</b>${!f.ativo && html` <${Etiqueta}>inativo</${Etiqueta}>`}` },

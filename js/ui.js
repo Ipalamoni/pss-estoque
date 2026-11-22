@@ -164,16 +164,17 @@ export function useCelular(px = 640) {
     return () => (q.removeEventListener ? q.removeEventListener('change', f) : q.removeListener(f)); }, []);
   return cel;
 }
-export function Filtros({ ativos = 0, fixo, children }) {
+export function Filtros({ ativos = 0, fixo, resumo, children, rotulo = 'Filtros' }) {
   const cel = useCelular();
   const [aberto, setAberto] = useState(false);
   if (!cel) return html`<div class="filtros">${fixo}${children}</div>`;
-  return html`<div class="filtros filtros-cel">
+  return html`<div class=${'filtros filtros-cel' + (fixo ? ' com-fixo' : '')}>
     ${fixo}
     <button type="button" class=${'btn btn-sec btn-filtros' + (ativos ? ' com-filtro' : '')} aria-expanded=${aberto} onClick=${() => setAberto(!aberto)}>
       <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M7 12h10M10 18h4" /></svg>
-      Filtros${ativos ? ` (${ativos})` : ''} <span class="seta-filtros">${aberto ? '▲' : '▼'}</span></button>
-    ${aberto && html`<div class="filtros-gaveta">${children}</div>`}
+      <span class="bf-txt">${resumo || rotulo}</span>${ativos ? html`<span class="bf-n">${ativos}</span>` : ''} <span class="seta-filtros">${aberto ? '▲' : '▼'}</span></button>
+    ${aberto && html`<div class="filtros-gaveta">${children}
+      <button type="button" class="btn btn-pri btn-peq bf-ok" onClick=${() => setAberto(false)}>Ver resultado</button></div>`}
   </div>`;
 }
 

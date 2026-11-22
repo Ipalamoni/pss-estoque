@@ -7,7 +7,7 @@
 //   ex.: 100 kg a R$ 1,00 → saem 50 → ficam 50 a R$ 1,00 → entram 100 a R$ 1,10
 //        → médio = (50×1,00 + 100×1,10) ÷ 150 = R$ 1,0667/kg
 // =====================================================================
-import { html, useState, useEffect, useMemo, useApp, Tabela, Modal, Cartao, Cabecalho, Etiqueta, Busca, Abas, Carregando, avisar } from '../ui.js';
+import { html, useState, useEffect, useMemo, useApp, Tabela, Modal, Cartao, Cabecalho, Etiqueta, Busca, Abas, Carregando, avisar, Filtros } from '../ui.js';
 import { CATEGORIAS, data, dataHora, hojeISO, num, qtd, moeda, pl, contem, numeroPedido, mensagemErro } from '../util.js';
 import { Exportar } from '../exportar.js';
 import { CustoProdutoAcabado, EstoqueValorizado, AvulsasPerdas } from './custos-producao.js';
@@ -77,14 +77,13 @@ function CustosProdutos({ ult }) {
       <${Cartao} titulo="Último custo acima do médio (+5%)" valor=${subiram} cor=${subiram ? 'c-laranja' : ''} sub="preço subiu na última compra" />
       <${Cartao} titulo="Sem custo de compra" valor=${semCusto} cor=${semCusto ? 'c-laranja' : ''} sub="ainda sem entrada com preço" />
     </div>
-    <div class="chips">
-      <button class=${'chip' + (!cat ? ' ativo' : '')} onClick=${() => setCat('')}>Todas</button>
-      ${Object.entries(CATEGORIAS).map(([k, v]) => html`<button class=${'chip' + (cat === k ? ' ativo' : '')} onClick=${() => setCat(k)}>${v}</button>`)}
-    </div>
-    <div class="filtros">
-      <${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Código, produto, grupo, classificação ou marca" />
+    <${Filtros} ativos=${[cat, inativos].filter(Boolean).length} fixo=${html`<${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Código, produto, grupo, classificação ou marca" />`}>
+      <div class="chips">
+        <button class=${'chip' + (!cat ? ' ativo' : '')} onClick=${() => setCat('')}>Todas</button>
+        ${Object.entries(CATEGORIAS).map(([k, v]) => html`<button class=${'chip' + (cat === k ? ' ativo' : '')} onClick=${() => setCat(k)}>${v}</button>`)}
+      </div>
       <label class="check"><input type="checkbox" checked=${inativos} onChange=${(e) => setInativos(e.target.checked)} /> Mostrar inativos</label>
-    </div>
+    </${Filtros}>
     <${Tabela} linhas=${linhas} ordemInicial=${{ chave: 'descricao', dir: 1 }}
       colunas=${[
         { chave: 'descricao', titulo: 'Produto', render: (p) => html`<b>${p.descricao}</b><br /><small>${p.codigo}${p.grupo ? ' · ' + p.grupo : ''}${p.classificacao ? ' · ' + p.classificacao : ''}</small>` },

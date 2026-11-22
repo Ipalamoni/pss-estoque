@@ -123,7 +123,8 @@ function Linhas({ edita }) {
 }
 
 const TEMPOS = [
-  { chave: 'producao_tolerancia_min', rotulo: 'Tolerância no começo do dia (min)', ajuda: 'Só para a 1ª batelada de cada maceira no dia, contada a partir do 1º recebimento.' },
+  { chave: 'producao_inicio_turno', rotulo: 'Início do turno das maceiras', ajuda: 'Antes da 1ª batelada do dia o semáforo não corre. Se passar dessa hora + a tolerância e ninguém iniciar, a maceira fica laranja “Ainda não iniciou”.', hora: true },
+  { chave: 'producao_tolerancia_min', rotulo: 'Tolerância para começar (min)', ajuda: 'Depois do início do turno, ou quando chega mistura numa maceira que estava parada.' },
   { chave: 'producao_tempo_padrao_min', rotulo: 'Tempo padrão da batelada (min)', ajuda: 'Usado quando a receita não tem tempo próprio.' },
   { chave: 'producao_prazo_finalizar_h', rotulo: 'Avisar batelada sem finalizar depois de (horas)', ajuda: 'Na tela Finalizar bateladas.' },
   { chave: 'mistura_parada_h', rotulo: 'Avisar mistura parada depois de (horas)', ajuda: 'Mistura pesada que não foi usada.' },
@@ -131,21 +132,24 @@ const TEMPOS = [
 
 function Tempos({ edita }) {
   const { dados, api, recarregar } = useApp();
-  const [v, setV] = useState(Object.fromEntries(TEMPOS.map((t) => [t.chave, String(dados.params[t.chave] ?? '')])));
+  const lista = TEMPOS.filter((t) => !t.hora || dados.params[t.chave] !== undefined);   // início do turno: depois da atualização 005 do banco
+  const [v, setV] = useState(Object.fromEntries(lista.map((t) => [t.chave, String(dados.params[t.chave] ?? '')])));
   const [ocupado, executar] = useAcao();
   async function salvar() {
-    if (await executar(() => api.rpc('salvar_parametros_producao', { p: Object.fromEntries(Object.entries(v).map(([k, x]) => [k, String(Math.round(n(x) || 0))])) }), 'Tempos salvos.')) await recarregar(true);
+    if (await executar(() => api.rpc('salvar_parametros_producao', { p: Object.fromEntries(Object.entries(v).map(([k, x]) => [k, k === 'producao_inicio_turno' ? x : String(Math.round(n(x) || 0))])) }), 'Tempos salvos.')) await recarregar(true);
   }
   const fichas = dados.fichas.filter((f) => f.ativo);
   return html`<section class="painel">
     <div class="semaforo-explica">
+      <div><span class="luz s-azul"></span><b>Azul</b> pronta para começar (o relógio só corre depois da 1ª batelada do dia)</div>
       <div><span class="luz s-verde"></span><b>Verde</b> até 1,5 × o tempo da receita</div>
       <div><span class="luz s-laranja"></span><b>Laranja</b> até 2 × — “Tempo médio em atraso”</div>
       <div><span class="luz s-vermelho"></span><b>Vermelho</b> acima de 2 × — “Produção em atraso”</div>
       <div><span class="luz s-cinza"></span><b>Cinza</b> aguardando pesagem ou programação</div>
     </div>
-    <div class="grade">${TEMPOS.map((t) => html`<${Campo} rotulo=${t.rotulo} ajuda=${t.ajuda}>
-      ${edita ? html`<${Numero} valor=${v[t.chave]} aoMudar=${(x) => setV({ ...v, [t.chave]: x })} />` : html`<b>${v[t.chave]}</b>`}</${Campo}>`)}</div>
+    <div class="grade">${lista.map((t) => html`<${Campo} rotulo=${t.rotulo} ajuda=${t.ajuda}>
+      ${!edita ? html`<b>${v[t.chave]}</b>` : t.hora ? html`<input class="entrada" type="time" value=${v[t.chave]} onInput=${(e) => setV({ ...v, [t.chave]: e.target.value })} />`
+        : html`<${Numero} valor=${v[t.chave]} aoMudar=${(x) => setV({ ...v, [t.chave]: x })} />`}</${Campo}>`)}</div>
     ${edita && html`<button class="btn btn-pri" disabled=${ocupado} onClick=${salvar}>Salvar tempos</button>`}
   </section>
   <h3 class="titulo-secao">Tempo de cada receita</h3>

@@ -1,5 +1,5 @@
 // Cadastro de fichas técnicas (receitas)
-import { html, useState, useMemo, useEffect, useApp, Tabela, Modal, Campo, Escolher, QtdUnidade, Busca, Etiqueta, Cabecalho, Carregando, useAcao, confirmar, avisar, n } from '../ui.js';
+import { html, useState, useMemo, useEffect, useApp, Tabela, Modal, Campo, Escolher, QtdUnidade, Busca, Etiqueta, Cabecalho, Carregando, useAcao, confirmar, avisar, n, Filtros } from '../ui.js';
 import { contem, qtd, moeda, fator, dataHora, nomeUsuario, pl, hojeISO } from '../util.js';
 import { Exportar } from '../exportar.js';
 import { UltimaAlteracao } from '../historico.js';
@@ -31,10 +31,9 @@ export function TelaFichas() {
           verCusto && { titulo: 'Custo estimado', valor: (x) => Math.round(Number(x.it.quantidade) * Number(dados.mapa.produto.get(x.it.produto_id)?.custo_medio || 0) * 100) / 100, num: true }].filter(Boolean)} />
       ${pode && html`<button class="btn btn-pri" onClick=${() => setEditando({})}><${Icone} nome="mais" tam=${18} /> Nova ficha</button>`}
     </${Cabecalho}>
-    <div class="filtros">
-      <${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Buscar receita" />
+    <${Filtros} ativos=${inativos ? 1 : 0} fixo=${html`<${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Buscar receita" />`}>
       <label class="check"><input type="checkbox" checked=${inativos} onChange=${(e) => setInativos(e.target.checked)} /> Mostrar inativas</label>
-    </div>
+    </${Filtros}>
     <${Tabela} linhas=${linhas} aoClicar=${setEditando} ordemInicial=${{ chave: 'nome', dir: 1 }}
       colunas=${[
         { chave: 'codigo', titulo: 'Código', render: (f) => html`<b>${f.codigo}</b>` },

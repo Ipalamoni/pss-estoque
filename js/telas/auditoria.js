@@ -1,5 +1,5 @@
 // Auditoria: quem alterou o quê nos cadastros, pedidos, usuários e configurações
-import { html, useState, useEffect, useMemo, useApp, Cabecalho, Tabela, Carregando, Etiqueta, avisar } from '../ui.js';
+import { html, useState, useEffect, useMemo, useApp, Cabecalho, Tabela, Carregando, Etiqueta, avisar, Filtros } from '../ui.js';
 import { dataHora, hojeISO, somarDias, mensagemErro, nomeUsuario } from '../util.js';
 import { mudancas } from '../historico.js';
 import { Exportar } from '../exportar.js';
@@ -26,12 +26,12 @@ export function TelaAuditoria() {
           { titulo: 'Ação', valor: (r) => ACAO[r.acao]?.[0] }, { titulo: 'Onde', valor: (r) => `${TABELAS[r.tabela] || r.tabela} #${r.registro_id}`, largura: 26 },
           { titulo: 'O que mudou', valor: (r) => mudancas(r), largura: 80 }]} />`}
     </${Cabecalho}>
-    <div class="filtros">
+    <${Filtros} ativos=${tabela ? 1 : 0} resumo=${`Período: ${de.split('-').reverse().join('/')} a ${ate.split('-').reverse().join('/')}`}>
       <label class="campo-inline">De <input class="entrada" type="date" value=${de} onChange=${(e) => setDe(e.target.value)} /></label>
       <label class="campo-inline">até <input class="entrada" type="date" value=${ate} onChange=${(e) => setAte(e.target.value)} /></label>
       <select class="entrada" value=${tabela} onChange=${(e) => setTabela(e.target.value)}><option value="">Tudo</option>
         ${Object.entries(TABELAS).map(([k, t]) => html`<option value=${k}>${t}</option>`)}</select>
-    </div>
+    </${Filtros}>
     <p class="nota">As movimentações de estoque não aparecem aqui porque elas mesmas já são um registro permanente (veja “Movimentações”).</p>
     ${regs === null ? html`<${Carregando} />` : html`<${Tabela} linhas=${lista} max=${500} colunas=${[
       { chave: 'data_hora', titulo: 'Data/hora', render: (r) => dataHora(r.data_hora) },

@@ -4,7 +4,7 @@
 //  - marca "lançado no sistema" / "pendente"
 //  - comprador ou financeiro ajustam a previsão de pagamento (com motivo)
 // =====================================================================
-import { html, useState, useMemo, useEffect, useApp, Tabela, Cartao, Cabecalho, Etiqueta, Busca, useAcao, avisar, useHistorico } from '../ui.js';
+import { html, useState, useMemo, useEffect, useApp, Tabela, Cartao, Cabecalho, Etiqueta, Busca, useAcao, avisar, useHistorico, Filtros } from '../ui.js';
 import { STATUS_PEDIDO, numeroPedido, data, dataHora, hojeISO, somarDias, diasEntre, diaLocal, moeda, pl, contem, nomeUsuario, formatarDoc } from '../util.js';
 import { resumoPedido, PedidoDetalhe, AjustarPagamento } from './pedidos.js';
 import { Exportar } from '../exportar.js';
@@ -166,8 +166,7 @@ export function TelaFinanceiro() {
     <div class="chips">
       ${Object.entries(RAPIDOS).map(([k, v]) => html`<button class=${'chip' + (rapido === k ? ' ativo' : '')} onClick=${() => setRapido(k)}>${v.t}</button>`)}
     </div>
-    <div class="filtros">
-      <${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Nº do pedido ou fornecedor" />
+    <${Filtros} ativos=${[pedDe, pedAte, venDe, venAte, lanc, ent].filter(Boolean).length} fixo=${html`<${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Nº do pedido ou fornecedor" />`}>
       <label class="campo-inline">Pedido de <input class="entrada" type="date" value=${pedDe} onChange=${(e) => setPedDe(e.target.value)} /></label>
       <label class="campo-inline">até <input class="entrada" type="date" value=${pedAte} onChange=${(e) => setPedAte(e.target.value)} /></label>
       <label class="campo-inline">Vencimento de <input class="entrada" type="date" value=${venDe} onChange=${(e) => setVenDe(e.target.value)} /></label>
@@ -180,7 +179,7 @@ export function TelaFinanceiro() {
         <option value="recebido">Recebido</option><option value="cancelado">Cancelado</option>
       </select>
       <button class="btn btn-sec btn-peq" onClick=${limpar}>Limpar filtros</button>
-    </div>
+    </${Filtros}>
     <${Tabela} linhas=${linhas} aoClicar=${(p) => setAberto(p.id)} ordemInicial=${{ chave: 'pgto', dir: 1 }}
       classeLinha=${(p) => (p.alertaEntrega || p.alertaCancelado ? 'linha-alerta' : '')}
       colunas=${[

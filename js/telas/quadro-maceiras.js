@@ -5,7 +5,7 @@
 import { html, useState, useApp, Modal, Campo, Numero, Etiqueta, Carregando, useAcao, avisar, n } from '../ui.js';
 import { num, hojeISO } from '../util.js';
 import { Icone } from '../icones.js';
-import { useFluxo, ETAPAS } from '../producao-util.js';
+import { useFluxo, ETAPAS, useEventos, LinhaTempo } from '../producao-util.js';
 
 export function QuadroMaceiras({ dia, setDia, SeletorDia }) {
   const { dados, api, recarregar } = useApp();
@@ -18,6 +18,7 @@ export function QuadroMaceiras({ dia, setDia, SeletorDia }) {
   const progs = dados.programacoes.filter((p) => p.data === dia && p.situacao === 'ativa' && !p.finalizada_em);
   const cols = [...dados.maceiras.filter((m) => m.ativa), { id: null, nome: 'Sem maceira' }];
   const daCol = (id) => progs.filter((p) => (p.maceira_id || null) === id).sort((a, b) => (a.prioridade ?? 999) - (b.prioridade ?? 999) || a.id - b.id);
+  const eventos = useEventos(progs.map((p) => p.id));
   const travada = (p) => { const f = fx.get(p.id); return f && f.iniciado > 0 && f.iniciado >= Number(p.quantidade) - 0.0001; };
 
   async function mover(pid, macId, pos) {
@@ -54,6 +55,7 @@ export function QuadroMaceiras({ dia, setDia, SeletorDia }) {
             <div class="qc-topo"><span class="qc-ordem">${i + 1}º</span><b>${f?.codigo}</b><span class="qc-nome">${f?.nome}</span></div>
             <div class="qc-qtd"><b>${num(p.quantidade, 1)}</b> receita(s)${p.operador_id ? html` · <small>${dados.mapa.operador.get(p.operador_id)?.nome}</small>` : ''}</div>
             ${fl && html`<div class="qc-barra">${ETAPAS.map((e) => fl[e.id] > 0.0001 && html`<i style=${`flex:${fl[e.id]};background:${e.cor}`} title=${`${e.titulo}: ${num(fl[e.id], 1)}`}></i>`)}</div>`}
+            <div class="qc-horas"><${LinhaTempo} p=${p} ev=${eventos.get(p.id)} bateladas=${fluxo?.bateladas || []} curta /></div>
             ${p.itens_alterados && html`<${Etiqueta} cor="laranja">receita alterada</${Etiqueta}>`}
             <div class="qc-acoes">
               <button class="btn-icone" title="Subir" disabled=${ocupado || i === 0} onClick=${() => mover(p.id, m.id, i - 1)}>▲</button>

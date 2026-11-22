@@ -2,7 +2,7 @@
 // exportar.js — botões padrão de exportação (Excel, PDF, Imprimir, WhatsApp)
 // usados em todas as telas de consulta e relatórios
 // =====================================================================
-import { html, useState, useEffect, useRef, useApp, avisar } from './ui.js';
+import { html, useState, useEffect, useRef, useApp, avisar, useCelular } from './ui.js';
 import { excelBlob, pdfTabela, pdfBlob, imprimirPDF, baixar, compartilhar } from './export.js';
 import { mensagemErro, hojeISO } from './util.js';
 import { Icone } from './icones.js';
@@ -40,6 +40,7 @@ export function Exportar(props) {
         totais: props.totais, paisagem: props.paisagem !== false, params: dados.params });
     return { doc, blob: pdfBlob(doc), nome: `${nome}.pdf` };
   }
+  const cel = useCelular();
   async function fazer(tipo, enviar = false) {
     setMenu(false);
     if (ocupado) return;
@@ -54,6 +55,16 @@ export function Exportar(props) {
     } catch (e) { avisar(mensagemErro(e), 'erro'); }
     finally { setOcupado(false); }
   }
+  if (cel) return html`<div class="exportar exportar-cel" ref=${ref}>
+    <button class="btn btn-sec btn-peq" disabled=${ocupado} aria-expanded=${menu} onClick=${() => setMenu(!menu)}>
+      <${Icone} nome="excel" tam=${16} /> ${ocupado ? 'Gerando…' : 'Exportar'} <${Icone} nome="setaBaixo" tam=${14} /></button>
+    ${menu && html`<div class="menu-suspenso">
+      <button onClick=${() => fazer('excel')}><${Icone} nome="excel" tam=${16} /> Baixar em Excel</button>
+      <button onClick=${() => fazer('pdf')}><${Icone} nome="pdf" tam=${16} /> Baixar em PDF</button>
+      <button onClick=${() => fazer('pdf', true)}><${Icone} nome="whatsapp" tam=${16} /> WhatsApp (PDF)</button>
+      <button onClick=${() => fazer('excel', true)}><${Icone} nome="whatsapp" tam=${16} /> WhatsApp (Excel)</button>
+    </div>`}
+  </div>`;
   return html`<div class="exportar" ref=${ref}>
     <button class="btn btn-sec btn-peq" disabled=${ocupado} title="Baixar em Excel" onClick=${() => fazer('excel')}><${Icone} nome="excel" tam=${16} /> Excel</button>
     <button class="btn btn-sec btn-peq" disabled=${ocupado} title="Baixar em PDF" onClick=${() => fazer('pdf')}><${Icone} nome="pdf" tam=${16} /> PDF</button>

@@ -1,5 +1,5 @@
 // Inventário: contagem física pelo celular e ajuste das diferenças
-import { html, useState, useMemo, useEffect, useApp, Modal, Campo, QtdUnidade, Busca, Etiqueta, Cabecalho, Abas, Tabela, Carregando, useAcao, confirmar, avisar, n } from '../ui.js';
+import { html, useState, useMemo, useEffect, useApp, Modal, Campo, QtdUnidade, Busca, Etiqueta, Cabecalho, Abas, Tabela, Carregando, useAcao, confirmar, avisar, n, Filtros } from '../ui.js';
 import { CATEGORIAS, MOTIVOS_INVENTARIO, qtd, moeda, num, contem, fator, qtdDupla, dataHora, mensagemErro, qu, plural, pl, nomeUsuario, hojeISO } from '../util.js';
 import { Exportar } from '../exportar.js';
 import { SeletorLocal, useLocalInicial } from '../producao-util.js';
@@ -52,11 +52,10 @@ function Contagem({ aoConcluir }) {
 
   return html`
     <div class="filtros"><${SeletorLocal} valor=${loc} aoMudar=${(v) => { setLoc(v); setCont({}); }} rotulo="Contando o local" /></div>
+    <${Filtros} ativos=${cats.size < Object.keys(CATEGORIAS).length ? 1 : 0} fixo=${html`<${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Buscar item" />`}>
+      <div class="grupo-checks">${Object.entries(CATEGORIAS).map(([k, v]) => html`<label class="check"><input type="checkbox" checked=${cats.has(k)} onChange=${() => alternar(k)} /> ${v}</label>`)}</div>
+    </${Filtros}>
     <div class="filtros">
-      ${Object.entries(CATEGORIAS).map(([k, v]) => html`<label class="check"><input type="checkbox" checked=${cats.has(k)} onChange=${() => alternar(k)} /> ${v}</label>`)}
-    </div>
-    <div class="filtros">
-      <${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Buscar item" />
       <${Exportar} titulo="Folha de contagem de estoque" filtros=${`${pl(itens.length, 'item', 'itens')} · ${dataHora(new Date())}`} arquivo=${`folha-contagem-${hojeISO()}`} linhas=${itens} paisagem=${false}
         colunas=${[{ titulo: 'Código', valor: (p) => p.codigo }, { titulo: 'Produto', valor: (p) => p.descricao, largura: 38 }, { titulo: 'Unid.', valor: (p) => p.unidade_compra || p.unidade_estoque },
           { titulo: 'No sistema', valor: (p) => Math.round(p.saldo * 1000) / 1000, texto: (p) => qtdDupla(p, p.saldo), num: true },

@@ -3920,6 +3920,41 @@ on conflict (versao) do nothing;
 
 
 -- =====================================================================
+-- Atualização 005 — versão 2.3.0 do banco
+-- Acrescenta o parâmetro "Início do turno" (semáforo das maceiras) e deixa o PCP ajustá-lo.
+-- Só acrescenta; não apaga nada. Pode rodar mais de uma vez.
+-- =====================================================================
+insert into public.parametros (chave, valor, descricao) values
+  ('producao_inicio_turno', '04:00', 'Produção: hora em que o turno das maceiras começa. Se houver mistura pronta e nenhuma batelada até essa hora + tolerância, a maceira fica laranja "Ainda não iniciou".')
+on conflict (chave) do nothing;
+
+update public.parametros
+   set descricao = 'Produção: minutos de tolerância para começar (depois do início do turno ou da chegada de mistura com a maceira parada)'
+ where chave = 'producao_tolerancia_min';
+
+create or replace function public.salvar_parametros_producao(p jsonb)
+returns void language plpgsql security definer set search_path = public as $$
+declare k text; v text;
+begin
+  perform public._exigir('producao_config');
+  for k, v in select * from jsonb_each_text(p) loop
+    if k = 'producao_inicio_turno' then
+      if v !~ '^([01][0-9]|2[0-3]):[0-5][0-9]$' then raise exception 'Início do turno inválido: use hora no formato 04:00.'; end if;
+    elsif k in ('producao_tolerancia_min','producao_tempo_padrao_min','producao_prazo_finalizar_h','mistura_parada_h') then
+      if v !~ '^[0-9]+$' or v::int <= 0 or v::int > 1440 then raise exception 'Valor inválido para %: use um número inteiro maior que zero.', k; end if;
+    else
+      raise exception 'Configuração não permitida aqui: %', k;
+    end if;
+    update public.parametros set valor = v where chave = k;
+  end loop;
+end $$;
+grant execute on function public.salvar_parametros_producao(jsonb) to authenticated;
+
+insert into public.versao_banco (versao, descricao) values ('2.3.0', 'Parâmetro início do turno das maceiras (semáforo)')
+on conflict (versao) do nothing;
+
+
+-- =====================================================================
 -- SEMENTE DO MODO DEMONSTRAÇÃO (dados fictícios)
 -- Usado SÓ no modo demonstração (PGlite, dentro do navegador).
 -- NUNCA rodar no Supabase de produção.

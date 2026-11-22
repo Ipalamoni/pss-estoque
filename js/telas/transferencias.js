@@ -6,7 +6,7 @@
 import { html, useState, useEffect, useApp, Cabecalho, Abas, Tabela, Etiqueta, Modal, Campo, Numero, Escolher, Vazio, Carregando, useAcao, confirmar, avisar, n } from '../ui.js';
 import { num, qu, dataHora, hojeISO, somarDias, operaLocal, ehGestao, SITUACAO_TRANSF, pl, mensagemErro, contem } from '../util.js';
 import { Icone } from '../icones.js';
-import { nomeLocal, saldoLocal, minutos, tempoTexto } from '../producao-util.js';
+import { nomeLocal, saldoLocal, minutos, tempoTexto, horaDia } from '../producao-util.js';
 import { Exportar } from '../exportar.js';
 
 const COR = { separada: 'laranja', enviada: 'azul', recebida: 'verde', cancelada: 'cinza' };
@@ -69,6 +69,8 @@ function CartaoTransf({ t, aoAbrir, podeOrigem, podeDestino, aba }) {
       <small class="transf-tempo">há ${tempoTexto(minutos(desde))}</small>
     </div>
     <div class="transf-rota" onClick=${aoAbrir}><span>${nomeLocal(dados, t.origem_id)}</span><span class="seta">→</span><b>${nomeLocal(dados, t.destino_id)}</b></div>
+    <div class="transf-horas">${[['separado', t.separado_em, t.separado_por], ['enviado', t.enviado_em, t.enviado_por], ['recebido', t.recebido_em, t.recebido_por]]
+      .filter((x) => x[1]).map(([r, h, u], i) => html`${i ? ' · ' : ''}<span>${r} <b>${horaDia(h)}</b> ${(dados.mapa.perfil.get(u)?.nome || '').split(' ')[0]}</span>`)}</div>
     <ul class="transf-itens" onClick=${aoAbrir}>${t.itens.map((i) => { const p = dados.mapa.produto.get(i.produto_id);
       return html`<li><b>${qu(i.quantidade, p?.unidade_estoque)}</b> ${p?.descricao}${i.qtd2 ? html` <small>(${num(i.qtd2, 0)} ${p?.unidade2 || 'vol.'})</small>` : ''}</li>`; })}</ul>
     ${t.observacao && html`<p class="nota">${t.observacao}</p>`}

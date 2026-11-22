@@ -95,10 +95,8 @@ export function TelaEstoque() {
         : html`<${Exportar} titulo="Posição de estoque" filtros=${`${pl(linhas.length, 'item', 'itens')} · ${dataHora(new Date())}`} arquivo=${`posicao-estoque-${hojeISO()}`}
           colunas=${colsExp} linhas=${linhas} abas=${abasExcel} pdf=${pdfEstoque} />`}
     </${Cabecalho}>
-    <div class="filtros">
-      ${Object.entries(CATEGORIAS).map(([k, t]) => html`<label class="check"><input type="checkbox" checked=${cats.has(k)} onChange=${() => alternar(k)} /> ${t}</label>`)}
-    </div>
-    <${Filtros} ativos=${[status, grupo, classif].filter(Boolean).length} fixo=${html`<${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Buscar produto" />`}>
+    <${Filtros} ativos=${[status, grupo, classif, cats.size < Object.keys(CATEGORIAS).length, completo].filter(Boolean).length} fixo=${html`<${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Buscar produto" />`}>
+      <div class="grupo-checks">${Object.entries(CATEGORIAS).map(([k, t]) => html`<label class="check"><input type="checkbox" checked=${cats.has(k)} onChange=${() => alternar(k)} /> ${t}</label>`)}</div>
       <select class="entrada" value=${status} onChange=${(e) => setStatus(e.target.value)}>
         <option value="">Todas as situações</option>
         ${Object.entries(STATUS_ESTOQUE).map(([k, s]) => html`<option value=${k}>${s.rotulo}</option>`)}
@@ -107,13 +105,11 @@ export function TelaEstoque() {
         <option value="">Todos os grupos</option>${grupos.map((g) => html`<option>${g}</option>`)}</select>
       <select class="entrada" value=${classif} onChange=${(e) => setClassif(e.target.value)}>
         <option value="">Todas as classificações</option>${classifs.map((c) => html`<option value=${c}>Classificação ${c}</option>`)}</select>
+      ${!agrupar && html`<label class="check"><input type="checkbox" checked=${completo} onChange=${(e) => setCompleto(e.target.checked)} /> Mostrar todas as colunas</label>`}
     </${Filtros}>
-    <div class="filtros">
-      <div class="alternador">
-        <button class=${'btn ' + (!agrupar ? 'btn-pri' : 'btn-sec')} onClick=${() => setAgrupar(false)}>Por produto (marca)</button>
-        <button class=${'btn ' + (agrupar ? 'btn-pri' : 'btn-sec')} onClick=${() => setAgrupar(true)}>Somado por grupo e classificação</button>
-      </div>
-      ${!agrupar && html`<label class="check"><input type="checkbox" checked=${completo} onChange=${(e) => setCompleto(e.target.checked)} /> Todas as colunas</label>`}
+    <div class="seg seg-visao" role="group" aria-label="Como ver">
+      <button class=${!agrupar ? 'ativo' : ''} onClick=${() => setAgrupar(false)}>Por produto</button>
+      <button class=${agrupar ? 'ativo' : ''} onClick=${() => setAgrupar(true)}>Por grupo</button>
     </div>
     ${agrupar ? html`<${Tabela} linhas=${grupos2} chave="k" ordemInicial=${{ chave: 'grupo', dir: 1 }}
         aoClicar=${(g) => { setGrupo(g.grupo === '(sem grupo)' ? '' : g.grupo); setClassif(g.classificacao); setAgrupar(false); }}

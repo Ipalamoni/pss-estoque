@@ -59,7 +59,7 @@ export function semaforo(dados, maceira, fluxo, bateladas, agora = Date.now()) {
   const tol = Number(dados.params.producao_tolerancia_min || 10);
   const proxima = progs.filter((l) => l.pronto > 0).sort((a, b) => a.prioridade - b.prioridade)[0];
   const T = tempoMedio(dados, ultima?.ficha_id || proxima?.ficha_id || progs[0]?.ficha_id, maceira);
-  const base = { progs, pronto, resto, ultima, T, batendo: null, iniciadasHoje: minhas.length };
+  const base = { progs, pronto, resto, ultima, primeira: minhas[minhas.length - 1], T, batendo: null, iniciadasHoje: minhas.length };
   const desdeUltima = ultima ? minutos(ultima.iniciada_em, agora) : null;
   if (ultima && desdeUltima < T) base.batendo = { ficha_id: ultima.ficha_id, min: desdeUltima };
   if (!pronto) {
@@ -67,9 +67,23 @@ export function semaforo(dados, maceira, fluxo, bateladas, agora = Date.now()) {
     if (progs.length && somar(progs, 'iniciado') >= somar(progs, 'programado') - 0.0005) return { ...base, cor: 'cinza', rotulo: 'Programação concluída', min: desdeUltima, concluida: true };
     return { ...base, cor: 'cinza', rotulo: 'Aguardando programação', min: null };
   }
-  let ref = ultima ? new Date(ultima.iniciada_em).getTime() : null;
-  if (!ref && recebimentos[0]) ref = new Date(recebimentos[0]).getTime() + tol * 60000;
-  const m = ref ? Math.max(0, Math.round((agora - ref) / 60000)) : 0;
+  // O relógio só corre depois da 1ª batelada do dia nesta maceira (a pesagem costuma deixar pronto na véspera/madrugada).
+  // Antes disso: azul "Pronta para começar"; passou do início do turno + tolerância sem iniciar: laranja "Ainda não iniciou".
+  const [hh, mm] = String(dados.params.producao_inicio_turno || '04:00').split(':').map(Number);
+  const turno = new Date(); turno.setHours(hh || 0, mm || 0, 0, 0);
+  const chegadas = progs.filter((l) => l.pronto > 0 && l.primeiro_recebimento).map((l) => new Date(l.primeiro_recebimento).getTime());
+  if (!ultima) {
+    const desde = Math.max(turno.getTime(), ...(chegadas.length ? [Math.min(...chegadas)] : [0]));
+    const m = Math.round((agora - desde) / 60000);
+    if (agora > desde + tol * 60000) return { ...base, cor: 'laranja', rotulo: 'Ainda não iniciou', min: m, semIniciar: true };
+    return { ...base, cor: 'azul', rotulo: 'Pronta para começar', min: null };
+  }
+  // Já começou: conta do início da última batelada até a próxima. Se a fila tinha acabado e chegou mistura depois,
+  // conta a partir da chegada (com a tolerância).
+  let ref = new Date(ultima.iniciada_em).getTime();
+  const chegouDepois = chegadas.filter((c) => c > ref + T * 60000);
+  if (chegouDepois.length) ref = Math.max(ref, Math.min(...chegouDepois) + tol * 60000);
+  const m = Math.max(0, Math.round((agora - ref) / 60000));
   if (base.batendo) return { ...base, cor: 'verde', rotulo: `Batendo há ${tempoTexto(desdeUltima)}`, min: m };
   if (m <= 1.5 * T) return { ...base, cor: 'verde', rotulo: 'No ritmo', min: m };
   if (m <= 2 * T) return { ...base, cor: 'laranja', rotulo: 'Tempo médio em atraso', min: m };
@@ -118,4 +132,65 @@ export function SeletorLocal({ valor, aoMudar, rotulo = 'Local' }) {
   if (meus.length <= 1) return meus.length ? html`<span class="local-fixo">${rotulo}: <b>${nomeLocal(dados, meus[0].id)}</b></span>` : null;
   return html`<label class="campo-inline">${rotulo} <select class="entrada" value=${valor || ''} onChange=${(e) => aoMudar(Number(e.target.value))}>
     ${meus.map((l) => html`<option value=${l.id}>${nomeLocal(dados, l.id)}</option>`)}</select></label>`;
+}
+
+// ---------------------------------------------------------------------
+// HORÁRIOS de cada etapa de uma programação (para o gerente acompanhar):
+// programado → pesado → enviado → recebido → iniciado → finalizado
+// ---------------------------------------------------------------------
+export const hora = (ts) => (ts ? new Date(ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '');
+export const horaDia = (ts) => {
+  if (!ts) return '';
+  const d = new Date(ts); const h = hora(ts);
+  return diaDe(ts) === hojeISO() ? h : `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')} ${h}`;
+};
+export function useEventos(progIds) {
+  const { api, dados } = useApp();
+  const [r, setR] = useState(new Map());
+  const chave = (progIds || []).join(',');
+  useEffect(() => {
+    let vivo = true;
+    if (!progIds || !progIds.length) { setR(new Map()); return undefined; }
+    (async () => {
+      const [prods, its] = await Promise.all([
+        api.listar('producoes', { em: { programacao_id: progIds } }).catch(() => []),
+        api.listar('transferencia_itens', { em: { programacao_id: progIds } }).catch(() => []),
+      ]);
+      const tids = [...new Set(its.map((i) => i.transferencia_id))];
+      const ts = tids.length ? await api.listar('transferencias', { em: { id: tids } }).catch(() => []) : [];
+      const tm = new Map(ts.map((t) => [t.id, t]));
+      const m = new Map();
+      const de = (id) => { if (!m.has(id)) m.set(id, { pesagens: [], envios: [] }); return m.get(id); };
+      prods.forEach((p) => de(p.programacao_id).pesagens.push(p));
+      its.forEach((i) => { const t = tm.get(i.transferencia_id); if (t && t.situacao !== 'cancelada') de(i.programacao_id).envios.push({ ...t, quantidade: Number(i.quantidade) }); });
+      m.forEach((v) => { v.pesagens.sort((a, b) => String(a.data_hora).localeCompare(String(b.data_hora))); v.envios.sort((a, b) => String(a.separado_em).localeCompare(String(b.separado_em))); });
+      if (vivo) setR(m);
+    })();
+    return () => { vivo = false; };
+  }, [chave, dados.carregadoEm]);
+  return r;
+}
+const ultimo = (l, campo) => l.filter((x) => x[campo]).map((x) => x[campo]).sort().slice(-1)[0];
+// Linha do tempo discreta de uma programação
+export function LinhaTempo({ p, ev, bateladas = [], curta = false }) {
+  const { dados } = useApp();
+  const nome = (u) => (dados.mapa.perfil.get(u)?.nome || '').split(' ')[0];
+  const passos = [];
+  if (p.criado_em) passos.push(['Programado', horaDia(p.criado_em), nome(p.criado_por)]);
+  const pes = ev?.pesagens || [];
+  if (pes.length) {
+    const q = pes.reduce((s, x) => s + Number(x.multiplicador || 0), 0);
+    passos.push([`Pesado ${num(q, q % 1 ? 1 : 0)}${curta ? '' : ` de ${num(p.quantidade, 0)}`}`, (pes.length > 1 ? 'últ. ' : '') + horaDia(pes[pes.length - 1].data_hora), nome(pes[pes.length - 1].usuario_id)]);
+  }
+  const env = (ev?.envios || []).filter((t) => t.enviado_em);
+  if (env.length) passos.push(['Enviado', horaDia(ultimo(env, 'enviado_em')), nome(env[env.length - 1].enviado_por)]);
+  const rec = env.filter((t) => t.recebido_em);
+  if (rec.length) { const t = rec[rec.length - 1]; passos.push(['Recebido', horaDia(ultimo(rec, 'recebido_em')), t.operador_id ? (dados.mapa.operador.get(t.operador_id)?.nome || '').split(' ')[0] : nome(t.recebido_por)]); }
+  const bs = bateladas.filter((b) => b.programacao_id === p.id && b.situacao !== 'cancelada').sort((a, b) => String(a.iniciada_em).localeCompare(String(b.iniciada_em)));
+  if (bs.length) passos.push([`Iniciadas ${bs.length}`, (bs.length > 1 ? 'últ. ' : '') + horaDia(bs[bs.length - 1].iniciada_em), (dados.mapa.operador.get(bs[bs.length - 1].operador_id)?.nome || '').split(' ')[0]]);
+  const fin = bs.filter((b) => b.situacao === 'finalizada');
+  if (fin.length && !curta) passos.push([`Finalizadas ${fin.length}`, horaDia(ultimo(fin, 'finalizada_em')), nome(fin[fin.length - 1].finalizada_por)]);
+  if (!passos.length) return null;
+  const vis = curta ? passos.slice(-2) : passos;
+  return html`<span class="linha-tempo-mini">${vis.map(([t, h, q], i) => html`${i ? html`<span class="ltm-sep">›</span>` : ''}<span class="ltm-passo"><b>${t}</b> ${h}${q ? html` <i>${q}</i>` : ''}</span>`)}</span>`;
 }

@@ -1,5 +1,5 @@
 // Relatórios: pedidos, compras por produto, consumo do período, ajustes e correções
-import { html, useState, useMemo, useEffect, useApp, Escolher, Busca, Etiqueta, Cabecalho, Abas, Tabela, Cartao, Carregando, Modal, avisar, useHistorico } from '../ui.js';
+import { html, useState, useMemo, useEffect, useApp, Escolher, Busca, Etiqueta, Cabecalho, Abas, Tabela, Cartao, Carregando, Modal, avisar, useHistorico, Filtros } from '../ui.js';
 import { CATEGORIAS, STATUS_PEDIDO, TIPOS_MOV, MOTIVOS_INVENTARIO, qtd, num, moeda, data, dataHora, hojeISO, somarDias, diasEntre, numeroPedido, contem, fator, qu, pl, plural, nomeUsuario, mensagemErro } from '../util.js';
 import { Exportar } from '../exportar.js';
 import { resumoPedido, PrazoEtiqueta, PedidoDetalhe, COR_STATUS } from './pedidos.js';
@@ -19,7 +19,7 @@ export function TelaRelatorios() {
     <${Abas} abas=${[{ id: 'pedidos', titulo: 'Pedidos de compra' }, { id: 'produtos', titulo: 'Compras por produto' },
       { id: 'recebimentos', titulo: 'Recebimentos' }, { id: 'producoes', titulo: 'Produções (pesagem)' },
       { id: 'consumo', titulo: 'Consumo do período' }, { id: 'ajustes', titulo: 'Ajustes e correções' }]} ativa=${aba} aoMudar=${setAba} />
-    <div class="filtros">
+    <${Filtros} resumo=${`Período: ${data(de)} a ${data(ate)}`}>
       <label class="campo-inline">De <input class="entrada" type="date" value=${de} onChange=${(e) => setDe(e.target.value)} /></label>
       <label class="campo-inline">até <input class="entrada" type="date" value=${ate} onChange=${(e) => setAte(e.target.value)} /></label>
       <span class="chips">
@@ -27,7 +27,7 @@ export function TelaRelatorios() {
         <button class="chip" onClick=${() => { setDe(somarDias(hojeISO(), -30)); setAte(hojeISO()); }}>30 dias</button>
         <button class="chip" onClick=${() => { setDe(somarDias(hojeISO(), -90)); setAte(hojeISO()); }}>90 dias</button>
       </span>
-    </div>
+    </${Filtros}>
     ${aba === 'pedidos' && html`<${RelPedidos} ...${periodo} />`}
     ${aba === 'produtos' && html`<${RelComprasProduto} ...${periodo} />`}
     ${aba === 'recebimentos' && html`<${RelRecebimentos} ...${periodo} />`}

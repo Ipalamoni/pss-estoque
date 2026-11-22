@@ -7,7 +7,7 @@
 import { html, useState, useEffect, useRef, useApp, Cabecalho, Modal, Campo, Numero, Escolher, Etiqueta, Carregando, Vazio, useAcao, confirmar, avisar, n } from '../ui.js';
 import { qtd, num, qu, hojeISO, pl, mensagemErro } from '../util.js';
 import { Icone } from '../icones.js';
-import { useFluxo, semaforo, saldoLocal, localTipo, misturaDaFicha, tempoTexto, useRelogio, somar, minutos } from '../producao-util.js';
+import { useFluxo, semaforo, saldoLocal, localTipo, misturaDaFicha, tempoTexto, useRelogio, somar, minutos, useEventos, LinhaTempo, hora, diaDe } from '../producao-util.js';
 
 const ehFermento = (p) => /ferment/i.test(`${p?.grupo || ''} ${p?.descricao || ''}`);
 const ehFarinha = (p) => /farinha/i.test(`${p?.grupo || ''} ${p?.descricao || ''}`);
@@ -79,7 +79,7 @@ export function TelaMaceiras() {
         </button>`;
       })}
     </div>
-    <p class="nota">Semáforo: <span class="leg s-verde"></span> no ritmo · <span class="leg s-laranja"></span> tempo médio em atraso · <span class="leg s-vermelho"></span> produção em atraso · <span class="leg s-cinza"></span> aguardando. É só um sinal: nada fica travado.</p>
+    <p class="nota">Semáforo: <span class="leg s-azul"></span> pronta para começar · <span class="leg s-verde"></span> no ritmo · <span class="leg s-laranja"></span> tempo médio em atraso · <span class="leg s-vermelho"></span> produção em atraso · <span class="leg s-cinza"></span> aguardando. É só um sinal: nada fica travado.</p>
 
     ${trocar && html`<${EntrarOperador} aoFechar=${() => setTrocar(false)} aoEntrar=${(o) => { setOperador(o); setTrocar(false); ultimo.current = Date.now(); }} />`}
     ${aberta && html`<${MaceiraAberta} m=${aberta} fluxo=${fluxo} agora=${agora} opera=${opera} aoFechar=${() => setAberta(null)}
@@ -131,7 +131,8 @@ function MaceiraAberta({ m, fluxo, agora, opera, aoFechar, aoIniciar, operador }
   const hoje = hojeISO();
   const fila = (outras ? fluxo.fluxo.filter((l) => l.data === hoje && l.maceira_id !== m.id) : s.progs)
     .filter((l) => !l.finalizada).sort((a, b) => (a.maceira_id || 0) - (b.maceira_id || 0) || a.prioridade - b.prioridade);
-  const batidas = fluxo.bateladas.filter((b) => b.maceira_id === m.id && b.situacao !== 'cancelada').sort((a, b) => String(b.iniciada_em).localeCompare(String(a.iniciada_em)));
+  const batidas = fluxo.bateladas.filter((b) => b.maceira_id === m.id && b.situacao !== 'cancelada' && diaDe(b.iniciada_em) === hoje).sort((a, b) => String(b.iniciada_em).localeCompare(String(a.iniciada_em)));
+  const eventos = useEventos(fila.map((l) => l.programacao_id));
   return html`<${Modal} titulo=${m.nome} aoFechar=${aoFechar} largo>
     <div class=${'mac-faixa s-' + s.cor}><span class="mac-luz"></span><b>${s.rotulo}</b>
       <span>${s.batendo ? `começou há ${tempoTexto(s.batendo.min)}` : s.min !== null && s.cor !== 'cinza' ? `${tempoTexto(s.min)} sem iniciar` : ''} · tempo médio ${s.T} min</span></div>
@@ -151,6 +152,7 @@ function MaceiraAberta({ m, fluxo, agora, opera, aoFechar, aoIniciar, operador }
               <span>Na pesagem <b>${num(l.a_pesar + l.na_pesagem, 0)}</b></span>
               <span>Iniciadas <b>${num(l.iniciado, 0)}</b></span>
             </div>
+            <small class="fila-horas"><${LinhaTempo} p=${{ id: l.programacao_id, quantidade: l.programado }} ev=${eventos.get(l.programacao_id)} bateladas=${fluxo.bateladas} curta /></small>
             ${l.operador_id && html`<small>Padeiro sugerido: ${dados.mapa.operador.get(l.operador_id)?.nome}</small>`}
           </div>
           <div class="fila-acoes">
@@ -162,8 +164,8 @@ function MaceiraAberta({ m, fluxo, agora, opera, aoFechar, aoIniciar, operador }
         </div>`;
       })}</div>`}
     <h3>Bateladas de hoje nesta maceira</h3>
-    ${batidas.length ? html`<div class="batidas">${batidas.slice(0, 12).map((b) => html`<span class=${'batida ' + b.situacao}>
-      ${new Date(b.iniciada_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} · ${dados.mapa.ficha.get(b.ficha_id)?.nome} · ${dados.mapa.operador.get(b.operador_id)?.nome || ''}
+    ${batidas.length ? html`<div class="batidas">${batidas.slice(0, 12).map((b, i) => html`<span class=${'batida ' + b.situacao}>
+      <b>${batidas.length - i}ª</b> · iniciada ${hora(b.iniciada_em)} · ${dados.mapa.ficha.get(b.ficha_id)?.nome} · ${dados.mapa.operador.get(b.operador_id)?.nome || ''}
       ${b.situacao === 'finalizada' ? ' ✔' : ''}</span>`)}</div>` : html`<p class="nota">Nenhuma batelada iniciada hoje.</p>`}
     ${acao && html`<${DevolverPerda} l=${acao} operador=${operador} aoFechar=${() => setAcao(null)} />`}
   </${Modal}>`;

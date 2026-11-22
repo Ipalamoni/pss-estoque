@@ -1,5 +1,5 @@
 // Pedidos de compra: lista, cadastro, detalhe, divergências, PDF / Excel / impressão
-import { html, useState, useMemo, useEffect, useApp, Tabela, Modal, Campo, Numero, Escolher, QtdUnidade, Busca, Etiqueta, Cabecalho, useAcao, confirmar, avisar, n, useHistorico } from '../ui.js';
+import { html, useState, useMemo, useEffect, useApp, Tabela, Modal, Campo, Numero, Escolher, QtdUnidade, Busca, Etiqueta, Cabecalho, useAcao, confirmar, avisar, n, useHistorico, Filtros } from '../ui.js';
 import { STATUS_PEDIDO, numeroPedido, data, dataHora, hojeISO, somarDias, diasEntre, moeda, qtd, num, contem, fator, qu, pl, plural, nomeUsuario, mensagemErro } from '../util.js';
 import { pdfPedido, pdfTabela, salvarPDF, imprimirPDF, excel, pdfBlob, compartilhar } from '../export.js';
 import { Exportar } from '../exportar.js';
@@ -103,8 +103,7 @@ export function TelaPedidos() {
       <span>⚠ <b>${pl(pendRec.length, 'recebimento', 'recebimentos')} aguardando a ciência do comprador</b>${' '}
         (${[qtdDivPend && pl(qtdDivPend, 'pedido com divergência', 'pedidos com divergência'), pendRec.filter((r) => !r.pedido_id).length && pl(pendRec.filter((r) => !r.pedido_id).length, 'sem pedido', 'sem pedido')].filter(Boolean).join(' · ')}).</span>
       <button class="btn btn-destaque btn-peq" onClick=${() => setPendencias(true)}>Ver e dar ciência</button></div>`}
-    <div class="filtros">
-      <${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Nº do pedido ou fornecedor" />
+    <${Filtros} ativos=${[filtro !== 'pendentes', de, ate, forn].filter(Boolean).length} fixo=${html`<${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Nº do pedido ou fornecedor" />`}>
       <select class="entrada" value=${filtro} onChange=${(e) => setFiltro(e.target.value)}>
         <option value="pendentes">Pendentes de entrega</option>
         <option value="atrasados">Atrasados</option>
@@ -117,7 +116,7 @@ export function TelaPedidos() {
       <label class="campo-inline">até <input class="entrada" type="date" value=${ate} onChange=${(e) => setAte(e.target.value)} /></label>
       <div class="filtro-escolher"><${Escolher} itens=${dados.fornecedores} valor=${forn} aoMudar=${setForn} rotuloDe=${(f) => f.nome} placeholder="Fornecedor (todos)" /></div>
       ${forn && html`<button class="btn btn-sec" onClick=${() => setForn(null)}>Limpar fornecedor</button>`}
-    </div>
+    </${Filtros}>
     <${Tabela} linhas=${linhas} aoClicar=${(p) => setAberto(p.id)} ordemInicial=${{ chave: 'id', dir: -1 }}
       colunas=${[
         { chave: 'id', titulo: 'Pedido', render: (p) => html`<b>${numeroPedido(p.id)}</b>` },

@@ -9,7 +9,7 @@ import { Exportar } from '../exportar.js';
 import { UltimaAlteracao, HistoricoAuditoria } from '../historico.js';
 import { Icone } from '../icones.js';
 import { ResumoPrevisao } from './previsao.js';
-import { useFluxo, ETAPAS, localTipo, saldoLocal } from '../producao-util.js';
+import { useFluxo, ETAPAS, localTipo, saldoLocal, useEventos, LinhaTempo } from '../producao-util.js';
 import { QuadroMaceiras } from './quadro-maceiras.js';
 
 const inicioDia = (iso) => new Date(iso + 'T00:00:00').toISOString();
@@ -121,6 +121,7 @@ function ProgramacaoDia({ dia, setDia, engenharia, pesagem }) {
   const prods = useProducoes(dia, dia, progs.map((p) => p.id));
   const fluxo = useFluxo(dia);
   const fx = new Map((fluxo?.fluxo || []).map((x) => [x.programacao_id, x]));
+  const eventos = useEventos(progs.map((p) => p.id));
   const [editar, setEditar] = useState(null);      // {} = nova; pg = editar
   const [baixa, setBaixa] = useState(null);
   const [abertaDet, setAberta] = useState(null);
@@ -184,7 +185,8 @@ function ProgramacaoDia({ dia, setDia, engenharia, pesagem }) {
         { chave: 'mac', titulo: 'Maceira', valor: (p) => dados.mapa.maceira.get(p.maceira_id)?.nome || '', render: (p) => html`${dados.mapa.maceira.get(p.maceira_id)?.nome || html`<small class="texto-cinza">sem maceira</small>`}${p.operador_id ? html`<br /><small>${dados.mapa.operador.get(p.operador_id)?.nome}</small>` : ''}` },
         { chave: 'quantidade', titulo: 'Programado', num: true, valor: (p) => Number(p.quantidade), render: (p) => num(p.quantidade, 3) },
         { chave: 'feito', titulo: 'Pesado', num: true, render: (p) => html`<b>${num(p.feito, 3)}</b>` },
-        { chave: 'etapas', titulo: 'Onde está', ordenar: false, render: (p) => html`<${EtapasMini} f=${fx.get(p.id)} />` },
+        { chave: 'etapas', titulo: 'Onde está', ordenar: false, render: (p) => html`<${EtapasMini} f=${fx.get(p.id)} />
+          <div><${LinhaTempo} p=${p} ev=${eventos.get(p.id)} bateladas=${fluxo?.bateladas || []} /></div>` },
         { chave: 'sit', titulo: 'Situação', valor: (p) => p.sit.rotulo, render: (p) => html`<${Etiqueta} cor=${p.sit.cor}>${p.sit.rotulo}</${Etiqueta}>` },
         { chave: 'acao', titulo: '', ordenar: false, render: (p) => aberta(p) && html`<span class="acoes-linha" onClick=${(e) => e.stopPropagation()}>
           ${pesagem && html`<button class="btn btn-pri btn-peq" onClick=${() => setBaixa(p)}>Pesar</button>`}

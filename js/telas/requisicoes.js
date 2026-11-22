@@ -5,7 +5,7 @@
 import { html, useState, useEffect, useApp, Cabecalho, Abas, Tabela, Etiqueta, Modal, Campo, Numero, Escolher, Vazio, Carregando, useAcao, confirmar, avisar, n } from '../ui.js';
 import { num, qu, dataHora, hojeISO, somarDias, operaLocal, pode, SITUACAO_REQ, mensagemErro, contem } from '../util.js';
 import { Icone } from '../icones.js';
-import { nomeLocal, saldoLocal, localTipo, minutos, tempoTexto } from '../producao-util.js';
+import { nomeLocal, saldoLocal, localTipo, minutos, tempoTexto, horaDia } from '../producao-util.js';
 import { Exportar } from '../exportar.js';
 
 const COR = { pendente: 'laranja', parcial: 'azul', atendida: 'verde', encerrada: 'cinza', cancelada: 'cinza' };
@@ -61,13 +61,13 @@ function CartaoReq({ r, acao }) {
   }
   return html`<div class=${'transf-cartao s-req-' + r.situacao}>
     <div class="transf-topo"><span class="transf-num">Requisição nº ${r.id}</span><${Etiqueta} cor=${COR[r.situacao]}>${SITUACAO_REQ[r.situacao]}</${Etiqueta}>
-      <small class="transf-tempo">${dados.mapa.perfil.get(r.solicitante_id)?.nome || ''} · há ${tempoTexto(minutos(r.criado_em))}</small></div>
+      <small class="transf-tempo">pedido <b>${horaDia(r.criado_em)}</b> · ${(dados.mapa.perfil.get(r.solicitante_id)?.nome || '').split(' ')[0]}</small></div>
     <div class="transf-rota"><span>Atende: ${nomeLocal(dados, r.origem_id)}</span><span class="seta">→</span><b>${nomeLocal(dados, r.destino_id)}</b></div>
     <ul class="req-itens">${r.itens.map((i) => { const p = dados.mapa.produto.get(i.produto_id); const pct = Math.min(100, (Number(i.atendido) / Number(i.quantidade)) * 100);
       return html`<li><div class="req-linha"><b>${p?.descricao}</b><span>${qu(i.atendido, p?.unidade_estoque)} de ${qu(i.quantidade, p?.unidade_estoque)}${i.qtd2 ? ` (${num(i.qtd2, 0)} ${p?.unidade2 || 'vol.'})` : ''}</span></div>
         <div class="barra-fina"><i style=${`width:${pct}%`}></i></div></li>`; })}</ul>
     ${r.observacao && html`<p class="nota">${r.observacao}</p>`}
-    ${chegando.length > 0 && html`<p class="nota azul"><${Icone} nome="caminhao" tam=${14} /> ${chegando.map((t) => `nº ${t.id} ${t.situacao === 'enviada' ? 'em trânsito' : 'separada'}`).join(' · ')}</p>`}
+    ${chegando.length > 0 && html`<p class="nota azul"><${Icone} nome="caminhao" tam=${14} /> ${chegando.map((t) => `nº ${t.id} ${t.situacao === 'enviada' ? `enviada ${horaDia(t.enviado_em)}` : `separada ${horaDia(t.separado_em)}`}`).join(' · ')}</p>`}
     <div class="transf-acoes">${acao}${podeEncerrar && html`<button class="btn btn-perigo-sec" disabled=${ocupado} onClick=${encerrar}>${r.itens.some((i) => Number(i.atendido) > 0) ? 'Encerrar o que falta' : 'Cancelar'}</button>`}</div>
   </div>`;
 }

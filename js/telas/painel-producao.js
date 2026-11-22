@@ -5,7 +5,7 @@
 import { html, useState, useMemo, useApp, Cabecalho, Carregando, Vazio, Etiqueta, Modal } from '../ui.js';
 import { num, hojeISO, somarDias, data, pl, qtd } from '../util.js';
 import { Colunas, BarrasH } from '../graficos.js';
-import { useFluxo, ETAPAS, somar, semaforo, tempoTexto, tempoMedio, useRelogio, diaDe, minutos } from '../producao-util.js';
+import { useFluxo, ETAPAS, somar, semaforo, tempoTexto, tempoMedio, useRelogio, diaDe, minutos, hora } from '../producao-util.js';
 import { Exportar } from '../exportar.js';
 
 const DIAS = [{ id: -1, t: 'Ontem' }, { id: 0, t: 'Hoje' }, { id: 1, t: 'Amanhã' }];
@@ -73,7 +73,7 @@ export function TelaPainelProducao() {
       <section class="painel">
         <h2>Maceiras</h2>
         <div class="tabela-rolagem"><table class="tabela tabela-mac">
-          <thead><tr><th>Maceira</th><th>Situação</th><th>Padeiro</th><th>Agora</th><th class="n">Prog.</th><th class="n">Inic.</th><th class="n">Pronto</th><th class="n">Pesagem</th><th>Último início</th></tr></thead>
+          <thead><tr><th>Maceira</th><th>Situação</th><th>Padeiro</th><th>Agora</th><th class="n">Prog.</th><th class="n">Inic.</th><th class="n">Pronto</th><th class="n">Pesagem</th><th>1ª do dia</th><th>Último início</th></tr></thead>
           <tbody>${sems.map(({ m, s }) => {
             const ult = s.ultima;
             return html`<tr key=${m.id}><td data-rotulo="Maceira"><b>${m.nome}</b></td>
@@ -82,7 +82,8 @@ export function TelaPainelProducao() {
               <td data-rotulo="Agora">${s.batendo ? html`${dados.mapa.ficha.get(s.batendo.ficha_id)?.nome} <small>há ${tempoTexto(s.batendo.min)}</small>` : s.min !== null && desloc === 0 && s.cor !== 'cinza' ? html`<small>${tempoTexto(s.min)} sem iniciar</small>` : '–'}</td>
               <td class="n" data-rotulo="Programado">${num(somar(s.progs, 'programado'), 0)}</td><td class="n" data-rotulo="Iniciado">${num(somar(s.progs, 'iniciado'), 0)}</td>
               <td class="n" data-rotulo="Pronto">${num(somar(s.progs, 'pronto'), 0)}</td><td class="n" data-rotulo="Na pesagem">${num(somar(s.progs, 'a_pesar') + somar(s.progs, 'na_pesagem'), 0)}</td>
-              <td data-rotulo="Último início">${ult ? new Date(ult.iniciada_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '–'}</td></tr>`;
+              <td data-rotulo="1ª do dia">${s.primeira ? html`<small>${hora(s.primeira.iniciada_em)}</small>` : '–'}</td>
+              <td data-rotulo="Último início">${ult ? html`${hora(ult.iniciada_em)} <small class="texto-cinza">(${s.iniciadasHoje} no dia)</small>` : '–'}</td></tr>`;
           })}</tbody></table></div>
       </section>
       <section class="painel">
