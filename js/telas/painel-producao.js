@@ -44,7 +44,7 @@ export function TelaPainelProducao() {
   const semFinalizar = fluxo.bateladas.filter((b) => b.situacao === 'em_producao' && minutos(b.iniciada_em, agora) > Number(dados.params.producao_prazo_finalizar_h || 12) * 60);
   const misturaParada = linhas.filter((l) => l.na_pesagem > 0);
   // avisos de mudança que o tablet ainda não confirmou (por masseira)
-  const naoVistos = desloc === 0 ? [...(dados.avisos || []).filter((a) => !a.ciente_em).reduce((m, a) => m.set(a.maceira_id, [...(m.get(a.maceira_id) || []), a]), new Map()).entries()] : [];
+  const naoVistos = desloc === 0 ? [...(dados.avisos || []).filter((a) => !a.ciente_em).reduce((m, a) => { const k = a.setor === 'pesagem' ? 'pesagem' : a.maceira_id; return m.set(k, [...(m.get(k) || []), a]); }, new Map()).entries()] : [];
 
   function alternarTela() { const v = !tela; setTela(v); try { localStorage.setItem('pss-painel-tv', v ? '1' : '0'); } catch { /* ignora */ } }
 
@@ -90,10 +90,10 @@ export function TelaPainelProducao() {
         <h2>Ritmo do dia</h2>
         <${Ritmo} bats=${bats} linhas=${linhas} />
         ${(semFinalizar.length > 0 || atrasadas.length > 0 || misturaParada.length > 0 || naoVistos.length > 0) && html`<h3>Alertas</h3><ul class="alertas-lista">
-          ${naoVistos.map(([mid, l]) => html`<li class="al-laranja"><b>${dados.mapa.maceira.get(mid)?.nome || 'Produção'}</b>: ${l.length === 1 ? 'mudança na programação ainda não vista' : `${l.length} mudanças ainda não vistas`} no tablet (desde ${hora(l[0].criado_em)})</li>`)}
+          ${naoVistos.map(([mid, l]) => html`<li class="al-laranja"><b>${mid === 'pesagem' ? 'Pesagem' : dados.mapa.maceira.get(mid)?.nome || 'Produção'}</b>: ${l.length === 1 ? 'mudança na programação ainda não vista' : `${l.length} mudanças ainda não vistas`} ${mid === 'pesagem' ? 'pela pesagem' : 'no tablet'} (desde ${hora(l[0].criado_em)})</li>`)}
           ${atrasadas.map((x) => html`<li class=${'al-' + x.s.cor}><b>${x.m.nome}</b>: ${x.s.rotulo.toLowerCase()} (${tempoTexto(x.s.min)} sem iniciar)</li>`)}
           ${semFinalizar.length > 0 && html`<li class="al-laranja"><b>${pl(semFinalizar.length, 'batelada', 'bateladas')}</b> em produção há mais de ${dados.params.producao_prazo_finalizar_h || 12} h sem finalizar</li>`}
-          ${misturaParada.map((l) => html`<li class="al-cinza"><b>${num(l.na_pesagem, 0)} mistura(s) de ${dados.mapa.ficha.get(l.ficha_id)?.nome}</b> pesadas e ainda não enviadas</li>`)}
+          ${misturaParada.map((l) => html`<li class="al-cinza"><b>${num(l.na_pesagem, 0)} base(s) de ${dados.mapa.ficha.get(l.ficha_id)?.nome}</b> pesadas e ainda não enviadas</li>`)}
         </ul>`}
       </section>
 

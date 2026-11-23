@@ -130,7 +130,7 @@ export function CorrigirBatelada({ b, aoFechar }) {
         ${dados.maceiras.filter((m) => m.ativa || m.id === b.maceira_id).map((m) => html`<option value=${m.id}>${m.nome}</option>`)}</select></${Campo}>`}
       ${tipo === 'padeiro' && html`<${Campo} rotulo="Padeiro certo"><select class="entrada" value=${oper} onChange=${(e) => setOper(Number(e.target.value))}>
         ${dados.operadores.filter((o) => o.ativo || o.id === b.operador_id).map((o) => html`<option value=${o.id}>${o.nome}</option>`)}</select></${Campo}>`}
-      ${tipo === 'cancelar' && html`<div class="alerta">A farinha, o fermento e a mistura voltam para o estoque. A batelada continua no histórico como <b>cancelada</b>.</div>`}
+      ${tipo === 'cancelar' && html`<div class="alerta">A farinha, o fermento e a base voltam para o estoque. A batelada continua no histórico como <b>cancelada</b>.</div>`}
       <div class="campo"><span class="campo-rotulo">Motivo <b class="obrig">*</b></span>
         <div class="chips">${MOTIVOS_CORRECAO.map((m) => html`<button type="button" class=${'chip' + (motivo === m ? ' ativo' : '')} aria-pressed=${motivo === m} onClick=${() => setMotivo(m)}>${m}</button>`)}</div></div>
       ${motivo === 'Outro' && html`<${Campo} rotulo="Escreva o motivo"><input class="entrada" maxlength="300" value=${outro} onInput=${(e) => setOutro(e.target.value)} /></${Campo}>`}

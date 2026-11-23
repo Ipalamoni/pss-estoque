@@ -1171,31 +1171,11 @@ html[data-tema="escuro"] {
    VERSÃO 2.7 — tablet da produção: aviso de mudança e confirmações simples
    (premissa: botões grandes, texto curto, cores com ícone + texto)
    ===================================================================== */
-.faixa-mudanca { background: #fd9b02; color: #1d2733; border: 4px solid #1d2733; border-radius: 18px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px;
-  box-shadow: 0 10px 30px rgba(0,0,0,.25); position: sticky; top: calc(var(--topo) + 8px); z-index: 25; animation: fm-entra .35s ease-out; }
-@keyframes fm-entra { from { transform: translateY(-12px); opacity: 0; } }
-.fm-titulo { display: flex; align-items: center; gap: 12px; font-size: 1.6rem; font-weight: 900; letter-spacing: .02em; line-height: 1.1; }
-.fm-lista { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; }
-.fm-mac { background: #fff7e6; border-radius: 12px; padding: 10px 14px; }
-.fm-nome { font-size: 1.15rem; display: block; margin-bottom: 4px; }
-.fm-mac ul { margin: 0; padding-left: 20px; font-size: 1.1rem; line-height: 1.45; }
-.fm-nota { margin: 0; font-size: 1.05rem; }
-.fm-quem { margin: 0; font-size: .95rem; font-weight: 700; }
-.fm-botao { align-self: stretch; min-height: 76px; border: 0; border-radius: 16px; background: #1d2733; color: #fff; font: inherit; font-size: 1.6rem; font-weight: 900;
-  display: flex; align-items: center; justify-content: center; gap: 12px; cursor: pointer; letter-spacing: .04em; }
-.fm-botao:active { transform: scale(.98); }
-.fm-botao:focus-visible { outline: 4px solid #fff; outline-offset: 3px; }
 .mac-mudou { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; background: #fd9b02; color: #1d2733; font-weight: 900; border-radius: 999px; padding: 3px 12px; font-size: .9rem; }
 .fora-ordem { display: flex; flex-direction: column; gap: 12px; font-size: 1.15rem; }
 .fora-ordem p { margin: 0; }
 .fo-pergunta { font-size: 1.3rem; }
 .fora-ordem .btn-gigante { min-height: 68px; font-size: 1.25rem; }
-[data-tema="escuro"] .fm-mac { background: #fff3dc; color: #1d2733; }
-@media (max-width: 640px) {
-  .fm-titulo { font-size: 1.25rem; }
-  .faixa-mudanca { position: static; padding: 14px; }
-  .fm-botao { min-height: 64px; font-size: 1.3rem; }
-}
 .quadro-col header .qc-recado { margin-top: 6px; align-self: flex-start; }
 .qc-aviso { display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; font-size: .78rem; font-weight: 700; color: #7a4100; background: #fff0dc; border-radius: 999px; padding: 2px 8px; }
 [data-tema="escuro"] .qc-aviso { color: #f7b155; background: #3a2d18; }
@@ -1232,3 +1212,84 @@ html[data-tema="escuro"] {
 /* números da fila separados (antes ficavam grudados: "30Pronto p/ iniciar") */
 .fila-nums { display: flex; flex-wrap: wrap; gap: 2px 16px; }
 .fila-nums b { margin-left: 3px; }
+
+/* =====================================================================
+   VERSÃO 2.9 — aviso AMARELO (AVISO em vermelho), faixa "Receber base",
+   ordem da pesagem e fila inteligente da masseira. Letras grandes e iguais.
+   (as cores da faixa são fixas: amarelo/vermelho/preto também no tema escuro)
+   ===================================================================== */
+@keyframes fm-entra { from { transform: translateY(-12px); opacity: 0; } }
+.faixa-aviso { --fa-vermelho: #b0000b; background: #ffd84d; color: #1a1a1a; border: 4px solid #1a1a1a; border-radius: 18px; padding: 18px 22px;
+  display: flex; flex-direction: column; gap: 14px; box-shadow: 0 10px 30px rgba(0,0,0,.25); position: sticky; top: calc(var(--topo) + 8px); z-index: 25;
+  animation: fm-entra .35s ease-out; font-size: 1.35rem; line-height: 1.35; max-height: calc(100vh - var(--topo) - 24px); overflow-y: auto; }
+.fa-topo { display: flex; align-items: center; gap: 12px; color: var(--fa-vermelho); }
+.fa-aviso { font-size: 2.5rem; font-weight: 900; letter-spacing: .06em; line-height: 1; }
+.fa-sub { margin: 0; font-size: 1.5rem; font-weight: 800; }
+.fa-grupos { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+.fa-grupo { background: #fff8d6; border: 2px solid #1a1a1a; border-radius: 14px; padding: 12px 16px; }
+.fa-mac { display: block; font-size: 1.35rem; font-weight: 900; text-transform: uppercase; margin-bottom: 4px; }
+.fa-mudou { margin: 0; padding-left: 1.2em; color: var(--fa-vermelho); font-weight: 900; font-size: 1.35rem; }
+.fa-mudou li + li { margin-top: 6px; }
+.fa-ordem { margin: 8px 0 0; font-size: 1.35rem; font-weight: 600; }
+.fa-instrucao { margin: 0; padding-left: 1.2em; font-size: 1.35rem; }
+.fa-instrucao li + li { margin-top: 4px; }
+.fa-quem, .fa-esperando { margin: 0; font-size: 1.2rem; font-weight: 700; }
+.fa-botao { align-self: stretch; min-height: 80px; border: 0; border-radius: 16px; background: #1a1a1a; color: #fff; font: inherit; font-size: 1.7rem; font-weight: 900;
+  display: flex; align-items: center; justify-content: center; gap: 12px; cursor: pointer; letter-spacing: .05em; }
+.fa-botao:active { transform: scale(.98); }
+.fa-botao:focus-visible { outline: 4px solid #fff; outline-offset: -8px; }
+@media (max-width: 640px) {
+  .faixa-aviso { position: static; padding: 14px; font-size: 1.2rem; max-height: none; }
+  .fa-aviso { font-size: 2rem; }
+  .fa-sub { font-size: 1.3rem; }
+  .fa-mac, .fa-mudou, .fa-ordem, .fa-instrucao { font-size: 1.2rem; }
+  .fa-grupos { grid-template-columns: 1fr; }
+  .fa-botao { min-height: 68px; font-size: 1.4rem; }
+}
+
+/* chegou base da pesagem (tablet) */
+.faixa-receber { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 20px; background: #e5f6ec; color: #0f3d26; border: 3px solid #157347;
+  border-radius: 18px; padding: 16px 20px; font-size: 1.3rem; }
+.fr-texto { display: flex; align-items: flex-start; gap: 14px; flex: 1 1 320px; }
+.fr-texto b { font-size: 1.45rem; font-weight: 900; }
+.fr-texto ul { margin: 4px 0 0; padding-left: 1.1em; }
+.fr-botao { min-height: 72px; padding: 0 28px; border: 0; border-radius: 16px; background: #157347; color: #fff; font: inherit; font-size: 1.45rem; font-weight: 900;
+  display: inline-flex; align-items: center; gap: 10px; cursor: pointer; flex: 0 0 auto; }
+.fr-botao:focus-visible { outline: 4px solid #0f3d26; outline-offset: 3px; }
+@media (max-width: 640px) { .fr-botao { flex: 1 1 100%; justify-content: center; } .faixa-receber { font-size: 1.15rem; } }
+[data-tema="escuro"] .faixa-receber { background: #12301f; color: #e6f7ec; border-color: #3fb37a; }
+
+/* fila da masseira: o que fazer agora e o que vai passar na frente */
+.fila-item.agora { border: 3px solid var(--verde); box-shadow: 0 0 0 4px rgba(21,115,71,.15); }
+.fila-agora { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; background: var(--verde); color: #fff; font-weight: 900;
+  border-radius: 999px; padding: 4px 12px; font-size: 1rem; letter-spacing: .04em; margin-bottom: 4px; }
+.fila-prioridade { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; background: #fff0d6; color: #7a3d00; border: 2px solid #c96a00;
+  font-weight: 800; border-radius: 10px; padding: 4px 10px; font-size: 1rem; margin-top: 4px; }
+.fila-info { display: flex; flex-direction: column; }
+[data-tema="escuro"] .fila-prioridade { background: #3a2a12; color: #ffd9a8; border-color: #e08a20; }
+
+/* ordem da pesagem */
+.ordem-pesagem { margin: 8px 0 18px; }
+.op-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.op-item { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; background: var(--cartao); border: 1px solid var(--borda);
+  border-radius: 14px; padding: 10px 14px; }
+.op-item.primeiro { border: 2px solid #b88a00; }
+.op-info { display: flex; flex-direction: column; min-width: 0; }
+.op-info > b { font-size: 1.15rem; }
+.op-acoes { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
+.op-seta { min-width: 44px; min-height: 44px; font-size: 1.1rem; }
+.op-urgente { min-height: 44px; color: #9a1b00; border-color: #c43a1a; }
+.op-pesar { min-height: 52px; padding: 0 24px; font-size: 1.1rem; }
+[data-tema="escuro"] .op-urgente { color: #ffb4a0; border-color: #e06a4a; }
+@media (max-width: 640px) { .op-item { grid-template-columns: auto 1fr; } .op-acoes { grid-column: 1 / -1; justify-content: stretch; } .op-acoes .op-pesar { flex: 1 1 auto; } }
+
+/* motivo da perda: botões de tocar */
+.motivos-perda { border: 0; padding: 0; margin: 12px 0 0; }
+.motivos-perda legend { font-weight: 700; margin-bottom: 8px; padding: 0; }
+.chips.grandes { display: flex; flex-wrap: wrap; gap: 8px; }
+.chips.grandes .chip { min-height: 52px; padding: 0 18px; font-size: 1.05rem; }
+.erro-campo { display: flex; align-items: center; gap: 6px; color: var(--vermelho, #b3261e); font-weight: 700; margin: 8px 0 0; }
+.texto-laranja { color: #9a4a00; }
+[data-tema="escuro"] .texto-laranja { color: #ffb366; }
+.ordem-pesagem .titulo-com-acao { flex-wrap: wrap; gap: 8px; }
+.ordem-pesagem .titulo-com-acao .btn { white-space: normal; max-width: 100%; text-align: left; min-height: 44px; }

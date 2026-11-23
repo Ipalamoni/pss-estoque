@@ -1,12 +1,13 @@
 // =====================================================================
 // PRODUÇÃO MACEIRAS — tela do padeiro (pensada para tablet)
 // Quadrados grandes por maceira, semáforo, fila por prioridade,
-// receber misturas da pesagem, iniciar 1 batelada por vez, saída avulsa.
+// receber bases da pesagem, iniciar 1 batelada por vez, saída avulsa.
 // O padeiro se identifica com o nome + senha de 6 números (troca rápida).
 // =====================================================================
 import { html, useState, useEffect, useRef, useApp, Cabecalho, Modal, Campo, Numero, Escolher, Etiqueta, Carregando, Vazio, useAcao, confirmar, avisar, n } from '../ui.js';
 import { qtd, num, qu, hojeISO, pl, mensagemErro } from '../util.js';
 import { Icone } from '../icones.js';
+import { FaixaAviso, useAlertaSonoro, avisosPendentes } from '../aviso-producao.js';
 import { useFluxo, semaforo, saldoLocal, localTipo, misturaDaFicha, tempoTexto, useRelogio, somar, minutos, useEventos, LinhaTempo, hora, diaDe } from '../producao-util.js';
 
 const ehFermento = (p) => /ferment/i.test(`${p?.grupo || ''} ${p?.descricao || ''}`);
@@ -33,7 +34,7 @@ export function TelaMaceiras() {
   const [receber, setReceber] = useState(false);
   const [avulsa, setAvulsa] = useState(false);
   const [ciente, setCiente] = useState(false);   // "Entendi" do aviso: escolher nome + senha
-  const avisos = (dados.avisos || []).filter((a) => !a.ciente_em);
+  const avisos = avisosPendentes(dados, 'masseira');
   useAlertaSonoro(opera ? avisos.length : 0);
   const mac = localTipo(dados, 'maceiras');
   const maceiras = dados.maceiras.filter((m) => m.ativa);
@@ -43,11 +44,18 @@ export function TelaMaceiras() {
   const chegando = dados.transferencias.filter((t) => t.situacao === 'enviada' && t.destino_id === mac.id);
   const qChegando = dados.transfItens.filter((i) => chegando.some((t) => t.id === i.transferencia_id)).reduce((s, i) => s + Number(i.quantidade), 0);
   const hoje = fluxo.fluxo.filter((l) => l.data === hojeISO());
+  const resumoChegando = [...dados.transfItens.filter((i) => chegando.some((t) => t.id === i.transferencia_id))
+    .reduce((m, i) => { const d = dados.mapa.produto.get(i.produto_id)?.descricao || 'Base'; return m.set(d, (m.get(d) || 0) + Number(i.quantidade)); }, new Map()).entries()];
   const exigir = (f) => () => { if (!opera) return avisar('Só o padeiro (ou o PCP) opera esta tela.', 'aviso'); if (!operador) return setTrocar(true); f(); };
 
   return html`<${Cabecalho} titulo="Produção Masseiras" semVoltar=${soPadeiro} semTrilha=${soPadeiro} />
   <div class="maceiras-tela">
-    ${avisos.length > 0 && html`<${FaixaMudanca} avisos=${avisos} opera=${opera} aoEntendi=${() => setCiente(true)} />`}
+    ${avisos.length > 0 && html`<${FaixaAviso} avisos=${avisos} setor="masseira" podeConfirmar=${opera} esperando="Aguardando o padeiro confirmar no tablet." aoEntendi=${() => setCiente(true)} />`}
+    ${chegando.length > 0 && html`<section class="faixa-receber" role="status">
+      <div class="fr-texto"><${Icone} nome="caminhao" tam=${40} /><div><b>CHEGOU BASE DA PESAGEM</b>
+        <ul>${resumoChegando.map(([d, q]) => html`<li key=${d}><b>${num(q, 0)}</b> × ${d.replace(/^Base – /, '')}</li>`)}</ul></div></div>
+      <button class="fr-botao" onClick=${exigir(() => setReceber(true))}><${Icone} nome="finalizar" tam=${30} /> RECEBER BASE</button>
+    </section>`}
     <div class="mac-topo">
       <div class="mac-quem">
         ${opera ? html`<button class=${'mac-operador' + (operador ? '' : ' vazio')} onClick=${() => setTrocar(true)}>
@@ -69,7 +77,7 @@ export function TelaMaceiras() {
     <div class="mac-grade">
       ${maceiras.map((m) => {
         const s = semaforo(dados, m, fluxo.fluxo, fluxo.bateladas, agora);
-        const prox = s.progs.filter((l) => l.pronto > 0 || l.a_caminho > 0 || l.na_pesagem > 0 || l.a_pesar > 0).sort((a, b) => a.prioridade - b.prioridade)[0];
+        const prox = filaReal(s.progs).find((l) => etapaFila(l) < 3);
         const nomesOp = (m.operadores || []).map((id) => dados.mapa.operador.get(id)?.nome).filter(Boolean);
         return html`<button class=${'mac-tile s-' + s.cor} key=${m.id} onClick=${() => setAberta(m)}>
           ${avisos.some((a) => a.maceira_id === m.id) && html`<div class="mac-mudou"><${Icone} nome="aviso" tam=${18} /> MUDANÇA</div>`}
@@ -97,25 +105,6 @@ export function TelaMaceiras() {
     ${avulsa && html`<${SaidaAvulsaPadeiro} operador=${operador} aoFechar=${() => setAvulsa(false)} />`}
   </div>`;
 }
-// ------------------------- AVISO DE MUDANÇA NA PROGRAMAÇÃO -------------------------
-// Faixa grande e chamativa; só some quando um padeiro toca em ENTENDI e confirma com nome + senha.
-function FaixaMudanca({ avisos, opera, aoEntendi }) {
-  const { dados } = useApp();
-  const porMac = new Map();
-  avisos.forEach((a) => { const k = a.maceira_id || 0; if (!porMac.has(k)) porMac.set(k, []); porMac.get(k).push(a); });
-  const ultimo = avisos.reduce((u, a) => (String(a.criado_em) > String(u.criado_em) ? a : u), avisos[0]);
-  const quem = dados.mapa.perfil.get(ultimo.criado_por)?.nome;
-  return html`<section class="faixa-mudanca" role="alert" aria-live="assertive">
-    <div class="fm-titulo"><${Icone} nome="aviso" tam=${40} /><span>MUDANÇA NA PROGRAMAÇÃO</span></div>
-    <div class="fm-lista">${[...porMac.entries()].map(([mid, l]) => html`<div class="fm-mac">
-      <b class="fm-nome">${dados.mapa.maceira.get(mid)?.nome || 'Produção'}</b>
-      <ul>${l.sort((a, b) => a.id - b.id).map((a) => html`<li>${a.texto}</li>`)}</ul></div>`)}</div>
-    <p class="fm-nota">A batelada que já está batendo <b>continua normalmente</b>. A mudança vale a partir da <b>próxima</b>.</p>
-    <p class="fm-quem">${quem ? `Mudado por ${quem.split(' ')[0]}` : 'Mudança'} às ${hora(ultimo.criado_em)}</p>
-    ${opera ? html`<button class="fm-botao" onClick=${aoEntendi}><${Icone} nome="finalizar" tam=${30} /> ENTENDI</button>`
-      : html`<p class="fm-nota">Aguardando o padeiro confirmar no tablet.</p>`}
-  </section>`;
-}
 async function confirmarAvisos({ api, recarregar }, o, avisos) {
   try {
     await api.rpc('confirmar_avisos_producao', { p: { ids: avisos.map((a) => a.id), operador_id: o.id, pin: o.pin } });
@@ -124,22 +113,13 @@ async function confirmarAvisos({ api, recarregar }, o, avisos) {
     return true;
   } catch (e) { avisar(mensagemErro(e), 'erro'); return null; }
 }
-// bipe curto + vibração quando chega aviso novo (chama a atenção no barulho da fábrica)
-function useAlertaSonoro(qtdAvisos) {
-  const antes = useRef(qtdAvisos);
-  useEffect(() => {
-    if (qtdAvisos > antes.current) {
-      try { navigator.vibrate && navigator.vibrate([300, 150, 300]); } catch { /* sem vibração */ }
-      try {
-        const C = window.AudioContext || window.webkitAudioContext; const ctx = new C();
-        [0, 0.35].forEach((t) => { const o = ctx.createOscillator(); const g = ctx.createGain(); o.frequency.value = 880; g.gain.value = 0.25;
-          o.connect(g); g.connect(ctx.destination); o.start(ctx.currentTime + t); o.stop(ctx.currentTime + t + 0.22); });
-        setTimeout(() => ctx.close(), 1200);
-      } catch { /* aparelho sem som */ }
-    }
-    antes.current = qtdAvisos;
-  }, [qtdAvisos]);
-}
+// Ordem que vale NA PRÁTICA no tablet: primeiro o que já tem a BASE aqui na masseira (na ordem do PCP),
+// depois o que está chegando, depois o que ainda está na pesagem; o que já foi todo iniciado vai para o fim.
+// Assim uma produção urgente que ainda não chegou não trava o padeiro: ela passa na frente sozinha
+// quando a base for recebida.
+const etapaFila = (l) => (l.iniciado >= l.programado ? 3 : l.pronto > 0 ? 0 : l.a_caminho > 0 ? 1 : 2);
+const pri = (l) => l.prioridade ?? 999;
+const filaReal = (progs) => progs.filter((l) => !l.finalizada).sort((a, b) => etapaFila(a) - etapaFila(b) || pri(a) - pri(b));
 
 const exigir2 = (opera, operador, setTrocar, f) => (...a) => { if (!opera) return avisar('Só o padeiro (ou o PCP) opera esta tela.', 'aviso'); if (!operador) return setTrocar(true); return f(...a); };
 
@@ -180,24 +160,29 @@ function MaceiraAberta({ m, fluxo, agora, opera, aoFechar, aoIniciar, operador }
   const [foraOrdem, setForaOrdem] = useState(null);   // produção escolhida que não é a 1ª da fila
   const s = semaforo(dados, m, fluxo.fluxo, fluxo.bateladas, agora);
   const hoje = hojeISO();
-  const fila = s.progs.filter((l) => !l.finalizada).sort((a, b) => (a.prioridade ?? 999) - (b.prioridade ?? 999));
-  // a "1ª da fila" é a primeira (ordem do PCP) que ainda tem batelada para iniciar e mistura pronta ou chegando
-  const primeira = fila.find((l) => l.iniciado < l.programado && (l.pronto > 0 || l.a_caminho > 0));
-  const iniciar = (l, extra) => (primeira && l.programacao_id !== primeira.programacao_id
-    ? setForaOrdem({ l, extra }) : aoIniciar({ ...l, maceira_destino: m.id, ...extra }));
+  const fila = filaReal(s.progs);
+  // "FAZER AGORA" = a 1ª (ordem do PCP) que já tem a base aqui na masseira (a mesma regra do banco)
+  const primeira = fila.find((l) => etapaFila(l) === 0);
+  // receber e iniciar uma que está chegando e é mais prioritária também está na ordem
+  const naOrdem = (l) => !primeira || l.programacao_id === primeira.programacao_id || (etapaFila(l) === 1 && pri(l) < pri(primeira));
+  const iniciar = (l, extra) => (naOrdem(l) ? aoIniciar({ ...l, maceira_destino: m.id, ...extra }) : setForaOrdem({ l, extra }));
   const batidas = fluxo.bateladas.filter((b) => b.maceira_id === m.id && b.situacao !== 'cancelada' && diaDe(b.iniciada_em) === hoje).sort((a, b) => String(b.iniciada_em).localeCompare(String(a.iniciada_em)));
   const eventos = useEventos(fila.map((l) => l.programacao_id));
   return html`<${Modal} titulo=${m.nome} aoFechar=${aoFechar} largo>
     <div class=${'mac-faixa s-' + s.cor}><span class="mac-luz"></span><b>${s.rotulo}</b>
       <span>${s.batendo ? `começou há ${tempoTexto(s.batendo.min)}` : s.min !== null && s.cor !== 'cinza' ? `${tempoTexto(s.min)} sem iniciar` : ''} · tempo médio ${s.T} min</span></div>
-    <div class="titulo-com-acao"><h3>Fila desta masseira (ordem do PCP)</h3></div>
+    <div class="titulo-com-acao"><h3>Fila desta masseira</h3></div>
+    <p class="nota">Primeiro o que já tem a base aqui, na ordem do PCP. Quando uma base chega, ela entra no lugar dela sozinha.</p>
     ${!fila.length ? html`<${Vazio} texto="Nada programado para esta masseira hoje." />`
       : html`<div class="fila">${fila.map((l, i) => {
         const f = dados.mapa.ficha.get(l.ficha_id);
         const podeIniciar = l.pronto > 0;
-        return html`<div class=${'fila-item' + (podeIniciar ? ' pronto' : '')} key=${l.programacao_id}>
+        const agora = primeira && l.programacao_id === primeira.programacao_id;
+        const passaNaFrente = !!primeira && etapaFila(l) > 0 && etapaFila(l) < 3 && pri(l) < pri(primeira);
+        return html`<div class=${'fila-item' + (podeIniciar ? ' pronto' : '') + (agora ? ' agora' : '')} key=${l.programacao_id}>
           <div class="fila-pos">${i + 1}º</div>
-          <div class="fila-info"><b>${f?.nome}</b>
+          <div class="fila-info">${agora && html`<span class="fila-agora"><${Icone} nome="play" tam=${16} /> FAZER AGORA</span>`}<b>${f?.nome}</b>
+            ${passaNaFrente && html`<span class="fila-prioridade"><${Icone} nome="aviso" tam=${16} /> PRIORIDADE: quando a base chegar, faça antes</span>`}
             <div class="fila-nums">
               <span>Programado <b>${num(l.programado, 0)}</b></span>
               <span class="n-pronto">Pronto p/ iniciar <b>${num(l.pronto, 0)}</b></span>
@@ -267,7 +252,7 @@ function IniciarBatelada({ prog, maceira, operador, fluxo, agora, aoFechar }) {
     rodape=${html`<button class="btn btn-sec btn-grande" onClick=${() => aoFechar(false)}>Voltar</button>
       <button class="btn btn-pri btn-gigante" disabled=${ocupado} onClick=${ok}><${Icone} nome="play" tam=${20} /> ${ocupado ? 'Iniciando…' : 'INICIAR'}</button>`}>
     <div class="ini-cab"><span>👤 <b>${operador?.nome}</b></span><span>🛢 <b>${m.nome}</b>${m.capacidade_kg ? ` (${num(m.capacidade_kg, 0)} kg)` : ''}</span>
-      ${prog.receber && html`<${Etiqueta} cor="laranja">vai receber a mistura que está a caminho</${Etiqueta}>`}</div>
+      ${prog.receber && html`<${Etiqueta} cor="laranja">vai receber a base que está a caminho</${Etiqueta}>`}</div>
     ${pg?.itens_alterados && html`<div class="alerta">O PCP alterou a receita nesta programação.</div>`}
     <p class="nota">Pegue no Depósito Produção e coloque na masseira:</p>
     <div class="ini-itens">${itens.map((i, k) => {
@@ -314,19 +299,19 @@ function TrocarFarinha({ atual, aoFechar, aoEscolher }) {
   </${Modal}>`;
 }
 
-// ------------------------- receber misturas da pesagem -------------------------
+// ------------------------- receber bases da pesagem -------------------------
 function ReceberMisturas({ chegando, operador, aoFechar }) {
   const { dados, api, recarregar } = useApp();
   const [ocupado, executar] = useAcao();
   async function receber(t) {
-    const r = await executar(() => api.rpc('receber_transferencia', { p: { id: t.id, operador_id: operador.id, pin: operador.pin } }), 'Recebido.');
+    const r = await executar(() => api.rpc('receber_transferencia', { p: { id: t.id, operador_id: operador.id, pin: operador.pin } }), 'Recebido. A fila da masseira já foi atualizada.');
     if (r !== null) await recarregar(true);
   }
   async function receberTudo() {
     for (const t of chegando) { const r = await executar(() => api.rpc('receber_transferencia', { p: { id: t.id, operador_id: operador.id, pin: operador.pin } })); if (r === null) break; }
-    await recarregar(true); avisar('Tudo recebido.'); aoFechar();
+    await recarregar(true); avisar('Tudo recebido. A fila da masseira já foi atualizada.'); aoFechar();
   }
-  return html`<${Modal} titulo="Chegando da pesagem" aoFechar=${aoFechar} largo
+  return html`<${Modal} titulo="Receber base da pesagem" aoFechar=${aoFechar} largo
     rodape=${html`<button class="btn btn-sec" onClick=${aoFechar}>Fechar</button>${chegando.length > 1 && html`<button class="btn btn-pri btn-grande" disabled=${ocupado} onClick=${receberTudo}>Receber tudo</button>`}`}>
     ${!chegando.length ? html`<${Vazio} texto="Nada a caminho agora." />` : html`<div class="lista-receber">${chegando.map((t) => html`<div class="receber-item" key=${t.id}>
       <div><b>Transferência nº ${t.id}</b><small>enviado ${t.enviado_em ? `há ${tempoTexto(minutos(t.enviado_em))}` : ''}</small>
@@ -335,11 +320,14 @@ function ReceberMisturas({ chegando, operador, aoFechar }) {
   </${Modal}>`;
 }
 
-// ------------------------- devolver mistura à pesagem / perda -------------------------
+// ------------------------- devolver base à pesagem / perda -------------------------
+// motivo da perda: o padeiro TOCA num botão (nada de digitar)
+const MOTIVOS_PERDA = ['Caiu / contaminou', 'Base errada', 'Passou do tempo', 'Masseira deu problema', 'Outro motivo'];
 function DevolverPerda({ l, operador, aoFechar }) {
   const { dados, api, recarregar } = useApp();
   const [q, setQ] = useState('1');
   const [motivo, setMotivo] = useState('');
+  const [semMotivo, setSemMotivo] = useState(false);
   const [ocupado, executar] = useAcao();
   const mis = misturaDaFicha(dados, l.ficha_id);
   const mac = localTipo(dados, 'maceiras'); const pes = localTipo(dados, 'pesagem');
@@ -350,18 +338,22 @@ function DevolverPerda({ l, operador, aoFechar }) {
     if (r) { await recarregar(true); aoFechar(); }
   }
   async function perda() {
-    if (!motivo.trim()) return avisar('Escreva o motivo da perda.', 'erro');
+    if (!motivo.trim()) { setSemMotivo(true); return; }
     if (!(n(q) > 0)) return avisar('Informe a quantidade.', 'erro');
     const r = await executar(() => api.rpc('registrar_perda', { p: { local_id: mac.id, produto_id: mis.id, quantidade: n(q), motivo, programacao_id: l.programacao_id,
       operador_id: operador.id, pin: operador.pin } }), 'Perda registrada.');
     if (r) { await recarregar(true); aoFechar(); }
   }
-  return html`<${Modal} titulo=${`Mistura de ${dados.mapa.ficha.get(l.ficha_id)?.nome}`} aoFechar=${aoFechar}
+  return html`<${Modal} titulo=${`Base de ${dados.mapa.ficha.get(l.ficha_id)?.nome}`} aoFechar=${aoFechar}
     rodape=${html`<button class="btn btn-perigo-sec" disabled=${ocupado} onClick=${perda}>Registrar perda</button><span class="espaco"></span>
       <button class="btn btn-pri" disabled=${ocupado} onClick=${devolver}>Devolver à pesagem</button>`}>
-    <p>Prontas aqui: <b>${num(l.pronto, 0)}</b>. Mudou a prioridade? Devolva à pesagem ou deixe aqui pendente. A mistura não volta a ser matéria-prima: ou é produzida ou vira perda.</p>
-    <div class="grade"><${Campo} rotulo="Quantas"><${Numero} valor=${q} aoMudar=${setQ} /></${Campo}>
-      <${Campo} rotulo="Motivo / observação"><input class="entrada" value=${motivo} onInput=${(e) => setMotivo(e.target.value)} placeholder="ex.: priorizar bisnaguinha" /></${Campo}></div>
+    <p>Prontas aqui: <b>${num(l.pronto, 0)}</b>. Mudou a prioridade? Devolva à pesagem ou deixe aqui pendente. A base não volta a ser matéria-prima: ou é produzida ou vira perda.</p>
+    <div class="grade"><${Campo} rotulo="Quantas"><${Numero} valor=${q} aoMudar=${setQ} /></${Campo}></div>
+    <fieldset class="motivos-perda"><legend>Se for perda, toque no motivo:</legend>
+      <div class="chips grandes">${MOTIVOS_PERDA.map((m) => html`<button type="button" class=${'chip' + (motivo === m ? ' ativo' : '')} aria-pressed=${motivo === m}
+        onClick=${() => { setMotivo(m); setSemMotivo(false); }}>${m}</button>`)}</div>
+      ${semMotivo && html`<p class="erro-campo" role="alert"><${Icone} nome="aviso" tam=${16} /> Toque no motivo da perda antes de registrar.</p>`}
+    </fieldset>
   </${Modal}>`;
 }
 

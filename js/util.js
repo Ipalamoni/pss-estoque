@@ -22,14 +22,14 @@ export const CATEGORIAS = {
   escritorio: 'Material de escritório',
   limpeza: 'Material de limpeza',
   outros: 'Outros',
-  intermediario: 'Produto intermediário (mistura)',
+  intermediario: 'Produto intermediário (base)',
   produto_acabado: 'Produto acabado',
 };
-// categorias que o usuário escolhe no cadastro (a mistura é criada pelo sistema)
+// categorias que o usuário escolhe no cadastro (a base é criada pelo sistema)
 export const CATEGORIAS_CADASTRO = ['materia_prima', 'embalagem', 'escritorio', 'limpeza', 'outros'];
 // "tipo de produto" nos filtros
 export const TIPOS_PRODUTO = {
-  materia_prima: 'Matéria-prima', embalagem: 'Embalagem', intermediario: 'Intermediário (mistura)',
+  materia_prima: 'Matéria-prima', embalagem: 'Embalagem', intermediario: 'Intermediário (base)',
   uso: 'Uso e consumo', produto_acabado: 'Produto acabado',
 };
 export const tipoProduto = (p) => (['escritorio', 'limpeza', 'outros'].includes(p?.categoria) ? 'uso' : p?.categoria);

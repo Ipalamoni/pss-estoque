@@ -1,6 +1,6 @@
 // =====================================================================
 // CENTRAL DE CUSTOS — parte da produção (controladoria + diretoria)
-//  - Produto acabado: custo de cada batelada (mistura + farinha/fermento + embalagem)
+//  - Produto acabado: custo de cada batelada (base + farinha/fermento + embalagem)
 //    e média do período ponderada pela quantidade produzida; real × padrão da ficha
 //  - Estoque valorizado por local (inclui em trânsito)
 //  - Saídas avulsas e perdas valorizadas à parte (não entram no custo do produto)
@@ -57,14 +57,14 @@ export function CustoProdutoAcabado() {
   const colR = [
     { titulo: 'Código', valor: (r) => f(r.id)?.codigo }, { titulo: 'Receita', valor: (r) => f(r.id)?.nome, largura: 30 },
     { titulo: 'Bateladas', valor: (r) => r.n, num: true }, { titulo: 'Produzido', valor: (r) => r.q, num: true }, { titulo: 'Unid.', valor: (r) => unid(r.id) },
-    { titulo: 'Custo mistura (pós)', valor: (r) => r.mis, texto: (r) => moeda(r.mis), num: true }, { titulo: 'Custo farinha/fermento', valor: (r) => r.mac, texto: (r) => moeda(r.mac), num: true },
+    { titulo: 'Custo base (pós)', valor: (r) => r.mis, texto: (r) => moeda(r.mis), num: true }, { titulo: 'Custo farinha/fermento', valor: (r) => r.mac, texto: (r) => moeda(r.mac), num: true },
     { titulo: 'Custo embalagem', valor: (r) => r.emb, texto: (r) => moeda(r.emb), num: true }, { titulo: 'Custo total', valor: (r) => r.tot, texto: (r) => moeda(r.tot), num: true },
     { titulo: 'Custo por unidade (média ponderada)', valor: (r) => r.un, texto: (r) => m4(r.un), num: true }, { titulo: 'Custo padrão por unidade', valor: (r) => r.unPad, texto: (r) => m4(r.unPad), num: true },
     { titulo: 'Real × padrão (%)', valor: (r) => (r.dif === null ? '' : Math.round(r.dif * 10) / 10), num: true }];
   const colB = [
     { titulo: 'Batelada', valor: (b) => b.batelada_id }, { titulo: 'Dia', valor: (b) => b.data }, { titulo: 'Receita', valor: (b) => `${f(b.ficha_id)?.codigo} ${f(b.ficha_id)?.nome}` },
     { titulo: 'Masseira', valor: (b) => dados.mapa.maceira.get(b.maceira_id)?.nome || '' }, { titulo: 'Padeiro', valor: (b) => dados.mapa.operador.get(b.operador_id)?.nome || '' },
-    { titulo: 'Produzido', valor: (b) => b.q, num: true }, { titulo: 'Custo mistura', valor: (b) => b.mis, num: true }, { titulo: 'Custo farinha/fermento', valor: (b) => b.mac, num: true },
+    { titulo: 'Produzido', valor: (b) => b.q, num: true }, { titulo: 'Custo base', valor: (b) => b.mis, num: true }, { titulo: 'Custo farinha/fermento', valor: (b) => b.mac, num: true },
     { titulo: 'Custo embalagem', valor: (b) => b.emb, num: true }, { titulo: 'Custo total', valor: (b) => b.tot, num: true },
     { titulo: 'Custo unitário', valor: (b) => Number(b.custo_unitario || 0), texto: (b) => m4(b.custo_unitario), num: true }, { titulo: 'Custo padrão', valor: (b) => b.pad, num: true }];
   return html`<${Periodo} de=${de} ate=${ate} setDe=${setDe} setAte=${setAte} />
@@ -85,10 +85,10 @@ export function CustoProdutoAcabado() {
         { chave: 'un', titulo: 'Por unidade (média)', num: true, render: (r) => html`<b>${m4(r.un)}</b>` },
         { chave: 'unPad', titulo: 'Padrão', num: true, render: (r) => m4(r.unPad) },
         { chave: 'dif', titulo: 'Real × padrão', num: true, render: (r) => (r.dif === null ? '–' : html`<span class=${r.dif > 2 ? 'texto-vermelho' : r.dif < -2 ? 'texto-verde' : ''}>${r.dif > 0 ? '+' : ''}${num(r.dif, 1)}%</span>`) },
-        { chave: 'comp', titulo: 'Composição', ordenar: false, render: (r) => html`<span class="barra-comp" title=${`mistura ${moeda(r.mis)} · farinha/fermento ${moeda(r.mac)} · embalagem ${moeda(r.emb)}`}>
+        { chave: 'comp', titulo: 'Composição', ordenar: false, render: (r) => html`<span class="barra-comp" title=${`base ${moeda(r.mis)} · farinha/fermento ${moeda(r.mac)} · embalagem ${moeda(r.emb)}`}>
           <i style=${`flex:${r.mis || 0.0001};background:#8b5cf6`}></i><i style=${`flex:${r.mac || 0.0001};background:#d9a441`}></i><i style=${`flex:${r.emb || 0.0001};background:#3b82c4`}></i></span>` },
       ]} />
-      <div class="legenda"><span><i style="background:#8b5cf6"></i>Mistura (pós)</span><span><i style="background:#d9a441"></i>Farinha e fermento</span><span><i style="background:#3b82c4"></i>Embalagem (simulada)</span></div>
+      <div class="legenda"><span><i style="background:#8b5cf6"></i>Base (pós)</span><span><i style="background:#d9a441"></i>Farinha e fermento</span><span><i style="background:#3b82c4"></i>Embalagem (simulada)</span></div>
       ${porReceita.length > 0 && de !== ate && html`<h3 class="titulo-secao">Custo por unidade, dia a dia</h3>
         <${Colunas} categorias=${dias.map((d) => d.slice(8, 10) + '/' + d.slice(5, 7))} formatar=${m4} altura=${200}
           series=${[{ nome: 'Custo por unidade (média do dia)', valores: dias.map((d) => { const bs = lista.filter((b) => b.data === d); const q = bs.reduce((s, b) => s + b.q, 0); return q > 0 ? bs.reduce((s, b) => s + b.tot, 0) / q : 0; }) }]} />`}`
@@ -101,7 +101,7 @@ export function CustoProdutoAcabado() {
         { chave: 'custo_unitario', titulo: 'Unitário', num: true, render: (b) => m4(b.custo_unitario) },
         { chave: 'pad', titulo: 'Padrão', num: true, render: (b) => moeda(b.pad) },
       ]} />`}
-    <p class="nota">Custo da batelada = mistura (pós, ao custo médio na pesagem) + farinha e fermento usados na masseira + embalagem (pela ficha × peso médio × custo médio; simulada enquanto a embalagem sair por requisição). Média do período ponderada pela quantidade produzida. Saídas avulsas e perdas não entram aqui.</p>`;
+    <p class="nota">Custo da batelada = base (pós, ao custo médio na pesagem) + farinha e fermento usados na masseira + embalagem (pela ficha × peso médio × custo médio; simulada enquanto a embalagem sair por requisição). Média do período ponderada pela quantidade produzida. Saídas avulsas e perdas não entram aqui.</p>`;
 }
 
 // ------------------------------ ESTOQUE VALORIZADO -------------------
@@ -168,7 +168,7 @@ export function AvulsasPerdas() {
   return html`<${Periodo} de=${de} ate=${ate} setDe=${setDe} setAte=${setAte} />
     <div class="cartoes">
       <${Cartao} titulo="Saídas avulsas" valor=${moeda(av.reduce((s, m) => s + v(m), 0))} sub=${`${av.length} lançamento(s)`} cor="c-laranja" />
-      <${Cartao} titulo="Perdas de mistura" valor=${moeda(pe.reduce((s, m) => s + v(m), 0))} sub=${`${pe.length} lançamento(s)`} cor="c-vermelho" />
+      <${Cartao} titulo="Perdas de base" valor=${moeda(pe.reduce((s, m) => s + v(m), 0))} sub=${`${pe.length} lançamento(s)`} cor="c-vermelho" />
     </div>
     ${top.length > 0 && html`<h3 class="titulo-secao">Onde mais saiu dinheiro</h3>
       <div class="barras-h">${top.map(([id, val]) => html`<div class="bh-linha"><span class="bh-rotulo">${dados.mapa.produto.get(id)?.descricao}</span>

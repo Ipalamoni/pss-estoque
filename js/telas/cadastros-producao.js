@@ -124,10 +124,10 @@ function Linhas({ edita }) {
 
 const TEMPOS = [
   { chave: 'producao_inicio_turno', rotulo: 'Início do turno das masseiras', ajuda: 'Antes da 1ª batelada do dia o semáforo não corre. Se passar dessa hora + a tolerância e ninguém iniciar, a masseira fica laranja “Ainda não iniciou”.', hora: true },
-  { chave: 'producao_tolerancia_min', rotulo: 'Tolerância para começar (min)', ajuda: 'Depois do início do turno, ou quando chega mistura numa masseira que estava parada.' },
+  { chave: 'producao_tolerancia_min', rotulo: 'Tolerância para começar (min)', ajuda: 'Depois do início do turno, ou quando chega base numa masseira que estava parada.' },
   { chave: 'producao_tempo_padrao_min', rotulo: 'Tempo padrão da batelada (min)', ajuda: 'Usado quando a receita não tem tempo próprio.' },
   { chave: 'producao_prazo_finalizar_h', rotulo: 'Avisar batelada sem finalizar depois de (horas)', ajuda: 'Na tela Finalizar bateladas.' },
-  { chave: 'mistura_parada_h', rotulo: 'Avisar mistura parada depois de (horas)', ajuda: 'Mistura pesada que não foi usada.' },
+  { chave: 'mistura_parada_h', rotulo: 'Avisar base parada depois de (horas)', ajuda: 'Base pesada que não foi usada.' },
 ];
 
 function Tempos({ edita }) {

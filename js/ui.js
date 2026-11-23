@@ -19,12 +19,16 @@ export function Avisos() {
   const [lista, setLista] = useState([]);
   useEffect(() => {
     const f = (a) => {
-      setLista((l) => [...l, a]);
-      // erro fica até a pessoa fechar (dá tempo de ler); os demais somem sozinhos
-      if (a.tipo !== 'erro') setTimeout(() => setLista((l) => l.filter((x) => x.id !== a.id)), a.tipo === 'aviso' ? 6000 : 3500);
+      // a mesma mensagem não se empilha (clicar 2 vezes mostra 1 aviso só)
+      setLista((l) => [...l.filter((x) => x.texto !== a.texto), a]);
+      // erro fica mais tempo (dá para ler com calma), mas também some sozinho; o X fecha na hora
+      setTimeout(() => setLista((l) => l.filter((x) => x.id !== a.id)), a.tipo === 'erro' ? 12000 : a.tipo === 'aviso' ? 6000 : 3500);
     };
+    // trocou de tela: erros da tela anterior não ficam presos no canto
+    const limpar = () => setLista((l) => l.filter((x) => x.tipo !== 'erro'));
     ouvintesAviso.push(f);
-    return () => { ouvintesAviso = ouvintesAviso.filter((x) => x !== f); };
+    window.addEventListener('hashchange', limpar);
+    return () => { ouvintesAviso = ouvintesAviso.filter((x) => x !== f); window.removeEventListener('hashchange', limpar); };
   }, []);
   const fechar = (id) => setLista((l) => l.filter((x) => x.id !== id));
   const item = (a) => html`<div key=${a.id} class=${'aviso aviso-' + a.tipo}>

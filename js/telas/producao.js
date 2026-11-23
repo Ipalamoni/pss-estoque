@@ -11,6 +11,7 @@ import { Icone } from '../icones.js';
 import { ResumoPrevisao } from './previsao.js';
 import { useFluxo, ETAPAS, localTipo, saldoLocal, useEventos, LinhaTempo } from '../producao-util.js';
 import { QuadroMaceiras } from './quadro-maceiras.js';
+import { OrdemPesagem, AvisoPesagem } from './ordem-pesagem.js';
 
 const inicioDia = (iso) => new Date(iso + 'T00:00:00').toISOString();
 const virg = (v) => String(Math.round(Number(v) * 10000) / 10000).replace('.', ',');
@@ -93,8 +94,9 @@ export function TelaProgramacao() {
   const engenharia = podeFazer('programacao');
   const pesagem = podeFazer('saida_receita');
   return html`
-    <${Cabecalho} titulo="Programação de produção"
-      sub=${engenharia ? 'Programe as receitas do dia, a masseira e a ordem. A pesagem pesa os pós e manda a mistura para as masseiras.' : 'O que o PCP programou. Pese os pós de cada receita e envie a mistura para as masseiras.'} />
+    <${Cabecalho} titulo="Programação e pesagem"
+      sub=${engenharia ? 'Programe as receitas do dia, a masseira e a ordem. A pesagem pesa os pós e manda a base para as masseiras.' : 'O que o PCP programou. Pese os pós de cada receita e envie a base para as masseiras.'} />
+    <${AvisoPesagem} />
     <${Abas} abas=${[{ id: 'dia', titulo: 'Programação do dia' }, ...(engenharia ? [{ id: 'quadro', titulo: 'Quadro das masseiras' }] : []), { id: 'periodo', titulo: 'Programado × produzido (período)' }]} ativa=${aba} aoMudar=${setAba} />
     ${aba === 'quadro' ? html`<${QuadroMaceiras} dia=${dia} setDia=${setDia} SeletorDia=${SeletorDia} />` : aba === 'dia' ? html`<${ProgramacaoDia} dia=${dia} setDia=${setDia} engenharia=${engenharia} pesagem=${pesagem} />
       ${podeFazer('previsao_producao') && html`<${ResumoPrevisao} dia=${dia} />`}`
@@ -169,6 +171,7 @@ function ProgramacaoDia({ dia, setDia, engenharia, pesagem }) {
       <${Cartao} titulo="Fora da programação" valor=${rec(fora.reduce((s, p) => s + Number(p.multiplicador), 0))} sub=${pl(fora.length, 'lançamento', 'lançamentos')} />
     </div>
     ${pesagem && html`<${EnviarMisturas} fluxo=${fluxo?.fluxo || []} />`}
+    ${(pesagem || engenharia) && html`<${OrdemPesagem} dia=${dia} feito=${feito} engenharia=${engenharia} pesagem=${pesagem} aoPesar=${setBaixa} />`}
     ${engenharia && html`<${ProgramarRapido} dia=${dia} aoAlterar=${(f) => setEditar({ data: dia, ficha_id: f || null, alterar: true })} />`}
     <div class="titulo-com-acao">
       <h3>Receitas programadas</h3>
@@ -340,7 +343,7 @@ function ModalBaixa({ pg, feito, aoFechar }) {
     const texto = alterar ? `Alterada na pesagem: ${resumoAlt || 'mesmos ingredientes'}.` : pg.itens_alterados ? `Receita alterada (programação): ${textoAlteracao(pg, dados)}.` : '';
     const r = await executar(() => api.rpc('registrar_producao', { p: { programacao_id: pg.id, ficha_id: pg.ficha_id, multiplicador: m,
       alterada: alterar, itens: alterar ? itensAlt : undefined, observacao: [texto, obs].filter(Boolean).join(' '), enviar } }),
-      `Pesado: ${rec(m)} de ${f.nome}${enviar ? ' — mistura enviada para as masseiras' : ' — mistura ficou na pesagem'}.`);
+      `Pesado: ${rec(m)} de ${f.nome}${enviar ? ' — base enviada para as masseiras' : ' — base ficou na pesagem'}.`);
     if (r) { await recarregar(); aoFechar(); }
   }
   return html`<${Modal} titulo=${`Pesar · ${f.codigo} ${f.nome}`} aoFechar=${aoFechar} largo
@@ -378,7 +381,7 @@ function ModalBaixa({ pg, feito, aoFechar }) {
           <td class=${'n' + (falta ? ' texto-vermelho' : '')} data-rotulo="Na pesagem">${qu(sl, p?.unidade_estoque)}${falta ? ' ⚠' : ''}</td></tr>`; })}</tbody></table></div>
     ${its.some((e) => !ehPesagem(e.produto_id)) && html`<p class="nota">Ficam para a masseira (não pesa aqui): ${its.filter((e) => !ehPesagem(e.produto_id)).map((e) => `${mp.get(e.produto_id)?.descricao} ${qu(e.base * m, mp.get(e.produto_id)?.unidade_estoque)}`).join(' · ')}.</p>`}
     <label class="check destaque"><input type="checkbox" checked=${enviar} onChange=${(e) => setEnviar(e.target.checked)} />
-      Enviar já a mistura para a <b>Produção Masseiras</b> (o padeiro recebe no tablet). Desmarque se a mistura vai ficar na pesagem por enquanto.</label>
+      Enviar já a base para a <b>Produção Masseiras</b> (o padeiro recebe no tablet). Desmarque se a base vai ficar na pesagem por enquanto.</label>
     <${Campo} rotulo="Observação (opcional)"><input class="entrada" value=${obs} onInput=${(e) => setObs(e.target.value)} /></${Campo}>
   </${Modal}>`;
 }
@@ -452,7 +455,7 @@ function DetalheProgramacao({ pg, prods, feito, engenharia, pesagem, aoFechar, a
   </${Modal}>`;
 }
 
-// Pesagem: manda para as maceiras as misturas pesadas que ficaram na pesagem
+// Pesagem: manda para as maceiras as bases pesadas que ficaram na pesagem
 function EnviarMisturas({ fluxo }) {
   const { dados, api, recarregar } = useApp();
   const [ocupado, executar] = useAcao();
@@ -464,8 +467,8 @@ function EnviarMisturas({ fluxo }) {
     const itens = pend.map((f) => { const m = dados.produtos.find((p) => p.categoria === 'intermediario' && p.ficha_id === f.ficha_id); return m && { produto_id: m.id, quantidade: f.na_pesagem, programacao_id: f.programacao_id }; }).filter(Boolean);
     const disp = new Map(); itens.forEach((i) => disp.set(i.produto_id, saldoLocal(dados, i.produto_id, pes.id).disponivel));
     const ok = itens.filter((i) => { const d = disp.get(i.produto_id); const q = Math.min(i.quantidade, d); disp.set(i.produto_id, d - q); i.quantidade = q; return q > 0.0001; });
-    if (!ok.length) return avisar('Não há mistura disponível na pesagem para enviar.', 'erro');
-    if (await executar(() => api.rpc('criar_transferencia', { p: { origem_id: pes.id, destino_id: mac.id, enviar: true, observacao: 'Misturas da pesagem', itens: ok } }), 'Misturas enviadas para as masseiras.')) await recarregar(true);
+    if (!ok.length) return avisar('Não há base disponível na pesagem para enviar.', 'erro');
+    if (await executar(() => api.rpc('criar_transferencia', { p: { origem_id: pes.id, destino_id: mac.id, enviar: true, observacao: 'Bases da pesagem', itens: ok } }), 'Bases enviadas para as masseiras.')) await recarregar(true);
   }
   return html`<div class="aviso-faixa azul"><span><${Icone} nome="caminhao" tam=${18} /> <b>${rec(total)}</b> pesada(s) e ainda na pesagem: ${pend.map((f) => `${dados.mapa.ficha.get(f.ficha_id)?.codigo} (${num(f.na_pesagem, 1)})`).join(', ')}</span>
     <button class="btn btn-pri btn-peq" disabled=${ocupado} onClick=${enviar}>Enviar para as masseiras</button></div>`;

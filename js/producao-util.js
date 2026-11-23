@@ -46,7 +46,7 @@ export function tempoMedio(dados, fichaId, maceira) {
 
 // SEMÁFORO da maceira (só sinalização, nunca trava):
 //  verde até 1,5 × T sem iniciar outra · laranja até 2 × T · vermelho acima
-//  o relógio começa 10 min (tolerância) depois da 1ª mistura recebida no dia e recomeça a cada batelada iniciada
+//  o relógio começa 10 min (tolerância) depois da 1ª base recebida no dia e recomeça a cada batelada iniciada
 export function semaforo(dados, maceira, fluxo, bateladas, agora = Date.now()) {
   const hoje = hojeISO();
   const progs = fluxo.filter((l) => l.maceira_id === maceira.id && l.data === hoje);
@@ -78,7 +78,7 @@ export function semaforo(dados, maceira, fluxo, bateladas, agora = Date.now()) {
     if (agora > desde + tol * 60000) return { ...base, cor: 'laranja', rotulo: 'Ainda não iniciou', min: m, semIniciar: true };
     return { ...base, cor: 'azul', rotulo: 'Pronta para começar', min: null };
   }
-  // Já começou: conta do início da última batelada até a próxima. Se a fila tinha acabado e chegou mistura depois,
+  // Já começou: conta do início da última batelada até a próxima. Se a fila tinha acabado e chegou base depois,
   // conta a partir da chegada (com a tolerância).
   let ref = new Date(ultima.iniciada_em).getTime();
   const chegouDepois = chegadas.filter((c) => c > ref + T * 60000);

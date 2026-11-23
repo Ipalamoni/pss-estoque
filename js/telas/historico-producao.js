@@ -10,9 +10,9 @@ import { Exportar } from '../exportar.js';
 import { localTipo } from '../producao-util.js';
 
 const ACOES = {
-  programou: ['Programou', 'azul'], pesou: ['Pesou', 'cinza'], enviou: ['Enviou p/ masseiras', 'cinza'], recebeu: ['Recebeu mistura', 'verde'],
+  programou: ['Programou', 'azul'], pesou: ['Pesou', 'cinza'], enviou: ['Enviou p/ masseiras', 'cinza'], recebeu: ['Recebeu base', 'verde'],
   iniciou: ['Iniciou batelada', 'verde'], finalizou: ['Finalizou', 'azul'], cancelou: ['Cancelou batelada', 'vermelho'],
-  devolveu: ['Devolveu mistura', 'laranja'], perda: ['Perda', 'vermelho'], saida_avulsa: ['Saída avulsa', 'cinza'],
+  devolveu: ['Devolveu base', 'laranja'], perda: ['Perda', 'vermelho'], saida_avulsa: ['Saída avulsa', 'cinza'],
   aviso: ['Mudança na programação', 'laranja'], ciente: ['Ficou ciente do aviso', 'verde'], correcao: ['Correção', 'roxo'],
 };
 const PERIODOS = [['hoje', 'Hoje'], ['ontem', 'Ontem'], ['7', '7 dias'], ['30', '30 dias']];
@@ -82,11 +82,11 @@ export function TelaHistoricoProducao() {
       const devolucao = t.origem_id === mac?.id;
       if (devolucao) {
         add({ k: `dev${t.id}`, quando: t.enviado_em || t.separado_em, acao: 'devolveu', padeiro: padeiro(t.operador_id), usuario: pessoa(t.enviado_por || t.separado_por),
-          receita: rec, qtd: `${num(q, 0)} misturas`, obs: t.observacao || '' });
+          receita: rec, qtd: `${num(q, 0)} bases`, obs: t.observacao || '' });
       } else {
-        add({ k: `env${t.id}`, quando: t.enviado_em, acao: 'enviou', usuario: pessoa(t.enviado_por), receita: rec, qtd: `${num(q, 0)} misturas`, obs: `transferência nº ${t.id}` });
+        add({ k: `env${t.id}`, quando: t.enviado_em, acao: 'enviou', usuario: pessoa(t.enviado_por), receita: rec, qtd: `${num(q, 0)} bases`, obs: `transferência nº ${t.id}` });
         add({ k: `rec${t.id}`, quando: t.recebido_em, acao: 'recebeu', padeiro: padeiro(t.operador_id), usuario: pessoa(t.recebido_por), receita: rec,
-          qtd: `${num(its.reduce((s, i) => s + Number(i.recebido ?? i.quantidade), 0), 0)} misturas`, obs: t.recebido_obs || `transferência nº ${t.id}` });
+          qtd: `${num(its.reduce((s, i) => s + Number(i.recebido ?? i.quantidade), 0), 0)} bases`, obs: t.recebido_obs || `transferência nº ${t.id}` });
       }
     });
     bruto.bats.forEach((b) => {
@@ -102,8 +102,8 @@ export function TelaHistoricoProducao() {
       padeiro: padeiro(m.operador_id), usuario: pessoa(m.usuario_id), receita: M.produto.get(m.produto_id)?.descricao,
       qtd: `${num(Math.abs(Number(m.quantidade)), 2)} ${M.produto.get(m.produto_id)?.unidade_estoque || ''}`, obs: [m.motivo, m.observacao].filter(Boolean).join(' · ') }));
     bruto.avisos.forEach((a) => {
-      add({ k: `av${a.id}`, quando: a.criado_em, acao: 'aviso', usuario: pessoa(a.criado_por), masseira: masseira(a.maceira_id), receita: receitaProg(a.programacao_id), obs: a.texto });
-      add({ k: `ci${a.id}`, quando: a.ciente_em, acao: 'ciente', padeiro: padeiro(a.ciente_operador_id), usuario: pessoa(a.ciente_por), masseira: masseira(a.maceira_id), obs: a.texto });
+      add({ k: `av${a.id}`, quando: a.criado_em, acao: 'aviso', usuario: pessoa(a.criado_por), masseira: a.setor === 'pesagem' ? 'Pesagem' : masseira(a.maceira_id), receita: receitaProg(a.programacao_id), obs: a.texto });
+      add({ k: `ci${a.id}`, quando: a.ciente_em, acao: 'ciente', padeiro: padeiro(a.ciente_operador_id), usuario: pessoa(a.ciente_por), masseira: a.setor === 'pesagem' ? 'Pesagem' : masseira(a.maceira_id), obs: a.texto });
     });
     bruto.corr.forEach((c) => {
       const b = bruto.bats.find((x) => x.id === c.batelada_id);
