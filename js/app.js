@@ -3,7 +3,7 @@
 // =====================================================================
 import { html, render, useState, useEffect, useRef, Ctx, Avisos, HostConfirmacao, avisar, Carregando, Modal, Campo, haEdicao, confirmarDescarte, protegido } from './ui.js';
 import { api } from './api.js';
-import { PAPEIS, pode, porId, mensagemErro, papeisTexto, operaLocal, pl, veValores, definirOcultarValores, numeroPedido, data } from './util.js';
+import { PAPEIS, pode, porId, mensagemErro, papeisTexto, operaLocal, pl, veValores, definirOcultarValores, numeroPedido, data, recebeNoLocal } from './util.js';
 import { prazoBatelada, duracaoBatelada, estadoTempo, tempoTexto } from './producao-util.js';
 import { indicadores } from './calc.js';
 import { Icone } from './icones.js';
@@ -213,7 +213,8 @@ export function pendencias(dados, papeis, eu, agora = Date.now()) {
   // ESTOQUE: requisição para atender (local de origem) e transferência chegando (local de destino)
   dados.requisicoes.filter((x) => meus.has(x.origem_id)).forEach((x) => add({ tipo: 'req', icone: 'requisicoes', id: x.id, rota: 'requisicoes',
     texto: `Requisição nº ${x.id} para atender`, sub: `${dados.mapa.local.get(x.destino_id)?.nome || ''} · ${dados.mapa.perfil.get(x.solicitante_id)?.nome || ''}`, quando: x.criado_em }));
-  dados.transferencias.filter((t) => t.situacao === 'enviada' && meus.has(t.destino_id)).forEach((t) => add({ tipo: 'tr', icone: 'transferencias', id: t.id, rota: 'transferencias',
+  const recebo = new Set(dados.locais.filter((l) => recebeNoLocal(papeis, l)).map((l) => l.id));
+  dados.transferencias.filter((t) => t.situacao === 'enviada' && recebo.has(t.destino_id)).forEach((t) => add({ tipo: 'tr', icone: 'transferencias', id: t.id, rota: 'transferencias',
     texto: `Transferência nº ${t.id} chegando`, sub: `de ${dados.mapa.local.get(t.origem_id)?.nome || ''} para ${dados.mapa.local.get(t.destino_id)?.nome || ''}`, quando: t.enviado_em }));
   // FINANCEIRO: pedido para lançar (some quando marcar "lançado") e cancelado já lançado (estornar)
   if (tem('financeiro')) {

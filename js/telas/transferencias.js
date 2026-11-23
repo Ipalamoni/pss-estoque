@@ -4,7 +4,7 @@
 // Cancelar envio → volta para separado · cancelar separação → volta ao disponível
 // =====================================================================
 import { html, useState, useEffect, useApp, Cabecalho, Abas, Tabela, Etiqueta, Modal, Campo, Numero, Escolher, Vazio, Carregando, useAcao, confirmar, avisar, n, useFiltroMudou } from '../ui.js';
-import { num, qu, dataHora, hojeISO, somarDias, operaLocal, ehGestao, SITUACAO_TRANSF, pl, mensagemErro, contem, tipoRealAnexo } from '../util.js';
+import { num, qu, dataHora, hojeISO, somarDias, operaLocal, recebeNoLocal, ehGestao, SITUACAO_TRANSF, pl, mensagemErro, contem, tipoRealAnexo } from '../util.js';
 import { Icone } from '../icones.js';
 import { nomeLocal, saldoLocal, minutos, tempoTexto, horaDia } from '../producao-util.js';
 import { Exportar } from '../exportar.js';
@@ -23,13 +23,17 @@ export function TelaTransferencias() {
   useEffect(() => { if (estadoRota?.abrir?.id) { setAberta(estadoRota.abrir.id); setEstadoRota(null); } }, []);
   const comItens = (t) => ({ ...t, itens: dados.transfItens.filter((i) => i.transferencia_id === t.id) });
   const minhaOrigem = (t) => admin || meus.has(t.origem_id);
-  const meuDestino = (t) => admin || meus.has(t.destino_id);
+  const meuDestino = (t) => admin || meus.has(t.destino_id);              // pode receber (botão)
+  const recebo = new Set(dados.locais.filter((l) => recebeNoLocal(papeis, l)).map((l) => l.id));
+  const paraMim = (t) => recebo.has(t.destino_id);                         // aparece em "A receber"
   const separadas = dados.transferencias.filter((t) => t.situacao === 'separada' && (minhaOrigem(t) || gestao)).map(comItens);
   const enviadas = dados.transferencias.filter((t) => t.situacao === 'enviada' && (minhaOrigem(t) || gestao)).map(comItens);
-  const receber = dados.transferencias.filter((t) => t.situacao === 'enviada' && (meuDestino(t) || gestao)).map(comItens);
+  // "A receber": só o que chega nos locais onde a pessoa RECEBE (as bases da pesagem vão para o tablet do padeiro).
+  // A gestão vê tudo que está em trânsito na aba "Enviadas" (e pode receber por lá, se precisar).
+  const receber = dados.transferencias.filter((t) => t.situacao === 'enviada' && paraMim(t)).map(comItens);
   const podeCriar = meus.size > 0;
   const abas = [
-    { id: 'receber', titulo: `A receber (${receber.filter(meuDestino).length})` },
+    { id: 'receber', titulo: `A receber (${receber.length})` },
     { id: 'separadas', titulo: `Separadas (${separadas.length})` },
     { id: 'enviadas', titulo: `Enviadas (${enviadas.length})` },
     { id: 'historico', titulo: 'Histórico' },
@@ -78,6 +82,7 @@ function CartaoTransf({ t, aoAbrir, podeOrigem, podeDestino, aba }) {
       ${aba === 'receber' && podeDestino && html`<button class="btn btn-pri btn-grande" onClick=${() => setReceber(true)}>Receber</button>`}
       ${aba === 'separadas' && podeOrigem && html`<button class="btn btn-pri" disabled=${ocupado} onClick=${enviar}><${Icone} nome="caminhao" tam=${16} /> Enviar</button>
         <button class="btn btn-perigo-sec" disabled=${ocupado} onClick=${cancelar}>Cancelar separação</button>`}
+      ${aba === 'enviadas' && podeDestino && html`<button class="btn btn-sec" onClick=${() => setReceber(true)}>Receber</button>`}
       ${aba === 'enviadas' && podeOrigem && html`<button class="btn btn-perigo-sec" disabled=${ocupado} onClick=${cancelar}>Cancelar envio</button>`}
     </div>
     ${receber && html`<${Receber} t=${t} aoFechar=${() => setReceber(false)} />`}

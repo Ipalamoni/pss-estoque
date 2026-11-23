@@ -114,6 +114,14 @@ export const PERMISSOES = {
   locais: ['admin'],
 };
 // o usuário opera este local? (administrador opera todos)
+// Quem RECEBE no local (aba "A receber" e sininho). Pesagem e masseiras são setores da produção:
+// recebe só quem trabalha lá (pesagem; padeiro, pelo tablet). Nos outros locais, quem opera o local.
+// O admin não entra automaticamente: ele recebe pelo botão na aba "Enviadas", se precisar.
+const RECEBE_POR_TIPO = { pesagem: ['pesagem'], maceiras: ['padeiro'] };
+export const recebeNoLocal = (papeis, local) => {
+  const p = (papeis || []).filter((x) => x !== 'admin');
+  return (RECEBE_POR_TIPO[local?.tipo] || local?.papeis || []).some((x) => p.includes(x));
+};
 export const operaLocal = (papeis, local) => (papeis || []).includes('admin') || (local?.papeis || []).some((x) => (papeis || []).includes(x));
 // gestão = vê tudo (estoque de todos os locais, produção, painel)
 export const ehGestao = (papeis) => (papeis || []).some((x) => ['admin', 'diretoria', 'engenharia', 'comprador', 'gestor_producao'].includes(x));

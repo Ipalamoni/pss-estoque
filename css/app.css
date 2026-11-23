@@ -1165,7 +1165,8 @@ html[data-tema="escuro"] {
   .barra-acao.fixa { backdrop-filter: none; background: var(--fundo); }
 }
 /* listas longas: o navegador pula o desenho do que está fora da tela */
-.lista-conferencia > .conf-item, .lista-transf > .transf-cartao { content-visibility: auto; contain-intrinsic-size: auto 160px; }
+/* cartões de transferência/requisição NÃO usam content-visibility: ela prende a janela (Receber) dentro do cartão */
+.lista-conferencia > .conf-item { content-visibility: auto; contain-intrinsic-size: auto 160px; }
 
 /* =====================================================================
    VERSÃO 2.7 — tablet da produção: aviso de mudança e confirmações simples
