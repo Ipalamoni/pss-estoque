@@ -11,6 +11,16 @@ Valem para TODA alteração neste projeto, sem precisar o dono pedir de novo.
 - Durante trabalhos longos, mandar avisos curtos de andamento ("terminei X, agora estou em Y").
 - No fim, dizer claramente o que foi feito, o que foi testado, o que ficou pendente e o que depende dele.
 
+## BACKUP · quando o dono disser "executar backup da versão atual"
+1. Conferir que tudo está commitado e publicado (git status limpo, push feito).
+2. Rodar: `python3 ferramentas/gerar_backup.py --saida <pasta de rascunho> --usuarios <lista privada>` (ele monta o banco completo, gera o
+   PROMPT_RECONSTRUCAO.md, a ESPECIFICACAO_DO_SISTEMA.md, o manifesto SHA-256, confere tudo e recusa se achar segredo).
+3. Se o script disser que atualizou `banco/00-instalar-banco-completo.sql`, fazer commit + push e rodar de novo.
+4. Entregar o zip ao dono (SendUserFile, display attach) e lembrar de guardar no Drive em "Backups sistema estoque".
+5. Toda atualização nova do banco: arquivo `banco/atualizar-banco-vX.Y.sql` E acrescentar o mesmo conteúdo ao fim de
+   `js/demo/banco-demo.sql` (o backup monta o banco completo a partir dos dois). A lista de usuários (sem senhas) NUNCA vai para o repositório (é público): vem do último backup (arquivo
+   `usuarios.md` dentro do zip) e é passada com `--usuarios`.
+
 ## 1. Segurança máxima (prioridade número 1)
 - Nunca colocar segredo no código: chave `service_role`, senhas, tokens. Só a chave **publicável** do Supabase pode ficar no `config.js`.
 - Toda regra de acesso vale **no banco** (RLS + funções `security definer` com checagem de papel). A tela só esconde botões; quem protege é o banco.
