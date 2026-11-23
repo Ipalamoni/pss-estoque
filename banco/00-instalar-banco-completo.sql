@@ -3,7 +3,7 @@
 -- Para um projeto NOVO do Supabase (vazio). Rode UMA vez, inteiro:
 --   Supabase › SQL Editor › New query › colar este arquivo › Run
 -- Conteúdo, nesta ordem: estrutura, segurança (RLS), funções, dados iniciais (unidade Matriz,
--- locais, parâmetros), atualizações 001–005, v2.6 (segurança) e v2.7 (produção).
+-- locais, parâmetros), atualizações 001–005, v2.6, v2.7.
 -- NÃO contém dados do dia a dia (pedidos, estoque…) nem senhas: só a estrutura e as regras.
 -- Gerado automaticamente a partir do código do sistema por ferramentas/gerar_backup.py.
 -- =====================================================================
