@@ -3,7 +3,8 @@
 // =====================================================================
 import { html, render, useState, useEffect, useRef, Ctx, Avisos, HostConfirmacao, avisar, Carregando, Modal, Campo, haEdicao, confirmarDescarte, protegido } from './ui.js';
 import { api } from './api.js';
-import { PAPEIS, pode, porId, mensagemErro, papeisTexto, operaLocal, pl, veValores, definirOcultarValores } from './util.js';
+import { PAPEIS, pode, porId, mensagemErro, papeisTexto, operaLocal, pl, veValores, definirOcultarValores, numeroPedido, data } from './util.js';
+import { prazoBatelada, duracaoBatelada, estadoTempo, tempoTexto } from './producao-util.js';
 import { indicadores } from './calc.js';
 import { Icone } from './icones.js';
 import { MarcaArtas } from './marca.js';
@@ -141,6 +142,9 @@ async function carregarDados(anterior, opcoes = {}) {
     Promise.all([api.listar('programacoes', { campoData: 'data', desde }), api.listar('programacoes', { eq: { situacao: 'ativa' }, nulo: ['finalizada_em'] })]).then((x) => unir(...x)),
     // avisos de mudança na programação ainda não vistos no tablet (últimos 2 dias)
     seguro(api.listar('avisos_producao', { nulo: ['ciente_em'], campoData: 'criado_em', desde: new Date(Date.now() - 2 * 864e5).toISOString() })),
+    // sininho: bateladas batendo (atraso para engenharia/gestor) e o que esta pessoa já viu
+    seguro(api.listar('bateladas', { eq: { situacao: 'em_producao' } })),
+    seguro(api.listar('sininho_vistos', { campoData: 'visto_em', desde: new Date(Date.now() - 30 * 864e5).toISOString() })),
   ]);
   // DESEMPENHO: a parte da operação começa junto com o resto (antes esperava tudo terminar);
   // a carga completa vai em 2 rodadas paralelas (antes eram 4 em sequência)
@@ -169,7 +173,7 @@ async function carregarDados(anterior, opcoes = {}) {
     base = { parametros, params, fornecedores, fichas, fichaItens, pedidos, pedidoItens, perfis, recebimentos, stats, unidades, locais, linhas, maceiras, operadores,
       statsEm: statsVelhas ? anterior.statsEm : Date.now(), completoEm: Date.now() };
   }
-  const [produtos, estoqueLocal, transferencias, requisicoes, programacoes, avisos] = await opP;
+  const [produtos, estoqueLocal, transferencias, requisicoes, programacoes, avisos, bateladasAbertas, vistos] = await opP;
   const [transfItens, reqItens] = await Promise.all([
     transferencias.length ? porIds('transferencia_itens', 'transferencia_id', transferencias.map((t) => t.id), seguro) : [],
     requisicoes.length ? porIds('requisicao_itens', 'requisicao_id', requisicoes.map((t) => t.id), seguro) : [],
@@ -185,7 +189,7 @@ async function carregarDados(anterior, opcoes = {}) {
     statsEm: base.statsEm, completoEm: base.completoEm,
     produtos, fornecedores, fichas, fichaItens, pedidos, pedidoItens, perfis, recebimentos, programacoes, parametros, params, stats, ind,
     unidades, locais: [...locais].sort((a, b) => a.ordem - b.ordem || a.id - b.id), estoqueLocal, linhas, maceiras: [...maceiras].sort((a, b) => a.ordem - b.ordem || a.id - b.id), operadores,
-    transferencias, transfItens, requisicoes, reqItens, avisos: avisos || [], historicoDesde: desde,
+    transferencias, transfItens, requisicoes, reqItens, avisos: avisos || [], bateladasAbertas: bateladasAbertas || [], vistos: vistos || [], historicoDesde: desde,
     mapa: { produto: porId(produtos), fornecedor: porId(fornecedores), ficha: porId(fichas), perfil: porId(perfis), ind: porId(ind),
       local: porId(locais), unidade: porId(unidades), maceira: porId(maceiras), operador: porId(operadores), linha: porId(linhas),
       itensPedido, recPedido, saldoLocal },
@@ -193,22 +197,81 @@ async function carregarDados(anterior, opcoes = {}) {
   };
 }
 
-// Sininho: requisições para atender e transferências chegando nos locais que a pessoa opera
-function pendencias(dados, papeis) {
+// SININHO POR RESPONSÁVEL: cada aviso vai só para quem precisa agir. O admin NÃO recebe tudo:
+// só o que for dos outros papéis que ele também tiver. Avisos só informativos (ex.: "mercadoria
+// recebida") somem quando a pessoa abre; os de ação somem quando a ação é feita.
+const SEMANA_MS = 7 * 864e5;
+export function pendencias(dados, papeis, eu, agora = Date.now()) {
   if (!dados) return [];
-  const meus = new Set(dados.locais.filter((l) => operaLocal(papeis, l) && (!(papeis || []).includes('admin') || l.papeis.length)).map((l) => l.id));
-  const admin = (papeis || []).includes('admin');
+  const resp = (papeis || []).filter((p) => p !== 'admin');
+  const tem = (p) => resp.includes(p);
+  const meus = new Set(dados.locais.filter((l) => (l.papeis || []).some((x) => resp.includes(x))).map((l) => l.id));
+  const vistos = new Set((dados.vistos || []).map((v) => v.chave));
   const itens = [];
-  dados.requisicoes.filter((r) => admin || meus.has(r.origem_id)).forEach((r) => itens.push({ tipo: 'req', id: r.id, rota: 'requisicoes',
-    texto: `Requisição nº ${r.id} para atender`, sub: `${dados.mapa.local.get(r.destino_id)?.nome || ''} · ${dados.mapa.perfil.get(r.solicitante_id)?.nome || ''}`, quando: r.criado_em }));
-  dados.transferencias.filter((t) => t.situacao === 'enviada' && (admin || meus.has(t.destino_id))).forEach((t) => itens.push({ tipo: 'tr', id: t.id, rota: 'transferencias',
+  const add = (i) => { if (!i.chave || !vistos.has(i.chave)) itens.push(i); };
+  const forn = (id) => dados.mapa.fornecedor.get(id)?.nome || '';
+  // ESTOQUE: requisição para atender (local de origem) e transferência chegando (local de destino)
+  dados.requisicoes.filter((x) => meus.has(x.origem_id)).forEach((x) => add({ tipo: 'req', icone: 'requisicoes', id: x.id, rota: 'requisicoes',
+    texto: `Requisição nº ${x.id} para atender`, sub: `${dados.mapa.local.get(x.destino_id)?.nome || ''} · ${dados.mapa.perfil.get(x.solicitante_id)?.nome || ''}`, quando: x.criado_em }));
+  dados.transferencias.filter((t) => t.situacao === 'enviada' && meus.has(t.destino_id)).forEach((t) => add({ tipo: 'tr', icone: 'transferencias', id: t.id, rota: 'transferencias',
     texto: `Transferência nº ${t.id} chegando`, sub: `de ${dados.mapa.local.get(t.origem_id)?.nome || ''} para ${dados.mapa.local.get(t.destino_id)?.nome || ''}`, quando: t.enviado_em }));
-  return itens.sort((a, b) => String(b.quando).localeCompare(String(a.quando)));
+  // FINANCEIRO: pedido para lançar (some quando marcar "lançado") e cancelado já lançado (estornar)
+  if (tem('financeiro')) {
+    const lancar = dados.pedidos.filter((x) => !x.fin_lancado && x.status !== 'cancelado').sort((a, b) => b.id - a.id);
+    if (lancar.length > 3) {   // muitos: uma linha só (abre a lista já filtrada)
+      add({ tipo: 'fin', icone: 'financeiro', id: 'lancar', rota: 'financeiro', estado: { rapido: 'pendentes' }, texto: `${lancar.length} pedidos para lançar no seu sistema`,
+        sub: `o mais novo: ${numeroPedido(lancar[0].id)} · ${forn(lancar[0].fornecedor_id)}`, quando: lancar[0].criado_em || lancar[0].data_pedido });
+    } else {
+      lancar.forEach((x) => add({ tipo: 'fin', icone: 'financeiro', id: x.id, rota: 'financeiro', estado: { rapido: 'pendentes' },
+        texto: `Pedido ${numeroPedido(x.id)} para lançar no seu sistema`, sub: `${forn(x.fornecedor_id)}${x.previsao_entrega ? ` · entrega prevista ${data(x.previsao_entrega)}` : ''}`, quando: x.criado_em || x.data_pedido }));
+    }
+    dados.pedidos.filter((x) => x.status === 'cancelado' && x.fin_lancado).forEach((x) => add({ tipo: 'fin', icone: 'financeiro', id: x.id, rota: 'financeiro', estado: { rapido: 'cancelados' },
+      texto: `Pedido ${numeroPedido(x.id)} CANCELADO: estornar no seu sistema`, sub: forn(x.fornecedor_id), quando: x.criado_em || x.data_pedido }));
+  }
+  // MERCADORIA RECEBIDA (últimos 7 dias): para o comprador do pedido e para o financeiro (some ao abrir)
+  const pedidoDe = new Map(dados.pedidos.map((x) => [x.id, x]));
+  const compradorAtivo = (uid) => !!dados.mapa.perfil.get(uid)?.ativo;
+  dados.recebimentos.filter((x) => agora - new Date(x.data_hora).getTime() < SEMANA_MS).forEach((x) => {
+    const ped = x.pedido_id ? pedidoDe.get(x.pedido_id) : null;
+    const doComprador = tem('comprador') && (!ped || ped.comprador_id === eu || !compradorAtivo(ped.comprador_id));
+    if (!doComprador && !tem('financeiro')) return;
+    add({ tipo: 'rec', icone: 'receber', id: x.id, chave: `rec:${x.id}`, rota: doComprador ? 'pedidos' : 'financeiro',
+      texto: x.pedido_id ? `Mercadoria recebida: ${numeroPedido(x.pedido_id)}` : 'Mercadoria recebida SEM pedido',
+      sub: `${forn(x.fornecedor_id)}${x.nota_fiscal ? ` · NF ${x.nota_fiscal}` : ''}${x.divergencia ? ' · com diferença' : ''}`, quando: x.data_hora });
+  });
+  // COMPRADOR: recebimento com diferença ou sem pedido esperando a ciência dele; pré-cadastros para completar
+  if (tem('comprador')) {
+    dados.recebimentos.filter((x) => !x.ciente_por && (x.divergencia || !x.pedido_id)).forEach((x) => {
+      const ped = x.pedido_id ? pedidoDe.get(x.pedido_id) : null;
+      if (ped && ped.comprador_id !== eu && compradorAtivo(ped.comprador_id)) return;
+      add({ tipo: 'rec', icone: 'aviso', id: x.id, rota: 'pedidos', texto: x.pedido_id ? `Dar ciência: ${numeroPedido(x.pedido_id)} chegou diferente` : 'Dar ciência: recebido sem pedido',
+        sub: `${forn(x.fornecedor_id)}${x.nota_fiscal ? ` · NF ${x.nota_fiscal}` : ''}`, quando: x.data_hora });
+    });
+    dados.produtos.filter((x) => x.pre_cadastro).forEach((x) => add({ tipo: 'pre', icone: 'produtos', id: x.id, rota: 'produtos', estado: { abrirId: x.id },
+      texto: `Completar cadastro: ${x.descricao}`, sub: 'Produto pré-cadastrado no recebimento', quando: x.pre_cadastro_em }));
+    dados.fornecedores.filter((x) => x.pre_cadastro).forEach((x) => add({ tipo: 'pre', icone: 'fornecedores', id: x.id, rota: 'fornecedores', estado: { abrirId: x.id },
+      texto: `Completar cadastro: ${x.nome}`, sub: 'Fornecedor pré-cadastrado no recebimento', quando: x.pre_cadastro_em }));
+  }
+  // PRODUÇÃO: batelada ATRASADA (passou do tempo + tolerância) — engenharia e gestor da produção
+  if (tem('engenharia') || tem('gestor_producao')) {
+    (dados.bateladasAbertas || []).forEach((b) => {
+      const m = dados.mapa.maceira.get(b.maceira_id); const pz = prazoBatelada(dados, b.ficha_id, m); const min = duracaoBatelada(b, agora);
+      if (estadoTempo(min, pz) !== 'atraso') return;
+      add({ tipo: 'atraso', icone: 'relogio', id: b.id, rota: 'painel-producao',
+        texto: `Batelada ATRASADA: ${m?.nome || 'masseira'}${b.operador_id ? ` (${dados.mapa.operador.get(b.operador_id)?.nome || ''})` : ''}`,
+        sub: `${dados.mapa.ficha.get(b.ficha_id)?.nome || ''} · ${tempoTexto(min)} (prazo ${pz.tempo} + ${pz.tol} min)`, quando: b.iniciada_em });
+    });
+  }
+  return itens.sort((a, b) => String(b.quando || '').localeCompare(String(a.quando || '')));
 }
 
-function Sininho({ dados, papeis, ir }) {
+function Sininho({ dados, papeis, ir, usuario, recarregar }) {
   const [aberto, setAberto] = useState(false);
-  const itens = pendencias(dados, papeis);
+  const [agora, setAgora] = useState(Date.now());
+  useEffect(() => { const t = setInterval(() => { if (!document.hidden) setAgora(Date.now()); }, 60000); return () => clearInterval(t); }, []);
+  const itens = pendencias(dados, papeis, usuario?.user_id, agora);
+  const informativos = itens.filter((i) => i.chave);
+  const marcar = (chaves) => api.rpc('marcar_vistos', { p: chaves }).then(() => recarregar(true)).catch(() => { /* sem conexão: tenta de novo na próxima */ });
   const ant = useRef(null);
   useEffect(() => {   // aviso do aparelho quando chega algo novo (se a pessoa ativou)
     const n = itens.length;
@@ -228,8 +291,10 @@ function Sininho({ dados, papeis, ir }) {
       <${Icone} nome="sino" />${itens.length > 0 && html`<span class="sino-num">${itens.length > 99 ? '99+' : itens.length}</span>`}</button>
     ${aberto && html`<div class="menu-fundo transparente" onClick=${() => setAberto(false)}></div><div class="sino-caixa">
       <b>${itens.length ? `Você tem ${pl(itens.length, 'pendência', 'pendências')}` : 'Nenhuma pendência agora'}</b>
-      ${itens.slice(0, 12).map((i) => html`<button class="sino-item" onClick=${() => { setAberto(false); ir(i.rota, { abrir: i }); }}>
-        <span class=${'sino-ico ' + i.tipo} aria-hidden="true"><${Icone} nome=${i.tipo === 'req' ? 'requisicoes' : 'transferencias'} tam=${18} /></span><span><b>${i.texto}</b><small>${i.sub}</small></span></button>`)}
+      ${itens.slice(0, 12).map((i) => html`<button class="sino-item" key=${i.tipo + i.id + (i.chave || '')} onClick=${() => { setAberto(false); if (i.chave) marcar([i.chave]); ir(i.rota, i.estado || { abrir: i }); }}>
+        <span class=${'sino-ico ' + i.tipo} aria-hidden="true"><${Icone} nome=${i.icone || 'sino'} tam=${18} /></span><span><b>${i.texto}</b><small>${i.sub}</small></span></button>`)}
+      ${itens.length > 12 && html`<small class="sino-mais">e mais ${itens.length - 12}…</small>`}
+      ${informativos.length > 0 && html`<button class="btn btn-sec btn-peq" onClick=${() => marcar(informativos.map((i) => i.chave))}>Marcar recebimentos como vistos (${informativos.length})</button>`}
       ${podeAvisar && html`<button class="btn btn-sec btn-peq" onClick=${() => Notification.requestPermission()}>Ativar avisos neste aparelho</button>`}
     </div>`}
   </div>`;
@@ -614,7 +679,7 @@ function App() {
       <div class="topo-usuario">
         <span class="so-tela"><strong>${atual.nome}</strong><small>${atual.funcao || papeisTexto(papeis)}</small></span>
         <${BotaoTema} />
-        ${dados && html`<${Sininho} dados=${dados} papeis=${papeis} ir=${ir} />`}
+        ${dados && html`<${Sininho} dados=${dados} papeis=${papeis} ir=${ir} usuario=${atual} recarregar=${recarregar} />`}
         ${(real.papeis || []).includes('admin') && html`<button class="btn-icone so-tela" title="Entrar como / ver como outra pessoa" aria-label="Ver como outra pessoa" onClick=${() => setEscolher(true)}><${Icone} nome="usuarios" /></button>`}
         ${api.modo !== 'demo' && html`<button class="btn-icone so-tela" title="Trocar senha" aria-label="Trocar senha" onClick=${() => setSenha(true)}><${Icone} nome="chave" /></button>`}
         <button class="btn-icone so-tela" title="Sair" aria-label="Sair" onClick=${protegido(sair)}><${Icone} nome="sair" /></button>

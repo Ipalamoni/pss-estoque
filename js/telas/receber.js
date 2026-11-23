@@ -1,6 +1,6 @@
 // Recebimento de mercadoria (pensado para o celular), com divergência
-import { html, AreaProtegida, protegido, useRef, useState, useMemo, useEffect, useApp, Campo, Numero, Escolher, QtdUnidade, Busca, Cabecalho, Vazio, useAcao, confirmar, avisar, n } from '../ui.js';
-import { numeroPedido, data, qtd, moeda, contem, fator, qu, pl, plural } from '../util.js';
+import { html, AreaProtegida, protegido, useRef, useState, useMemo, useEffect, useApp, Campo, Numero, Escolher, QtdUnidade, Busca, Cabecalho, Vazio, Modal, useAcao, confirmar, avisar, n } from '../ui.js';
+import { numeroPedido, data, qtd, moeda, contem, fator, qu, pl, plural, UNIDADES_ESTOQUE } from '../util.js';
 import { resumoPedido, PrazoEtiqueta } from './pedidos.js';
 
 // Para onde vai (local) e, se o produto conta por volume (ex.: bobina), quantos volumes
@@ -163,52 +163,123 @@ function ConferirPedido({ pedido, aoVoltar }) {
       ${ocupado ? 'Registrando…' : temDiv ? 'Receber com divergência' : 'Confirmar recebimento'}</button></div></${AreaProtegida}>`;
 }
 
+// ------------------------- recebimento SEM pedido -------------------------
+// Fornecedor e nota fiscal obrigatórios (o banco confere). Se o fornecedor ou o produto não
+// estiver cadastrado, o "+" faz um PRÉ-CADASTRO na hora; o comprador completa depois (sininho dele).
+const novaLinha = () => ({ k: Math.random(), produto_id: null, quantidade: '', unidade: null, custo: '' });
 function ReceberSemPedido({ aoVoltar }) {
   const { dados, recarregar, api } = useApp();
   const [forn, setForn] = useState(null);
   const [nf, setNf] = useState('');
   const [obs, setObs] = useState('');
   const [avisado, setAvisado] = useState(false);
-  const [linhas, setLinhas] = useState([{ k: 1, produto_id: null, quantidade: '', unidade: null, custo: '' }]);
+  const [linhas, setLinhas] = useState([novaLinha()]);
+  const [preForn, setPreForn] = useState(false);
+  const [preProd, setPreProd] = useState(null);   // k da linha que pediu o pré-cadastro
   const [ocupado, executar] = useAcao();
   const mudar = (k, ch) => setLinhas((l) => l.map((x) => (x.k === k ? { ...x, ...ch } : x)));
+  const prod = (id) => dados.mapa.produto.get(id);
+  const totalLinha = (l) => (n(l.quantidade) || 0) * (n(l.custo) || 0);
+  const totalNota = linhas.reduce((s, l) => s + totalLinha(l), 0);
 
   async function registrar() {
     const its = linhas.filter((l) => l.produto_id && n(l.quantidade) > 0);
+    if (!forn) return avisar('Escolha o fornecedor. Se ele não estiver na lista, toque no + para o pré-cadastro.', 'erro');
+    if (!nf.trim()) return avisar('Informe o número da nota fiscal.', 'erro');
     if (!its.length) return avisar('Informe pelo menos 1 item e a quantidade.', 'erro');
+    const semPreco = its.find((l) => prod(l.produto_id)?.pre_cadastro && !(n(l.custo) > 0));
+    if (semPreco) return avisar(`Informe o preço de ${prod(semPreco.produto_id)?.descricao} (produto novo, ainda sem custo).`, 'erro');
     if (!obs.trim()) return avisar('Escreva a ressalva: por que chegou sem pedido e com quem foi combinado.', 'erro');
     const ok = await confirmar({ titulo: 'Confirmar recebimento SEM PEDIDO', ok: 'Dar entrada no estoque', mensagem: html`
-      <ul class="lista-simples">${its.map((l) => html`<li><b>${qu(n(l.quantidade), l.unidade)}</b> ${dados.mapa.produto.get(l.produto_id)?.descricao}</li>`)}</ul>
+      <p>${dados.mapa.fornecedor.get(forn)?.nome} · NF ${nf}</p>
+      <ul class="lista-simples">${its.map((l) => html`<li><b>${qu(n(l.quantidade), l.unidade)}</b> ${prod(l.produto_id)?.descricao}${n(l.custo) > 0 ? ` · ${moeda(totalLinha(l))}` : ''}</li>`)}</ul>
+      ${totalNota > 0 && html`<p>Total da nota: <b>${moeda(totalNota)}</b></p>`}
       <div class="alerta">Entra no estoque agora e fica marcado como <b>recebido sem pedido</b> até o comprador dar ciência no sistema.</div>` });
     if (!ok) return;
-    const res = await executar(() => api.rpc('registrar_recebimento', { p: { fornecedor_id: forn, nota_fiscal: nf, observacao: obs, comprador_avisado: avisado,
-      itens: its.map((l) => ({ produto_id: l.produto_id, quantidade: n(l.quantidade), unidade: l.unidade, custo_unitario: n(l.custo), ...extraDestino(dados, l, dados.mapa.produto.get(l.produto_id)) })) } }), 'Recebido sem pedido. O comprador vai ver o aviso no sistema.');
+    const res = await executar(() => api.rpc('registrar_recebimento', { p: { fornecedor_id: forn, nota_fiscal: nf.trim(), observacao: obs, comprador_avisado: avisado,
+      itens: its.map((l) => ({ produto_id: l.produto_id, quantidade: n(l.quantidade), unidade: l.unidade, custo_unitario: n(l.custo), ...extraDestino(dados, l, prod(l.produto_id)) })) } }), 'Recebido sem pedido. O comprador vai ver o aviso no sistema.');
     if (res) { await recarregar(); aoVoltar(); }
   }
   return html`<${AreaProtegida} rotulo="recebimento sem pedido">
     <${Cabecalho} aoVoltar=${protegido(aoVoltar)} titulo="Recebimento sem pedido" sub="Mercadoria que chegou sem pedido de compra no sistema" />
     <div class="grade">
-      <${Campo} rotulo="Fornecedor"><${Escolher} itens=${dados.fornecedores.filter((x) => x.ativo)} valor=${forn} aoMudar=${setForn} rotuloDe=${(x) => x.nome} placeholder="(opcional)" /></${Campo}>
-      <${Campo} rotulo="Nº da nota fiscal"><input class="entrada" value=${nf} onInput=${(e) => setNf(e.target.value)} /></${Campo}>
+      <${Campo} rotulo="Fornecedor" obrigatorio ajuda="Não está na lista? Toque no + e escreva a razão social (pré-cadastro).">
+        <div class="escolher-mais"><${Escolher} itens=${dados.fornecedores.filter((x) => x.ativo)} valor=${forn} aoMudar=${setForn} rotuloDe=${(x) => x.nome}
+          detalheDe=${(x) => (x.pre_cadastro ? 'pré-cadastro' : '')} placeholder="Buscar fornecedor…" />
+          <button type="button" class="btn btn-sec btn-mais" title="Pré-cadastrar fornecedor" aria-label="Pré-cadastrar fornecedor" onClick=${() => setPreForn(true)}>+</button></div></${Campo}>
+      <${Campo} rotulo="Nº da nota fiscal" obrigatorio><input class="entrada" inputmode="numeric" maxlength="60" value=${nf} onInput=${(e) => setNf(e.target.value)} /></${Campo}>
     </div>
     <h3>O que chegou</h3>
-    <div class="linhas-itens">
-      ${linhas.map((l) => { const p = dados.mapa.produto.get(l.produto_id); return html`<div class="linha-item linha-pedido" key=${l.k}>
-        <div class="li-prod"><${Escolher} itens=${dados.produtos.filter((x) => x.ativo)} valor=${l.produto_id} rotuloDe=${(x) => `${x.codigo} · ${x.descricao}`}
-          aoMudar=${(id, pr) => mudar(l.k, { produto_id: id, unidade: pr.unidade_compra || pr.unidade_estoque })} placeholder="Produto…" /></div>
-        <${QtdUnidade} produto=${p} valor=${l.quantidade} unidade=${l.unidade} desabilitado=${!p} aoMudar=${(v, u) => mudar(l.k, { quantidade: v, unidade: u })} />
-        <div class="li-preco"><small>Preço por ${l.unidade || 'unidade'} (opcional)</small><${Numero} valor=${l.custo} aoMudar=${(v) => mudar(l.k, { custo: v })} placeholder="0,00" /></div>
-        <button class="btn-icone btn-remover" onClick=${() => setLinhas((x) => x.filter((y) => y.k !== l.k))}>✕</button>
+    <div class="rsp-lista">
+      ${linhas.map((l) => { const p = prod(l.produto_id); return html`<div class="rsp-item" key=${l.k}>
+        <div class="rsp-prod">
+          <div class="escolher-mais"><${Escolher} itens=${dados.produtos.filter((x) => x.ativo && x.categoria !== 'intermediario')} valor=${l.produto_id} rotuloDe=${(x) => `${x.codigo} · ${x.descricao}`}
+            aoMudar=${(id, pr) => mudar(l.k, { produto_id: id, unidade: pr.unidade_compra || pr.unidade_estoque })} placeholder="Buscar produto…" />
+            <button type="button" class="btn btn-sec btn-mais" title="Pré-cadastrar produto" aria-label="Pré-cadastrar produto" onClick=${() => setPreProd(l.k)}>+</button></div>
+          ${p?.pre_cadastro && html`<small class="texto-laranja">Pré-cadastro: o comprador vai completar o cadastro.</small>`}
+        </div>
+        <label class="rsp-campo"><span>Quantidade</span><${QtdUnidade} produto=${p} valor=${l.quantidade} unidade=${l.unidade} desabilitado=${!p} aoMudar=${(v, u) => mudar(l.k, { quantidade: v, unidade: u })} /></label>
+        <label class="rsp-campo"><span>Preço por ${l.unidade || 'unidade'}${p?.pre_cadastro ? ' *' : ' (opcional)'}</span><${Numero} valor=${l.custo} aoMudar=${(v) => mudar(l.k, { custo: v })} placeholder="0,00" /></label>
+        <div class="rsp-campo rsp-total"><span>Total</span><b>${totalLinha(l) > 0 ? moeda(totalLinha(l)) : '–'}</b></div>
         <${Destino} p=${p} l=${l} aoMudar=${(ch) => mudar(l.k, ch)} />
+        ${linhas.length > 1 && html`<button type="button" class="btn btn-sec btn-peq rsp-remover" onClick=${() => setLinhas((x) => x.filter((y) => y.k !== l.k))}>✕ Tirar item</button>`}
       </div>`; })}
     </div>
-    <button class="btn btn-sec btn-bloco-cel" onClick=${() => setLinhas((x) => [...x, { k: Math.random(), produto_id: null, quantidade: '', unidade: null, custo: '' }])}>+ Item</button>
+    <div class="rsp-rodape">
+      <button class="btn btn-sec btn-bloco-cel" onClick=${() => setLinhas((x) => [...x, novaLinha()])}>+ Item</button>
+      <div class="rsp-total-nota"><span>Total da nota</span><b>${moeda(totalNota)}</b></div>
+    </div>
     <div class="painel painel-alerta">
       <h3>⚠ Recebimento sem pedido de compra</h3>
       <p class="nota">Você pode receber normalmente. Fica registrado como <b>recebido sem pedido</b> e o comprador precisa dar ciência no sistema.</p>
       <label class="check destaque"><input type="checkbox" checked=${avisado} onChange=${(e) => setAvisado(e.target.checked)} /> Avisei o comprador e ele autorizou receber</label>
     </div>
     <${Campo} rotulo="Ressalva (obrigatória)" obrigatorio ajuda="Por que chegou sem pedido? Com quem foi combinado?"><textarea class="entrada" rows="3" value=${obs} onInput=${(e) => setObs(e.target.value)}></textarea></${Campo}>
-    <p class="nota">Sem preço informado, a entrada usa o custo médio atual do produto.</p>
-    <div class="barra-acao"><button class="btn btn-alerta btn-grande" disabled=${ocupado} onClick=${registrar}>${ocupado ? 'Registrando…' : 'Receber sem pedido'}</button></div></${AreaProtegida}>`;
+    <p class="nota">Produto já cadastrado e sem preço informado: a entrada usa o custo médio atual.</p>
+    <div class="barra-acao"><button class="btn btn-alerta btn-grande" disabled=${ocupado} onClick=${registrar}>${ocupado ? 'Registrando…' : 'Receber sem pedido'}</button></div>
+    ${preForn && html`<${PreFornecedor} aoFechar=${(id) => { setPreForn(false); if (id) setForn(id); }} />`}
+    ${preProd !== null && html`<${PreProduto} aoFechar=${(r) => { const k = preProd; setPreProd(null); if (r) mudar(k, { produto_id: r.id, unidade: r.unidade }); }} />`}
+  </${AreaProtegida}>`;
+}
+
+// pré-cadastro do fornecedor: só a razão social (o comprador completa depois)
+function PreFornecedor({ aoFechar }) {
+  const { api, recarregar } = useApp();
+  const [nome, setNome] = useState('');
+  const [ocupado, executar] = useAcao();
+  async function salvar() {
+    if (nome.trim().length < 3) return avisar('Escreva a razão social do fornecedor.', 'erro');
+    const id = await executar(() => api.rpc('pre_cadastrar_fornecedor', { p: { nome } }), 'Fornecedor pré-cadastrado. O comprador vai completar o cadastro.');
+    if (id) { await recarregar(); aoFechar(id); }
+  }
+  return html`<${Modal} titulo="Pré-cadastro de fornecedor" aoFechar=${() => aoFechar(null)}
+    rodape=${html`<button class="btn btn-sec" onClick=${() => aoFechar(null)}>Voltar</button><button class="btn btn-pri" disabled=${ocupado} onClick=${salvar}>Salvar pré-cadastro</button>`}>
+    <${Campo} rotulo="Razão social (como está na nota)" obrigatorio><input class="entrada" maxlength="150" value=${nome} onInput=${(e) => setNome(e.target.value)} autoFocus /></${Campo}>
+    <p class="nota">O comprador recebe um aviso no sininho para completar CNPJ, contato e condição de pagamento.</p>
+  </${Modal}>`;
+}
+
+// pré-cadastro do produto: nome curto + unidade + tipo (o comprador completa depois)
+const TIPOS_PRE = [['materia_prima', 'Matéria-prima'], ['embalagem', 'Embalagem'], ['escritorio', 'Escritório'], ['limpeza', 'Limpeza'], ['outros', 'Outros']];
+function PreProduto({ aoFechar }) {
+  const { api, recarregar } = useApp();
+  const [desc, setDesc] = useState('');
+  const [un, setUn] = useState('');
+  const [cat, setCat] = useState('outros');
+  const [ocupado, executar] = useAcao();
+  async function salvar() {
+    if (desc.trim().length < 3) return avisar('Escreva um nome curto para o produto. Ex.: Caneta azul.', 'erro');
+    if (!un) return avisar('Escolha a unidade em que ele está chegando (kg, un, L…).', 'erro');
+    const id = await executar(() => api.rpc('pre_cadastrar_produto', { p: { descricao: desc, unidade: un, categoria: cat } }), 'Produto pré-cadastrado. O comprador vai completar o cadastro.');
+    if (id) { await recarregar(); aoFechar({ id, unidade: un }); }
+  }
+  return html`<${Modal} titulo="Pré-cadastro de produto" aoFechar=${() => aoFechar(null)}
+    rodape=${html`<button class="btn btn-sec" onClick=${() => aoFechar(null)}>Voltar</button><button class="btn btn-pri" disabled=${ocupado} onClick=${salvar}>Salvar pré-cadastro</button>`}>
+    <${Campo} rotulo="Nome curto do produto" obrigatorio ajuda="Ex.: Caneta azul, Embalagem hot dog 10 un."><input class="entrada" maxlength="80" value=${desc} onInput=${(e) => setDesc(e.target.value)} autoFocus /></${Campo}>
+    <fieldset class="motivos-perda"><legend>Unidade em que está chegando *</legend>
+      <div class="chips grandes">${UNIDADES_ESTOQUE.map((u) => html`<button type="button" class=${'chip' + (un === u ? ' ativo' : '')} aria-pressed=${un === u} onClick=${() => setUn(u)}>${u}</button>`)}</div></fieldset>
+    <fieldset class="motivos-perda"><legend>Tipo</legend>
+      <div class="chips grandes">${TIPOS_PRE.map(([v, t]) => html`<button type="button" class=${'chip' + (cat === v ? ' ativo' : '')} aria-pressed=${cat === v} onClick=${() => setCat(v)}>${t}</button>`)}</div></fieldset>
+    <p class="nota">O comprador recebe um aviso no sininho para completar grupo, unidade de compra, estoque mínimo e fornecedor.</p>
+  </${Modal}>`;
 }

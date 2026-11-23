@@ -1,5 +1,5 @@
 // Cadastro de produtos (matérias-primas, embalagens e outros)
-import { html, useState, useMemo, useApp, Tabela, Modal, Campo, Numero, Escolher, Busca, Etiqueta, Cabecalho, useAcao, confirmar, n, Filtros } from '../ui.js';
+import { html, useState, useMemo, useEffect, useApp, Tabela, Modal, Campo, Numero, Escolher, Busca, Etiqueta, Cabecalho, useAcao, confirmar, n, Filtros } from '../ui.js';
 import { veValores, CATEGORIAS, CATEGORIAS_CADASTRO, UNIDADES_ESTOQUE, UNIDADES_COMPRA, contem, qtdDupla, num, moeda, qu, pl, hojeISO } from '../util.js';
 import { Icone } from '../icones.js';
 import { UltimaAlteracao, HistoricoAuditoria } from '../historico.js';
@@ -8,7 +8,7 @@ import { Exportar } from '../exportar.js';
 const distintos = (lista, campo) => [...new Set(lista.map((x) => x[campo]).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
 
 export function TelaProdutos() {
-  const { dados, podeFazer } = useApp();
+  const { dados, podeFazer, estadoRota, setEstadoRota } = useApp();
   const [busca, setBusca] = useState('');
   const [cat, setCat] = useState('');
   const [grupo, setGrupo] = useState('');
@@ -16,6 +16,9 @@ export function TelaProdutos() {
   const [inativos, setInativos] = useState(false);
   const [editando, setEditando] = useState(null);
   const pode = podeFazer('cadastro_produto');
+  // veio do sininho ("Completar cadastro"): abre o produto direto
+  useEffect(() => { const id = estadoRota?.abrirId; if (id) { const p = dados.mapa.produto.get(id); if (p) setEditando(p); setEstadoRota(null); } }, [estadoRota]);
+  const pre = dados.produtos.filter((p) => p.pre_cadastro);
   const grupos = distintos(dados.produtos, 'grupo');
   const classifs = distintos(dados.produtos.filter((p) => !grupo || p.grupo === grupo), 'classificacao');
 
@@ -34,6 +37,8 @@ export function TelaProdutos() {
         { titulo: 'Fornecedor principal', valor: (p) => dados.mapa.fornecedor.get(p.fornecedor_padrao_id)?.nome }, { titulo: 'Ativo', valor: (p) => (p.ativo ? 'sim' : 'não') }]} />
       ${pode && html`<button class="btn btn-pri" onClick=${() => setEditando({})}><${Icone} nome="mais" tam=${18} /> Novo produto</button>`}
     </${Cabecalho}>
+    ${pre.length > 0 && html`<div class="alerta alerta-pre"><b>${pl(pre.length, 'produto pré-cadastrado', 'produtos pré-cadastrados')} no recebimento.</b> ${pode ? 'Abra, complete e salve:' : 'O comprador vai completar:'}
+      <span class="pre-lista">${pre.map((p) => html`<button type="button" class="chip" key=${p.id} onClick=${() => setEditando(p)}>${p.descricao}</button>`)}</span></div>`}
     <${Filtros} ativos=${[cat, grupo, classif].filter(Boolean).length} fixo=${html`<${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Buscar por código, descrição ou marca" />`}>
       <select class="entrada" value=${cat} onChange=${(e) => setCat(e.target.value)}>
         <option value="">Todas as categorias</option>
@@ -48,7 +53,7 @@ export function TelaProdutos() {
     <${Tabela} linhas=${linhas} aoClicar=${(p) => setEditando(p)} ordemInicial=${{ chave: 'codigo', dir: 1 }}
       colunas=${[
         { chave: 'codigo', titulo: 'Código', render: (p) => html`<b>${p.codigo}</b>` },
-        { chave: 'descricao', titulo: 'Descrição', classe: 'col-desc', render: (p) => html`${p.descricao}${!p.ativo && html` <${Etiqueta}>inativo</${Etiqueta}>`}` },
+        { chave: 'descricao', titulo: 'Descrição', classe: 'col-desc', render: (p) => html`${p.descricao}${p.pre_cadastro && html`<span class="tag-pre">pré-cadastro</span>`}${!p.ativo && html` <${Etiqueta}>inativo</${Etiqueta}>`}` },
         { chave: 'categoria', titulo: 'Categoria', render: (p) => CATEGORIAS[p.categoria] },
         { chave: 'grupo', titulo: 'Grupo', render: (p) => p.grupo || '–' },
         { chave: 'classificacao', titulo: 'Classif.', render: (p) => (p.classificacao ? html`<${Etiqueta} cor="azul">${p.classificacao}</${Etiqueta}>` : '–') },

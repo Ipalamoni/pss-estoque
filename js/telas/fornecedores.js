@@ -1,16 +1,19 @@
 // Cadastro de fornecedores
-import { html, useState, useMemo, useApp, Tabela, Modal, Campo, Numero, Busca, Etiqueta, Cabecalho, useAcao, confirmar, n, Filtros } from '../ui.js';
+import { html, useState, useMemo, useEffect, useApp, Tabela, Modal, Campo, Numero, Busca, Etiqueta, Cabecalho, useAcao, confirmar, n, Filtros } from '../ui.js';
 import { contem, hojeISO, pl, formatarDoc, mascaraDoc, docLimpo, problemaDoc, rotuloDoc, TIPOS_PESSOA } from '../util.js';
 import { Exportar } from '../exportar.js';
 import { Icone } from '../icones.js';
 import { UltimaAlteracao, HistoricoAuditoria } from '../historico.js';
 
 export function TelaFornecedores() {
-  const { dados, podeFazer } = useApp();
+  const { dados, podeFazer, estadoRota, setEstadoRota } = useApp();
   const [busca, setBusca] = useState('');
   const [inativos, setInativos] = useState(false);
   const [editando, setEditando] = useState(null);
   const pode = podeFazer('cadastro_fornecedor');
+  // veio do sininho ("Completar cadastro"): abre o fornecedor direto
+  useEffect(() => { const id = estadoRota?.abrirId; if (id) { const f = dados.mapa.fornecedor.get(id); if (f) setEditando(f); setEstadoRota(null); } }, [estadoRota]);
+  const pre = dados.fornecedores.filter((f) => f.pre_cadastro);
   const linhas = useMemo(() => dados.fornecedores.filter((f) => (inativos || f.ativo) && contem(`${f.nome} ${f.razao_social || ''} ${f.cnpj || ''} ${formatarDoc(f.cnpj, f.tipo_pessoa)} ${f.contato} ${f.cidade || ''}`, busca)), [dados, busca, inativos]);
   const qtdProdutos = (id) => dados.produtos.filter((p) => p.fornecedor_padrao_id === id).length;
 
@@ -25,12 +28,14 @@ export function TelaFornecedores() {
         { titulo: 'Ativo', valor: (f) => (f.ativo ? 'sim' : 'não') }]} />
       ${pode && html`<button class="btn btn-pri" onClick=${() => setEditando({})}><${Icone} nome="mais" tam=${18} /> Novo fornecedor</button>`}
     </${Cabecalho}>
+    ${pre.length > 0 && html`<div class="alerta alerta-pre"><b>${pre.length === 1 ? '1 fornecedor pré-cadastrado' : `${pre.length} fornecedores pré-cadastrados`} no recebimento.</b> ${pode ? 'Abra, complete e salve:' : 'O comprador vai completar:'}
+      <span class="pre-lista">${pre.map((f) => html`<button type="button" class="chip" key=${f.id} onClick=${() => setEditando(f)}>${f.nome}</button>`)}</span></div>`}
     <${Filtros} ativos=${inativos ? 1 : 0} fixo=${html`<${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Buscar por nome, CNPJ, CPF ou contato" />`}>
       <label class="check"><input type="checkbox" checked=${inativos} onChange=${(e) => setInativos(e.target.checked)} /> Mostrar inativos</label>
     </${Filtros}>
     <${Tabela} linhas=${linhas} aoClicar=${setEditando} ordemInicial=${{ chave: 'nome', dir: 1 }}
       colunas=${[
-        { chave: 'nome', titulo: 'Fornecedor', render: (f) => html`<b>${f.nome}</b>${!f.ativo && html` <${Etiqueta}>inativo</${Etiqueta}>`}` },
+        { chave: 'nome', titulo: 'Fornecedor', render: (f) => html`<b>${f.nome}</b>${f.pre_cadastro && html`<span class="tag-pre">pré-cadastro</span>`}${!f.ativo && html` <${Etiqueta}>inativo</${Etiqueta}>`}` },
         { chave: 'cnpj', titulo: 'CNPJ / CPF', render: (f) => formatarDoc(f.cnpj, f.tipo_pessoa) || '–' },
         { chave: 'cidade', titulo: 'Cidade', render: (f) => [f.cidade, f.uf].filter(Boolean).join('/') || '–' },
         { chave: 'contato', titulo: 'Contato', render: (f) => [f.contato, f.whatsapp || f.telefone].filter(Boolean).join(' · ') },
