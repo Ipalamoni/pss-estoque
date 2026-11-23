@@ -73,8 +73,8 @@ export function TelaContagemInicial() {
       <${Cartao} titulo="Já implantados" valor=${nImpl} cor=${filtro === 'implantados' ? 'c-ativo' : ''} aoClicar=${() => setFiltro('implantados')} />
     </div>
     <div class="chips">
-      ${Object.entries(CATEGORIAS).map(([k, t]) => html`<button class=${'chip' + (cat === k ? ' ativo' : '')} onClick=${() => { setCat(k); setFiltro('todos'); }}>${t}</button>`)}
-      <button class=${'chip' + (!cat ? ' ativo' : '')} onClick=${() => setCat('')}>Todas</button>
+      ${Object.entries(CATEGORIAS).map(([k, t]) => html`<button class=${'chip' + (cat === k ? ' ativo' : '')} aria-pressed=${!!(cat === k)} onClick=${() => { setCat(k); setFiltro('todos'); }}>${t}</button>`)}
+      <button class=${'chip' + (!cat ? ' ativo' : '')} aria-pressed=${!!(!cat)} onClick=${() => setCat('')}>Todas</button>
     </div>
     <div class="filtros"><${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Buscar produto" /></div>
     ${!produtos.length && html`<div class="aviso-faixa"><span>Nenhum produto cadastrado nesta categoria. Os produtos precisam estar cadastrados antes da contagem (Cadastros › Produtos ou Configurações › Importar planilha).</span></div>`}

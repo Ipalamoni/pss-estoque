@@ -28,17 +28,54 @@ function periodo(id) {
   if (id === '90') return { de: somarDias(h, -89), ate: h, rotulo: 'últimos 90 dias' };
   return { de: `${a}-01-01`, ate: h, rotulo: `ano de ${a}` };
 }
+// período de comparação: mesmo tamanho, imediatamente antes (no ano, não compara: carregaria 2 anos)
+function anterior(id, P) {
+  if (id === 'ano') return null;
+  const dias = diasEntre(P.de, P.ate);
+  if (id === 'mes') { const [a, m] = P.de.split('-').map(Number); const d = new Date(a, m - 2, 1);
+    const ini = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+    const fimMes = new Date(a, m - 1, 0).getDate(); const dia = Math.min(Number(P.ate.slice(8, 10)), fimMes);
+    return { de: ini, ate: `${ini.slice(0, 8)}${String(dia).padStart(2, '0')}`, rotulo: 'mesmo período do mês anterior' }; }
+  if (id === 'mes_ant') { const [a, m] = P.de.split('-').map(Number); const d = new Date(a, m - 2, 1); const f = new Date(a, m - 1, 0);
+    const iso = (x) => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
+    return { de: iso(d), ate: iso(f), rotulo: `${MESES[d.getMonth()]}/${d.getFullYear()}` }; }
+  return { de: somarDias(P.de, -(dias + 1)), ate: somarDias(P.de, -1), rotulo: '90 dias anteriores' };
+}
+// "▲ 12% vs. mês anterior": maisEhBom diz se subir é bom; null = só informa (sem cor de bom/ruim)
+function variacao(atual, antes, rotulo, maisEhBom = true) {
+  if (antes === null || antes === undefined || !(antes > 0)) return null;
+  const d = ((atual - antes) / antes) * 100;
+  if (Math.abs(d) < 0.5) return { texto: `= estável vs. ${rotulo}`, tom: 'neutro' };
+  const sobe = d > 0;
+  return { texto: `${sobe ? '▲' : '▼'} ${num(Math.abs(d), 0)}% vs. ${rotulo}`, tom: maisEhBom === null ? 'neutro' : sobe === maisEhBom ? 'bom' : 'ruim' };
+}
+// soma de compras e consumo num período (para comparar)
+function totaisPeriodo(dados, movs, Q) {
+  const naData = (iso) => iso >= Q.de && iso <= Q.ate;
+  const comprado = dados.pedidos.filter((p) => p.status !== 'cancelado' && naData(p.data_pedido)).reduce((s, p) => s + resumoPedido(p, dados).valor, 0);
+  const porId = new Map(movs.map((x) => [x.id, x]));
+  const tipoReal = (x) => (x.tipo === 'correcao' ? porId.get(x.corrige_id)?.tipo : x.tipo);
+  let recebido = 0, consumo = 0;
+  for (const x of movs) {
+    if (!naData(diaLocal(x.data_hora))) continue;
+    const t = tipoReal(x);
+    if (x.tipo === 'entrada') recebido += Number(x.valor);
+    if (['saida_receita', 'saida_avulsa', 'saida_almox'].includes(t)) consumo += -Number(x.valor);
+  }
+  return { comprado, recebido, consumo };
+}
 
 export function TelaPainel() {
   const { dados, api, ir } = useApp();
   const [per, setPer] = useState('mes');
   const [movs, setMovs] = useState(null);
   const P = periodo(per);
+  const A = anterior(per, P);
   const h = hojeISO();
   // 6 meses para o gráfico mensal + o período escolhido + 30 dias para "dias de estoque"
   const [a, m] = h.split('-').map(Number);
   const seisMeses = `${new Date(a, m - 6, 1).getFullYear()}-${String(new Date(a, m - 6, 1).getMonth() + 1).padStart(2, '0')}-01`;
-  const desde = [seisMeses, P.de, somarDias(h, -29)].sort()[0];
+  const desde = [seisMeses, P.de, somarDias(h, -29), A ? A.de : P.de].sort()[0];
   useHistorico(desde);
   const mudou = useFiltroMudou([desde]);
   useEffect(() => {
@@ -50,28 +87,36 @@ export function TelaPainel() {
 
   const est = useMemo(() => calcEstoque(dados), [dados]);
   const cmp = useMemo(() => (movs ? calcCompras(dados, movs, P, seisMeses) : null), [dados, movs, per]);
+  const ant = useMemo(() => (movs && A ? totaisPeriodo(dados, movs, A) : null), [dados, movs, per]);
+  const vr = (campo, atual, maisEhBom) => (ant && A ? variacao(atual, ant[campo], A.rotulo, maisEhBom) : null);
+  const alertaQtd = est.alerta.length;
 
-  const chips = html`<span class="chips">${[['mes', 'Este mês'], ['mes_ant', 'Mês anterior'], ['90', '90 dias'], ['ano', 'Ano']].map(([id, t]) =>
-    html`<button class=${'chip' + (per === id ? ' ativo' : '')} onClick=${() => setPer(id)}>${t}</button>`)}</span>`;
+  const chips = html`<span class="chips" role="group" aria-label="Período">${[['mes', 'Este mês'], ['mes_ant', 'Mês anterior'], ['90', 'Últimos 90 dias'], ['ano', 'Este ano']].map(([id, t]) =>
+    html`<button class=${'chip' + (per === id ? ' ativo' : '')} aria-pressed=${!!(per === id)} onClick=${() => setPer(id)}>${t}</button>`)}</span>`;
 
   return html`
-    <${Cabecalho} titulo="Resumo (indicadores)" sub=${`Estoque, compras e consumo · atualizado em ${dataHora(dados.carregadoEm || new Date())}`}>
-      ${cmp && html`<${Exportar} titulo="Painel gerencial de estoque e compras" filtros=${`Compras e consumo: ${P.rotulo} (${data(P.de)} a ${data(P.ate)})`}
+    <${Cabecalho} titulo="Painel de Estoque e Compras" sub=${`Estoque, compras e consumo · atualizado em ${dataHora(dados.carregadoEm || new Date())}`}>
+      ${cmp && html`<${Exportar} titulo="Painel de Estoque e Compras" filtros=${`Compras e consumo: ${P.rotulo} (${data(P.de)} a ${data(P.ate)})`}
         arquivo=${`painel-gerencial-${h}`} paisagem=${false} colunas=${[{ titulo: 'Indicador', valor: (l) => l[0], largura: 42 }, { titulo: 'Valor', valor: (l) => l[1], largura: 22 }, { titulo: 'Detalhe', valor: (l) => l[2] || '', largura: 40 }]}
         linhas=${resumoIndicadores(est, cmp, P)} abas=${() => abasExcel(est, cmp, P, dados)} />`}
     </${Cabecalho}>
 
+    <div class="periodo-barra">
+      <span class="periodo-rotulo">Período</span>${chips}
+      <span class="nota">${data(P.de)} a ${data(P.ate)} · vale para Compras e Consumo (o Estoque é sempre o de hoje)</span>
+    </div>
+
     <h2 class="secao-titulo">Estoque hoje</h2>
     <div class="cartoes">
       <${Cartao} titulo="Valor em estoque" valor=${moeda(est.total)} sub=${pl(est.itens, 'item com saldo', 'itens com saldo')} aoClicar=${() => ir('estoque')} />
-      ${est.cats.slice(0, 3).map((c) => html`<${Cartao} titulo=${c.rotulo} valor=${moeda(c.valor)} sub=${`${pct(c.valor, est.total)} do estoque`} aoClicar=${() => ir('estoque')} />`)}
+      ${est.cats.slice(0, 3).map((c) => html`<${Cartao} titulo=${c.rotulo} valor=${moeda(c.valor)} sub=${`${pct(c.valor, est.total)} do estoque`} aoClicar=${() => ir('estoque', { categoria: c.id })} />`)}
       <${Cartao} titulo="Dias de estoque" valor=${cmp && cmp.consumoDia30 > 0 ? num(est.total / cmp.consumoDia30, 0) : '–'}
-        sub=${cmp ? `consumo médio ${moeda(cmp.consumoDia30)}/dia (30 dias)` : 'calculando…'} />
-      <${Cartao} titulo="Críticos ou zerados" valor=${est.alerta.length} sub=${pl(est.comprar, 'item no ponto de pedido', 'itens no ponto de pedido')}
-        cor=${est.alerta.length ? 'c-vermelho' : ''} aoClicar=${() => ir('estoque')} />
+        sub=${!cmp ? 'calculando…' : cmp.consumoDia30 > 0 ? `pelo consumo dos últimos 30 dias (${moeda(cmp.consumoDia30)}/dia)` : 'sem consumo nos últimos 30 dias'} />
+      <${Cartao} titulo="Zerados ou críticos" valor=${alertaQtd} sub=${`+ ${pl(est.comprar, 'item no ponto de pedido', 'itens no ponto de pedido')}`}
+        cor=${alertaQtd ? 'c-vermelho' : ''} aoClicar=${() => ir('estoque', { status: 'alerta' })} />
     </div>
     <section class="painel"><h3>Quantidades em estoque (por grupo e classificação)</h3>
-      <${Tabela} linhas=${est.quant} chave="k" max=${12} colunas=${[
+      <${Tabela} linhas=${est.quant} chave="k" max=${12} aoVerTodos=${() => ir('estoque')} colunas=${[
         { chave: 'grupo', titulo: 'Grupo', render: (g) => html`<b>${g.grupo}</b>` },
         { chave: 'classe', titulo: 'Classif.', render: (g) => (g.classe ? html`<${Etiqueta} cor="azul">${g.classe}</${Etiqueta}>` : '–') },
         { chave: 'saldo', titulo: 'Quantidade', num: true, render: (g) => html`<b>${num(g.saldo, g.saldo < 100 ? 2 : 0)}</b> <small>${g.unidade}</small>` },
@@ -102,18 +147,18 @@ export function TelaPainel() {
       </section>
     </div>
 
-    <div class="secao-com-filtro"><h2 class="secao-titulo">Compras</h2>${chips}<span class="nota">${data(P.de)} a ${data(P.ate)}</span></div>
+    <h2 class="secao-titulo">Compras (${P.rotulo})</h2>
     ${!cmp ? html`<${Carregando} />` : html`
       <div class="cartoes">
-        <${Cartao} titulo="Comprado no período" valor=${moeda(cmp.comprado)} sub=${pl(cmp.pedidosPeriodo, 'pedido emitido', 'pedidos emitidos')} aoClicar=${() => ir('relatorios')} />
-        <${Cartao} titulo="Recebido no período" valor=${moeda(cmp.recebido)} sub=${pl(cmp.recebimentos, 'recebimento', 'recebimentos')} />
-        <${Cartao} titulo="A receber" valor=${moeda(cmp.aReceber)} sub=${pl(cmp.pendentes.length, 'pedido pendente', 'pedidos pendentes')} aoClicar=${() => ir('pedidos')} />
-        <${Cartao} titulo="Atrasados" valor=${moeda(cmp.atrasadoValor)} sub=${pl(cmp.atrasados, 'pedido', 'pedidos')} cor=${cmp.atrasados ? 'c-vermelho' : ''} aoClicar=${() => ir('pedidos')} />
+        <${Cartao} titulo="Comprado no período" valor=${moeda(cmp.comprado)} sub=${pl(cmp.pedidosPeriodo, 'pedido emitido', 'pedidos emitidos')} variacao=${vr('comprado', cmp.comprado, null)} aoClicar=${() => ir('pedidos', { filtro: 'todos' })} />
+        <${Cartao} titulo="Recebido no período" valor=${moeda(cmp.recebido)} sub=${pl(cmp.recebimentos, 'recebimento', 'recebimentos')} variacao=${vr('recebido', cmp.recebido, null)} />
+        <${Cartao} titulo="A receber" valor=${moeda(cmp.aReceber)} sub=${pl(cmp.pendentes.length, 'pedido pendente', 'pedidos pendentes')} aoClicar=${() => ir('pedidos', { filtro: 'pendentes' })} />
+        <${Cartao} titulo="Atrasados" valor=${moeda(cmp.atrasadoValor)} sub=${pl(cmp.atrasados, 'pedido', 'pedidos')} cor=${cmp.atrasados ? 'c-vermelho' : ''} aoClicar=${() => ir('pedidos', { filtro: 'atrasados' })} />
         <${Cartao} titulo="Prazo real de entrega" valor=${cmp.prazoMedio === null ? '–' : pl(Math.round(cmp.prazoMedio), 'dia', 'dias')} sub=${cmp.pontualidade === null ? 'sem entregas no período' : `${num(cmp.pontualidade, 0)}% chegaram no prazo`} />
-        <${Cartao} titulo="Recebidos com divergência" valor=${cmp.recebimentos ? pct(cmp.divergentes, cmp.recebimentos) : '–'} sub=${pl(cmp.divergentes, 'recebimento', 'recebimentos')} cor=${cmp.divergentes ? 'c-laranja' : ''} />
+        <${Cartao} titulo="Recebimentos com divergência" valor=${cmp.recebimentos ? pct(cmp.divergentes, cmp.recebimentos) : '–'} sub=${pl(cmp.divergentes, 'recebimento', 'recebimentos')} cor=${cmp.divergentes ? 'c-laranja' : ''} />
       </div>
       <div class="painel-grade">
-        <section class="painel"><h3>Compras por mês</h3>
+        <section class="painel"><h3>Compras por mês <small>(últimos 6 meses, não muda com o período)</small></h3>
           <${Colunas} categorias=${cmp.meses.map((x) => x.rotulo)} series=${[{ nome: 'Pedidos emitidos', valores: cmp.meses.map((x) => x.pedido) }, { nome: 'Recebido', valores: cmp.meses.map((x) => x.recebido) }]}
             formatar=${moeda} formatarEixo=${curta} />
         </section>
@@ -127,7 +172,7 @@ export function TelaPainel() {
             <tbody>${est.cats.map((c) => { const r = cmp.receberCat.get(c.id) || 0; return html`<tr><td>${c.rotulo}</td><td class="n">${moeda(c.valor)}</td><td class="n">${r ? moeda(r) : '–'}</td><td class="n"><b>${moeda(c.valor + r)}</b></td></tr>`; })}</tbody></table>
         </section>
         <section class="painel"><h3>Próximas entregas</h3>
-          <${Tabela} linhas=${cmp.proximos} max=${8} aoClicar=${(p) => ir('pedidos', { abrir: p.id })} vazio="Nenhum pedido pendente." colunas=${[
+          <${Tabela} linhas=${cmp.proximos} max=${8} aoClicar=${(p) => ir('pedidos', { abrir: p.id })} aoVerTodos=${() => ir('pedidos', { filtro: 'pendentes' })} vazio="Nenhum pedido pendente." colunas=${[
             { chave: 'id', titulo: 'Pedido', render: (p) => html`<b>${numeroPedido(p.id)}</b>` },
             { chave: 'f', titulo: 'Fornecedor', render: (p) => p.r.fornecedor?.nome },
             { chave: 'previsao_entrega', titulo: 'Previsão', render: (p) => (p.previsao_entrega ? data(p.previsao_entrega) : '–') },
@@ -139,7 +184,7 @@ export function TelaPainel() {
 
       <h2 class="secao-titulo">Consumo (${P.rotulo})</h2>
       <div class="cartoes">
-        <${Cartao} titulo="Consumo total" valor=${moeda(cmp.consumo.total)} sub=${`${moeda(cmp.consumo.total / Math.max(1, diasEntre(P.de, P.ate) + 1))}/dia`} />
+        <${Cartao} titulo="Consumo total" valor=${moeda(cmp.consumo.total)} sub=${`${moeda(cmp.consumo.total / Math.max(1, diasEntre(P.de, P.ate) + 1))}/dia`} variacao=${vr('consumo', cmp.consumo.total, null)} />
         <${Cartao} titulo="Pelas receitas" valor=${moeda(cmp.consumo.receita)} sub=${pct(cmp.consumo.receita, cmp.consumo.total)} aoClicar=${() => ir('saidas-producao')} />
         <${Cartao} titulo="Avulsas da pesagem" valor=${moeda(cmp.consumo.avulsa)} sub=${pct(cmp.consumo.avulsa, cmp.consumo.total)} cor=${cmp.consumo.avulsa ? 'c-laranja' : ''} />
         <${Cartao} titulo="Almoxarifado" valor=${moeda(cmp.consumo.almox)} sub="embalagens, escritório, limpeza" />

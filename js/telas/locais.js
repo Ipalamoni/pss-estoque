@@ -62,7 +62,7 @@ function EditarLocal({ l, aoFechar }) {
         ${Object.entries(TIPOS_LOCAL).map(([k, t]) => html`<option value=${k}>${t}</option>`)}</select></${Campo}>
       <${Campo} rotulo="Ordem"><input class="entrada" inputmode="numeric" value=${v.ordem} onInput=${(e) => setV({ ...v, ordem: e.target.value.replace(/\D/g, '') })} /></${Campo}>
     </div>
-    <${Campo} rotulo="Quem opera este local"><div class="chips">${PAPEIS_LOCAL.map((p) => html`<button type="button" class=${'chip' + (v.papeis.includes(p) ? ' ativo' : '')} onClick=${() => alt(p)}>${PAPEIS[p] || p}</button>`)}</div></${Campo}>
+    <${Campo} rotulo="Quem opera este local"><div class="chips">${PAPEIS_LOCAL.map((p) => html`<button type="button" class=${'chip' + (v.papeis.includes(p) ? ' ativo' : '')} aria-pressed=${!!(v.papeis.includes(p))} onClick=${() => alt(p)}>${PAPEIS[p] || p}</button>`)}</div></${Campo}>
     <label class="check"><input type="checkbox" checked=${v.ativo} onChange=${(e) => setV({ ...v, ativo: e.target.checked })} /> Ativo (para desativar, o local precisa estar sem estoque)</label>
   </${Modal}>`;
 }

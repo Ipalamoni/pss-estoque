@@ -48,8 +48,8 @@ export function TelaPainelProducao() {
 
   return html`<div class=${'painel-prod' + (tela ? ' modo-tv' : '')}>
     <${Cabecalho} titulo="Painel de Produção" sub=${`${data(dia)} · atualiza sozinho · ${new Date(agora).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`}>
-      <div class="chips">${DIAS.map((d) => html`<button class=${'chip' + (desloc === d.id ? ' ativo' : '')} onClick=${() => setDesloc(d.id)}>${d.t}</button>`)}</div>
-      ${dados.linhas.length > 0 && html`<select class="entrada" style="width:auto" value=${linha} onChange=${(e) => setLinha(e.target.value)}>
+      <div class="chips">${DIAS.map((d) => html`<button class=${'chip' + (desloc === d.id ? ' ativo' : '')} aria-pressed=${!!(desloc === d.id)} onClick=${() => setDesloc(d.id)}>${d.t}</button>`)}</div>
+      ${dados.linhas.length > 0 && html`<select class="entrada entrada-auto" aria-label="Linha de produção" value=${linha} onChange=${(e) => setLinha(e.target.value)}>
         <option value="">Todas as linhas</option>${dados.linhas.map((l) => html`<option value=${String(l.id)}>${l.nome}</option>`)}</select>`}
       <button class="btn btn-sec btn-peq" onClick=${alternarTela} title="Tela cheia (ex.: numa TV da fábrica)">${tela ? 'Sair da tela cheia' : 'Tela cheia'}</button>
     </${Cabecalho}>
@@ -59,7 +59,7 @@ export function TelaPainelProducao() {
       <div class="kpi"><small>Programado</small><b>${num(tot.programado, 0)}</b><span>bateladas · ${num(previsto, 0)} un. previstas</span></div>
       <div class="kpi verde"><small>Finalizado</small><b>${num(tot.finalizado, 0)}</b><span>${num(tot.produzido, 0)} un. produzidas</span></div>
       <div class="kpi laranja"><small>Em produção</small><b>${num(tot.em_producao, 0)}</b><span>iniciadas, aguardando finalizar</span></div>
-      <div class="kpi"><small>Andamento</small><b>${num(pctIni, 0)}%</b><span class="kpi-barra"><i style=${{ width: `${Math.min(pctIni, 100)}%` }}></i></span><span>iniciado · ${num(pct, 0)}% finalizado</span></div>
+      <div class="kpi"><small>Andamento</small><b>${num(pct, 0)}%</b><span class="kpi-barra" role="img" aria-label=${`${num(pct, 0)}% finalizado`}><i style=${{ width: `${Math.min(pct, 100)}%` }}></i></span><span>finalizado · ${num(pctIni, 0)}% iniciado</span></div>
       <div class="kpi azul"><small>Previsão de término</small><b>${fim ? fim.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : desloc === 0 ? 'Concluído' : '–'}</b><span>${fim ? 'no ritmo do tempo médio' : ''}</span></div>
       <div class=${'kpi ' + (atrasadas.length ? 'vermelho' : 'verde')}><small>Atrasos</small><b>${atrasadas.length}</b><span>${atrasadas.length ? atrasadas.map((x) => x.m.nome).join(', ') : 'tudo no ritmo'}</span></div>
     </div>
@@ -69,11 +69,10 @@ export function TelaPainelProducao() {
       <${Funil} tot=${tot} />
     </section>
 
-    <div class="duas-colunas">
-      <section class="painel">
+    <section class="painel">
         <h2>Maceiras</h2>
         <div class="tabela-rolagem"><table class="tabela tabela-mac">
-          <thead><tr><th>Maceira</th><th>Situação</th><th>Padeiro</th><th>Agora</th><th class="n">Prog.</th><th class="n">Inic.</th><th class="n">Pronto</th><th class="n">Pesagem</th><th>1ª do dia</th><th>Último início</th></tr></thead>
+          <thead><tr><th>Maceira</th><th>Situação</th><th>Padeiro</th><th>Agora</th><th class="n">Programado</th><th class="n">Iniciado</th><th class="n">Pronto</th><th class="n">Na pesagem</th><th>Horários</th></tr></thead>
           <tbody>${sems.map(({ m, s }) => {
             const ult = s.ultima;
             return html`<tr key=${m.id}><td data-rotulo="Maceira"><b>${m.nome}</b></td>
@@ -82,11 +81,10 @@ export function TelaPainelProducao() {
               <td data-rotulo="Agora">${s.batendo ? html`${dados.mapa.ficha.get(s.batendo.ficha_id)?.nome} <small>há ${tempoTexto(s.batendo.min)}</small>` : s.min !== null && desloc === 0 && s.cor !== 'cinza' ? html`<small>${tempoTexto(s.min)} sem iniciar</small>` : '–'}</td>
               <td class="n" data-rotulo="Programado">${num(somar(s.progs, 'programado'), 0)}</td><td class="n" data-rotulo="Iniciado">${num(somar(s.progs, 'iniciado'), 0)}</td>
               <td class="n" data-rotulo="Pronto">${num(somar(s.progs, 'pronto'), 0)}</td><td class="n" data-rotulo="Na pesagem">${num(somar(s.progs, 'a_pesar') + somar(s.progs, 'na_pesagem'), 0)}</td>
-              <td data-rotulo="1ª do dia">${s.primeira ? html`<small>${hora(s.primeira.iniciada_em)}</small>` : '–'}</td>
-              <td data-rotulo="Último início">${ult ? html`${hora(ult.iniciada_em)} <small class="texto-cinza">(${s.iniciadasHoje} no dia)</small>` : '–'}</td></tr>`;
+              <td data-rotulo="Horários" class="horarios">${s.primeira || ult ? html`${s.primeira ? html`<small>1ª: <b>${hora(s.primeira.iniciada_em)}</b></small>` : ''}${ult ? html`<small>última: <b>${hora(ult.iniciada_em)}</b> (${s.iniciadasHoje} no dia)</small>` : ''}` : '–'}</td></tr>`;
           })}</tbody></table></div>
       </section>
-      <section class="painel">
+    <section class="painel">
         <h2>Ritmo do dia</h2>
         <${Ritmo} bats=${bats} linhas=${linhas} />
         ${(semFinalizar.length > 0 || atrasadas.length > 0 || misturaParada.length > 0) && html`<h3>Alertas</h3><ul class="alertas-lista">
@@ -95,7 +93,6 @@ export function TelaPainelProducao() {
           ${misturaParada.map((l) => html`<li class="al-cinza"><b>${num(l.na_pesagem, 0)} mistura(s) de ${dados.mapa.ficha.get(l.ficha_id)?.nome}</b> pesadas e ainda não enviadas</li>`)}
         </ul>`}
       </section>
-    </div>
 
     <section class="painel">
       <div class="painel-topo"><h2>Programações na ordem de prioridade</h2>

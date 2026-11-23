@@ -79,8 +79,8 @@ function CustosProdutos({ ult }) {
     </div>
     <${Filtros} ativos=${[cat, inativos].filter(Boolean).length} fixo=${html`<${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Código, produto, grupo, classificação ou marca" />`}>
       <div class="chips">
-        <button class=${'chip' + (!cat ? ' ativo' : '')} onClick=${() => setCat('')}>Todas</button>
-        ${Object.entries(CATEGORIAS).map(([k, v]) => html`<button class=${'chip' + (cat === k ? ' ativo' : '')} onClick=${() => setCat(k)}>${v}</button>`)}
+        <button class=${'chip' + (!cat ? ' ativo' : '')} aria-pressed=${!!(!cat)} onClick=${() => setCat('')}>Todas</button>
+        ${Object.entries(CATEGORIAS).map(([k, v]) => html`<button class=${'chip' + (cat === k ? ' ativo' : '')} aria-pressed=${!!(cat === k)} onClick=${() => setCat(k)}>${v}</button>`)}
       </div>
       <label class="check"><input type="checkbox" checked=${inativos} onChange=${(e) => setInativos(e.target.checked)} /> Mostrar inativos</label>
     </${Filtros}>

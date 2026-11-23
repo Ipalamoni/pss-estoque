@@ -10,7 +10,7 @@ const v = (x, c = 2) => (x === null || x === undefined ? '–' : num(x, c));
 
 export function TelaEstoque() {
   const { dados, estadoRota, setEstadoRota, ir } = useApp();
-  const [cats, setCats] = useState(new Set(Object.keys(CATEGORIAS)));
+  const [cats, setCats] = useState(() => new Set(estadoRota?.categoria ? [estadoRota.categoria] : Object.keys(CATEGORIAS)));
   const [status, setStatus] = useState(estadoRota?.status || '');
   const [busca, setBusca] = useState('');
   const [completo, setCompleto] = useState(window.innerWidth > 760);
@@ -24,7 +24,7 @@ export function TelaEstoque() {
   const classifs = distintos(dados.produtos.filter((p) => !grupo || p.grupo === grupo), 'classificacao');
   const alternar = (k) => setCats((s) => { const x = new Set(s); x.has(k) ? x.delete(k) : x.add(k); return x; });
 
-  const linhas = useMemo(() => dados.ind.filter((p) => p.ativo && cats.has(p.categoria) && (!status || p.status === status)
+  const linhas = useMemo(() => dados.ind.filter((p) => p.ativo && cats.has(p.categoria) && (!status || p.status === status || (status === 'alerta' && (p.status === 'zerado' || p.status === 'critico')))
     && (!grupo || p.grupo === grupo) && (!classif || p.classificacao === classif)
     && contem(`${p.codigo} ${p.descricao} ${p.marca || ''}`, busca)), [dados, cats, status, busca, grupo, classif]);
   // visão somada por grupo + classificação (ex.: toda a farinha tipo A, de todas as marcas)
@@ -99,6 +99,7 @@ export function TelaEstoque() {
       <div class="grupo-checks">${Object.entries(CATEGORIAS).map(([k, t]) => html`<label class="check"><input type="checkbox" checked=${cats.has(k)} onChange=${() => alternar(k)} /> ${t}</label>`)}</div>
       <select class="entrada" value=${status} onChange=${(e) => setStatus(e.target.value)}>
         <option value="">Todas as situações</option>
+        <option value="alerta">Zerados ou críticos</option>
         ${Object.entries(STATUS_ESTOQUE).map(([k, s]) => html`<option value=${k}>${s.rotulo}</option>`)}
       </select>
       <select class="entrada" value=${grupo} onChange=${(e) => { setGrupo(e.target.value); setClassif(''); }}>

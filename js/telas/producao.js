@@ -108,9 +108,9 @@ function SeletorDia({ dia, setDia }) {
     <input class="entrada" type="date" value=${dia} onChange=${(e) => e.target.value && setDia(e.target.value)} />
     <button class="btn btn-sec btn-peq" title="Próximo dia" onClick=${() => setDia(somarDias(dia, 1))}>›</button>
     <span class="chips">
-      <button class=${'chip' + (dia === somarDias(h, -1) ? ' ativo' : '')} onClick=${() => setDia(somarDias(h, -1))}>Ontem</button>
-      <button class=${'chip' + (dia === h ? ' ativo' : '')} onClick=${() => setDia(h)}>Hoje</button>
-      <button class=${'chip' + (dia === somarDias(h, 1) ? ' ativo' : '')} onClick=${() => setDia(somarDias(h, 1))}>Amanhã</button>
+      <button class=${'chip' + (dia === somarDias(h, -1) ? ' ativo' : '')} aria-pressed=${!!(dia === somarDias(h, -1))} onClick=${() => setDia(somarDias(h, -1))}>Ontem</button>
+      <button class=${'chip' + (dia === h ? ' ativo' : '')} aria-pressed=${!!(dia === h)} onClick=${() => setDia(h)}>Hoje</button>
+      <button class=${'chip' + (dia === somarDias(h, 1) ? ' ativo' : '')} aria-pressed=${!!(dia === somarDias(h, 1))} onClick=${() => setDia(somarDias(h, 1))}>Amanhã</button>
     </span>
     <b class="dia-rotulo">${rotuloDia(dia)}</b>
   </div>`;
@@ -550,7 +550,7 @@ export function TelaSaidasProducao() {
     <label class="campo-inline">De <input class="entrada" type="date" value=${de} onChange=${(e) => setDe(e.target.value)} /></label>
     <label class="campo-inline">até <input class="entrada" type="date" value=${ate} onChange=${(e) => setAte(e.target.value)} /></label>
     <span class="chips">
-      <button class=${'chip' + (de === h && ate === h ? ' ativo' : '')} onClick=${() => { setDe(h); setAte(h); }}>Hoje</button>
+      <button class=${'chip' + (de === h && ate === h ? ' ativo' : '')} aria-pressed=${!!(de === h && ate === h)} onClick=${() => { setDe(h); setAte(h); }}>Hoje</button>
       <button class="chip" onClick=${() => { setDe(somarDias(h, -1)); setAte(somarDias(h, -1)); }}>Ontem</button>
       <button class="chip" onClick=${() => { setDe(somarDias(h, -6)); setAte(h); }}>7 dias</button>
       <button class="chip" onClick=${() => { setDe(h.slice(0, 8) + '01'); setAte(h); }}>Este mês</button>

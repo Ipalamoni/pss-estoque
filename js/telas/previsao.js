@@ -139,7 +139,7 @@ export function TelaPrevisao() {
         abas=${() => [{ nome: 'Dia a dia', colunas: colDia, linhas }, { nome: 'Por produto', colunas: colProd, linhas: porProduto }]} />
     </${Cabecalho}>
     <div class="chips">
-      ${PERIODOS.filter((p) => !reduzido || ['hoje', 'amanha'].includes(p.id)).map((p) => html`<button class=${'chip' + (per === p.id ? ' ativo' : '')} onClick=${() => escolher(p.id)}>${p.t}</button>`)}
+      ${PERIODOS.filter((p) => !reduzido || ['hoje', 'amanha'].includes(p.id)).map((p) => html`<button class=${'chip' + (per === p.id ? ' ativo' : '')} aria-pressed=${!!(per === p.id)} onClick=${() => escolher(p.id)}>${p.t}</button>`)}
     </div>
     ${per === 'livre' && html`<div class="filtros">
       <label class="campo-inline">De <input class="entrada" type="date" value=${de} onChange=${(e) => { setDe(e.target.value); if (e.target.value > ate) setAte(e.target.value); }} /></label>

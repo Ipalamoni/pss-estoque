@@ -1,10 +1,12 @@
 // =====================================================================
 // graficos.js — gráficos simples (sem biblioteca), nas cores da PSS
-// Paleta validada (daltonismo e contraste): verde #1a9a74 · laranja #d17800
+// Paleta: verde-escuro + laranja-claro, com luminosidade bem diferente (dá para
+// distinguir em preto e branco e com daltonismo). As cores vêm do CSS (--serie-1/2),
+// que tem versão própria no tema escuro.
 // =====================================================================
 import { html, useState, useEffect, useRef } from './ui.js';
 
-export const COR_SERIE = ['#1a9a74', '#d17800'];
+export const COR_SERIE = ['var(--serie-1)', 'var(--serie-2)'];
 
 // Barras horizontais ordenadas (uma série, uma cor). Rótulo à esquerda,
 // valor à direita, dica ao passar o mouse/tocar.
@@ -18,8 +20,9 @@ export function BarrasH({ itens, formatar = String, cor = COR_SERIE[0], vazio = 
       return html`<div class=${'bh-linha' + (aoClicar ? ' clicavel' : '')} role="listitem" title=${i.dica || `${i.rotulo}: ${i.texto || formatar(i.valor)}`}
         onClick=${aoClicar ? () => aoClicar(i) : undefined}>
         <span class="bh-rotulo">${i.rotulo}${i.sub && html`<small>${i.sub}</small>`}</span>
-        <span class="bh-trilho"><span class="bh-barra" style=${{ width: `${w}%`, background: cor }}></span></span>
+        <span class="bh-trilho" aria-hidden="true"><span class="bh-barra" style=${{ width: `${w}%`, background: cor }}></span></span>
         <span class="bh-valor">${i.texto || formatar(i.valor)}</span>
+        ${i.dica && html`<span class="so-leitor">${i.dica}</span>`}
       </div>`;
     })}
   </div>`;
@@ -45,18 +48,23 @@ export function Colunas({ categorias, series, formatar = String, formatarEixo = 
   const bw = Math.max(4, Math.min(28, (gw - 12) / series.length));
   const y = (v) => m.t + (H - m.t - m.b) * (1 - v / topo);
   const marcas = []; for (let v = 0; v <= topo + 1e-9; v += passo) marcas.push(v);
+  const resumo = (i) => `${categorias[i]}: ${series.map((s) => `${s.nome} ${formatar(s.valores[i])}`).join(', ')}`;
   return html`<div class="colunas">
-    ${series.length > 1 && html`<div class="legenda-graf">${series.map((s, k) => html`<span><i style=${{ background: COR_SERIE[k] }}></i>${s.nome}</span>`)}</div>`}
-    <div class="colunas-area" ref=${caixa}>
-      <svg viewBox=${`0 0 ${W} ${H}`} width=${W} height=${H} role="img" aria-label=${series.map((s) => s.nome).join(' e ')} onMouseLeave=${() => setFoco(null)}>
+    ${series.length > 1 && html`<div class="legenda-graf" aria-hidden="true">${series.map((s, k) => html`<span><i style=${{ background: COR_SERIE[k] }}></i>${s.nome}</span>`)}</div>`}
+    <table class="so-leitor"><caption>${series.map((s) => s.nome).join(' e ')}</caption>
+      <thead><tr><th scope="col">Período</th>${series.map((s) => html`<th scope="col">${s.nome}</th>`)}</tr></thead>
+      <tbody>${categorias.map((c, i) => html`<tr><th scope="row">${c}</th>${series.map((s) => html`<td>${formatar(s.valores[i])}</td>`)}</tr>`)}</tbody></table>
+    <div class="colunas-area" ref=${caixa} aria-hidden="true">
+      <svg viewBox=${`0 0 ${W} ${H}`} width=${W} height=${H} onMouseLeave=${() => setFoco(null)}>
         ${marcas.map((v) => html`<g><line x1=${m.e} x2=${W - m.d} y1=${y(v)} y2=${y(v)} class=${v === 0 ? 'eixo' : 'grade'} />
           <text x=${m.e - 6} y=${y(v) + 4} text-anchor="end" class="rot-eixo">${formatarEixo(v)}</text></g>`)}
         ${categorias.map((c, i) => {
           const x0 = m.e + gw * i + (gw - bw * series.length - 2 * (series.length - 1)) / 2;
-          return html`<g onMouseEnter=${() => setFoco(i)} onClick=${() => setFoco(i)}>
+          return html`<g onMouseEnter=${() => setFoco(i)} onClick=${() => setFoco(i)} onFocus=${() => setFoco(i)} onBlur=${() => setFoco(null)}
+            tabindex="0" class="col-alvo" aria-label=${resumo(i)}>
             <rect x=${m.e + gw * i} y=${m.t} width=${gw} height=${H - m.t - m.b} class=${'alvo' + (foco === i ? ' ativo' : '')} />
             ${series.map((s, k) => { const v = Number(s.valores[i]) || 0; const h = Math.max(0, y(0) - y(v));
-              return html`<path d=${coluna(x0 + k * (bw + 2), y(0), bw, h)} fill=${COR_SERIE[k]} />`; })}
+              return html`<path d=${coluna(x0 + k * (bw + 2), y(0), bw, h)} style=${{ fill: COR_SERIE[k] }} />`; })}
             <text x=${m.e + gw * i + gw / 2} y=${H - 8} text-anchor="middle" class="rot-eixo">${c}</text>
           </g>`;
         })}

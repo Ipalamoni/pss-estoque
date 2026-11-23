@@ -58,6 +58,7 @@ export function TelaPedidos() {
   const linhas = useMemo(() => todos.filter((p) => {
     if (filtro === 'pendentes' && !p.r.pendente) return false;
     if (filtro === 'atrasados' && !p.r.atrasado) return false;
+    if (filtro === 'semana' && !(p.r.pendente && p.previsao_entrega && p.previsao_entrega >= hojeISO() && p.previsao_entrega <= somarDias(hojeISO(), 7))) return false;
     if (filtro === 'divergencia' && !p.r.divPendente) return false;
     if (filtro === 'divergentes' && !p.r.divergencia) return false;
     if (STATUS_PEDIDO[filtro] && p.status !== filtro) return false;
@@ -107,6 +108,7 @@ export function TelaPedidos() {
       <select class="entrada" value=${filtro} onChange=${(e) => setFiltro(e.target.value)}>
         <option value="pendentes">Pendentes de entrega</option>
         <option value="atrasados">Atrasados</option>
+        <option value="semana">Chegam nos próximos 7 dias</option>
         <option value="divergencia">Divergência aguardando ciência</option>
         <option value="divergentes">Recebidos com divergência (todos)</option>
         <option value="todos">Todos</option>

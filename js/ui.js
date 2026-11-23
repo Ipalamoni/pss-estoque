@@ -20,14 +20,19 @@ export function Avisos() {
   useEffect(() => {
     const f = (a) => {
       setLista((l) => [...l, a]);
-      setTimeout(() => setLista((l) => l.filter((x) => x.id !== a.id)), a.tipo === 'erro' ? 7000 : 3500);
+      // erro fica até a pessoa fechar (dá tempo de ler); os demais somem sozinhos
+      if (a.tipo !== 'erro') setTimeout(() => setLista((l) => l.filter((x) => x.id !== a.id)), a.tipo === 'aviso' ? 6000 : 3500);
     };
     ouvintesAviso.push(f);
     return () => { ouvintesAviso = ouvintesAviso.filter((x) => x !== f); };
   }, []);
-  return html`<div class="avisos" role="status" aria-live="polite">
-    ${lista.map((a) => html`<div key=${a.id} class=${'aviso aviso-' + a.tipo}
-      onClick=${() => setLista((l) => l.filter((x) => x.id !== a.id))}>${a.texto}</div>`)}
+  const fechar = (id) => setLista((l) => l.filter((x) => x.id !== id));
+  const item = (a) => html`<div key=${a.id} class=${'aviso aviso-' + a.tipo}>
+    <span class="aviso-txt">${a.texto}</span>
+    <button type="button" class="aviso-fechar" aria-label="Fechar aviso" title="Fechar" onClick=${() => fechar(a.id)}>✕</button></div>`;
+  return html`<div class="avisos">
+    <div role="alert" aria-live="assertive">${lista.filter((a) => a.tipo === 'erro').map(item)}</div>
+    <div role="status" aria-live="polite">${lista.filter((a) => a.tipo !== 'erro').map(item)}</div>
   </div>`;
 }
 
@@ -49,18 +54,40 @@ export function HostConfirmacao() {
 }
 
 // ------------------------------ Modal --------------------------------
+let seqModal = 0;
+const FOCAVEIS = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 export function Modal({ titulo, aoFechar, children, rodape, largo, cheio }) {
+  const caixa = useRef(null);
+  const fecharRef = useRef(aoFechar); fecharRef.current = aoFechar;
+  const [idTitulo] = useState(() => `modal-titulo-${++seqModal}`);
   useEffect(() => {
-    const f = (e) => { if (e.key === 'Escape') aoFechar?.(); };
+    const antes = document.activeElement;   // devolve o foco para onde estava ao fechar
+    const el = caixa.current;
+    if (el && !el.contains(document.activeElement)) {
+      const primeiro = el.querySelector('.modal-corpo ' + FOCAVEIS) || el;
+      try { primeiro.focus({ preventScroll: true }); } catch { /* ignora */ }
+    }
+    const f = (e) => {
+      if (e.key === 'Escape') { fecharRef.current?.(); return; }
+      if (e.key !== 'Tab' || !caixa.current) return;   // Tab não sai da janela
+      const itens = [...caixa.current.querySelectorAll(FOCAVEIS)].filter((x) => x.offsetParent !== null);
+      if (!itens.length) return;
+      const pri = itens[0], ult = itens[itens.length - 1];
+      if (e.shiftKey && document.activeElement === pri) { e.preventDefault(); ult.focus(); }
+      else if (!e.shiftKey && document.activeElement === ult) { e.preventDefault(); pri.focus(); }
+    };
     document.addEventListener('keydown', f);
     document.body.classList.add('sem-rolagem');
-    return () => { document.removeEventListener('keydown', f); document.body.classList.remove('sem-rolagem'); };
+    return () => {
+      document.removeEventListener('keydown', f); document.body.classList.remove('sem-rolagem');
+      if (antes && antes.focus && document.contains(antes)) { try { antes.focus({ preventScroll: true }); } catch { /* ignora */ } }
+    };
   }, []);
   return html`<div class="modal-fundo" onClick=${(e) => e.target === e.currentTarget && aoFechar?.()}>
-    <div class=${'modal' + (largo ? ' modal-largo' : '') + (cheio ? ' modal-cheio' : '')} role="dialog" aria-modal="true">
+    <div class=${'modal' + (largo ? ' modal-largo' : '') + (cheio ? ' modal-cheio' : '')} role="dialog" aria-modal="true" aria-labelledby=${idTitulo} tabindex="-1" ref=${caixa}>
       <div class="modal-topo">
         ${aoFechar && html`<button class="btn-voltar" title="Voltar" aria-label="Voltar" onClick=${aoFechar}><${Seta} /></button>`}
-        <h2>${titulo}</h2>
+        <h2 id=${idTitulo}>${titulo}</h2>
         ${aoFechar && html`<button class="btn-icone btn-fechar" title="Fechar" aria-label="Fechar" onClick=${aoFechar}>✕</button>`}
       </div>
       <div class="modal-corpo">${children}</div>
@@ -182,12 +209,17 @@ export const Etiqueta = ({ cor = 'cinza', children, titulo }) => html`<span clas
 export const Vazio = ({ texto = 'Nada por aqui ainda.' }) => html`<div class="vazio">${texto}</div>`;
 export const Carregando = ({ texto = 'Carregando…' }) => html`<div class="carregando"><span class="giro"></span>${texto}</div>`;
 
-export function Cartao({ titulo, valor, sub, cor = '', aoClicar }) {
-  return html`<button class=${'cartao ' + cor} onClick=${aoClicar} disabled=${!aoClicar}>
-    <span class="cartao-titulo">${titulo}</span>
+// variacao: { texto: '▲ 12% vs. mês anterior', tom: 'bom' | 'ruim' | 'neutro' } (seta + texto, nunca só a cor)
+export function Cartao({ titulo, valor, sub, cor = '', aoClicar, variacao }) {
+  const miolo = html`
+    <span class="cartao-titulo">${titulo}${aoClicar && html`<span class="cartao-seta" aria-hidden="true">›</span>`}</span>
     <strong class="cartao-valor">${valor}</strong>
     ${sub && html`<span class="cartao-sub">${sub}</span>`}
-  </button>`;
+    ${variacao && html`<span class=${'cartao-var var-' + (variacao.tom || 'neutro')}>${variacao.texto}</span>`}`;
+  // só é botão quando leva a algum lugar (senão o leitor de tela anunciaria "botão indisponível")
+  return aoClicar
+    ? html`<button type="button" class=${'cartao clicavel ' + cor} onClick=${aoClicar}>${miolo}</button>`
+    : html`<div class=${'cartao ' + cor}>${miolo}</div>`;
 }
 
 // Cabeçalho de tela: seta "voltar" discreta + título + ações (exportar, novo...)
@@ -214,7 +246,7 @@ const Seta = () => html`<svg width="18" height="18" viewBox="0 0 24 24" fill="no
 
 // ------------------------------ Tabela -------------------------------
 // colunas: [{ chave, titulo, valor:(l)=>valor p/ ordenar, render:(l)=>conteúdo, num:true, classe }]
-export function Tabela({ colunas, linhas, aoClicar, vazio, rodape, ordemInicial, chave = 'id', classeLinha, max }) {
+export function Tabela({ colunas, linhas, aoClicar, vazio, rodape, ordemInicial, chave = 'id', classeLinha, max, aoVerTodos }) {
   const [ord, setOrd] = useState(ordemInicial || null);
   const lista = useMemo(() => {
     if (!ord) return linhas;
@@ -227,13 +259,17 @@ export function Tabela({ colunas, linhas, aoClicar, vazio, rodape, ordemInicial,
   return html`<div class="tabela-rolagem">
     <table class="tabela">
       <thead><tr>
-        ${colunas.map((c) => html`<th class=${(c.num ? 'n ' : '') + (c.classe || '')}
-          onClick=${() => c.ordenar !== false && setOrd((o) => ({ chave: c.chave, dir: o && o.chave === c.chave ? -o.dir : (c.num ? -1 : 1) }))}>
-          ${c.titulo}${ord && ord.chave === c.chave ? (ord.dir > 0 ? ' ▲' : ' ▼') : ''}</th>`)}
+        ${colunas.map((c) => { const ativa = ord && ord.chave === c.chave;
+          const ordenarCol = () => setOrd((o) => ({ chave: c.chave, dir: o && o.chave === c.chave ? -o.dir : (c.num ? -1 : 1) }));
+          return html`<th class=${(c.num ? 'n ' : '') + (c.classe || '')} scope="col"
+            aria-sort=${ativa ? (ord.dir > 0 ? 'ascending' : 'descending') : null}>
+            ${c.ordenar === false || !c.titulo ? c.titulo : html`<button type="button" class="th-ordenar" onClick=${ordenarCol}
+              title=${`Ordenar por ${String(c.titulo).toLowerCase()}`}>${c.titulo}${ativa ? (ord.dir > 0 ? ' ▲' : ' ▼') : ''}</button>`}</th>`; })}
       </tr></thead>
       <tbody>
         ${mostrar.map((l) => html`<tr key=${l[chave]} class=${(aoClicar ? 'clicavel ' : '') + (classeLinha ? classeLinha(l) : '')}
-          onClick=${aoClicar ? () => aoClicar(l) : null}>
+          onClick=${aoClicar ? () => aoClicar(l) : null} tabindex=${aoClicar ? '0' : null}
+          onKeyDown=${aoClicar ? (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) { e.preventDefault(); aoClicar(l); } } : null}>
           ${colunas.map((c) => { const v = c.render ? c.render(l) : l[c.chave];
             return html`<td class=${(c.num ? 'n ' : '') + (c.classe || '') + (celulaVazia(v) ? ' vazia' : '')} data-rotulo=${c.titulo}>
             <span class="td-v">${v}</span></td>`; })}
@@ -241,7 +277,9 @@ export function Tabela({ colunas, linhas, aoClicar, vazio, rodape, ordemInicial,
       </tbody>
       ${rodape && html`<tfoot>${rodape}</tfoot>`}
     </table>
-    ${max && lista.length > max && html`<p class="nota">Mostrando ${max} de ${lista.length}. Use os filtros ou exporte para ver tudo.</p>`}
+    ${max && lista.length > max && (aoVerTodos
+      ? html`<p class="nota">Mostrando ${max} de ${lista.length}. <button type="button" class="btn-link" onClick=${aoVerTodos}>Ver todos (${lista.length})</button></p>`
+      : html`<p class="nota">Mostrando ${max} de ${lista.length}. Use os filtros ou exporte para ver tudo.</p>`)}
   </div>`;
 }
 

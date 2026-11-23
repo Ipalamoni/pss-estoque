@@ -1,5 +1,5 @@
 // Tela inicial: atalhos por perfil, indicadores e alertas
-import { html, useApp, Cartao, Tabela, Etiqueta, Cabecalho } from '../ui.js';
+import { html, useState, useApp, Cartao, Tabela, Etiqueta, Cabecalho } from '../ui.js';
 import { STATUS_ESTOQUE } from '../calc.js';
 import { moeda, num, qtdDupla, numeroPedido, data, hojeISO, diasEntre, somarDias, pl, qu, acessoAmplo, pode, operaLocal, ehGestao } from '../util.js';
 import { linhasFinanceiro } from './financeiro.js';
@@ -50,6 +50,7 @@ function InicioRestrito() {
 
 function InicioOperacao() {
   const { usuario, dados, ir, podeFazer, papeis } = useApp();
+  const [todosAtalhos, setTodosAtalhos] = useState(false);
   const { ind, pedidos, pedidoItens, mapa } = dados;
   const hoje = hojeISO();
   const h = new Date().getHours();
@@ -79,13 +80,12 @@ function InicioOperacao() {
     nChegando > 0 && { t: 'Receber transferências', i: 'transferencias', f: () => ir('transferencias'), n: nChegando },
     nSeparadas > 0 && { t: 'Separadas para enviar', i: 'caminhao', f: () => ir('transferencias'), n: nSeparadas },
     podeFazer('requisicao') && { t: 'Pedir material (requisição)', i: 'requisicoes', f: () => ir('requisicoes') },
-    papeis.some((x) => ['admin', 'diretoria', 'comprador', 'almoxarifado', 'engenharia'].includes(x)) && { t: 'Resumo (indicadores)', i: 'painel', f: () => ir('painel') },
+    papeis.some((x) => ['admin', 'diretoria', 'comprador', 'almoxarifado', 'engenharia'].includes(x)) && { t: 'Painel de Estoque e Compras', i: 'painel', f: () => ir('painel') },
     podeFazer('custos') && { t: 'Central de Custos', i: 'custos', f: () => ir('custos') },
     podeFazer('contagem_inicial') && !dados.produtos.some((p) => Number(p.saldo) !== 0) && { t: 'Contagem inicial (saldo)', i: 'contagem', f: () => ir('contagem') },
     podeFazer('previsao_producao') && !gestao && { t: 'Programado × produzido', i: 'previsao', f: () => ir('previsao') },
     papeis.some((x) => ['admin', 'diretoria'].includes(x)) && { t: 'Pedidos a pagar', i: 'financeiro', f: () => ir('financeiro') },
-    podeFazer('programacao') ? { t: 'Programar produção', i: 'programacao', f: () => ir('programacao') }
-      : verProg && podeFazer('saida_receita') && { t: 'Pesagem de hoje', i: 'programacao', f: () => ir('programacao') },
+    (podeFazer('programacao') || (verProg && podeFazer('saida_receita'))) && { t: 'Programação e pesagem', i: 'programacao', f: () => ir('programacao') },
     podeFazer('recebimento') && { t: 'Receber mercadoria', i: 'receber', f: () => ir('receber') },
     podeFazer('saida_avulsa') && { t: 'Saída avulsa', i: 'saidas', f: () => ir('saidas', { aba: 'avulsa' }) },
     podeFazer('saida_almox') && { t: 'Saída almoxarifado', i: 'saidas', f: () => ir('saidas', { aba: 'almox' }) },
@@ -99,8 +99,15 @@ function InicioOperacao() {
   const agora = [
     ...atalhos.filter((a) => a.n > 0),
     verPed && atrasados.length > 0 && { t: 'Pedidos de compra atrasados', i: 'pedidos', n: atrasados.length, f: () => ir('pedidos', { filtro: 'atrasados' }) },
-    podeFazer('pedido') && conta('zerado') + conta('critico') > 0 && { t: 'Itens zerados ou críticos', i: 'estoque', n: conta('zerado') + conta('critico'), f: () => ir('estoque', { status: conta('zerado') ? 'zerado' : 'critico' }) },
+    podeFazer('pedido') && conta('zerado') + conta('critico') > 0 && { id: 'alerta', t: 'Itens zerados ou críticos', i: 'estoque', n: conta('zerado') + conta('critico'), f: () => ir('estoque', { status: 'alerta' }) },
   ].filter(Boolean);
+  // o que já está em "Para fazer agora" não se repete nos cartões
+  const naLista = (id) => agora.some((a) => a.id === id);
+  const atrasadosNaLista = verPed && atrasados.length > 0;
+  const outrosAtalhos = atalhos.filter((a) => !a.n);
+  const LIMITE_ATALHOS = 6;
+  const atalhosVisiveis = todosAtalhos ? outrosAtalhos : outrosAtalhos.slice(0, LIMITE_ATALHOS);
+  const hora = (dados.carregadoEm || new Date()).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   const progHoje = (dados.programacoes || []).filter((p) => p.situacao === 'ativa' && p.data === hoje);
   const pendFinal = (dados.programacoes || []).filter((p) => p.situacao === 'ativa' && !p.finalizada_em && p.data < hoje);
 
@@ -110,7 +117,7 @@ function InicioOperacao() {
   const verPedidos = papeis.some((x) => ['admin', 'comprador', 'almoxarifado', 'recebimento', 'diretoria'].includes(x));
 
   return html`
-    <${Cabecalho} titulo=${`${saudacao}, ${usuario.nome.split(' ')[0]}!`} sub="O que você precisa fazer agora?" />
+    <${Cabecalho} titulo=${`${saudacao}, ${usuario.nome.split(' ')[0]}!`} sub=${`O que você precisa fazer agora? · atualizado às ${hora}`} />
     ${podeFazer('programacao') && pendFinal.length > 0 && html`<${AvisoFinalizar} progs=${pendFinal} aoAbrir=${() => ir('programacao')} />`}
     ${agora.length > 0 && html`<section class="agora" aria-label="Para fazer agora">
       <h2 class="titulo-bloco">Para fazer agora</h2>
@@ -120,39 +127,41 @@ function InicioOperacao() {
 
     <div class="cartoes">
       <${Cartao} titulo="Valor em estoque" valor=${moeda(valorEstoque)} sub=${pl(ativos.length, 'item ativo', 'itens ativos')} aoClicar=${() => ir('estoque')} />
-      <${Cartao} titulo="Zerados" valor=${conta('zerado')} cor=${conta('zerado') ? 'c-vermelho' : ''} aoClicar=${() => ir('estoque', { status: 'zerado' })} />
-      <${Cartao} titulo="Críticos" valor=${conta('critico')} cor=${conta('critico') ? 'c-vermelho' : ''} sub="abaixo da segurança" aoClicar=${() => ir('estoque', { status: 'critico' })} />
+      ${!naLista('alerta') && html`<${Cartao} titulo="Zerados ou críticos" valor=${conta('zerado') + conta('critico')} cor=${conta('zerado') + conta('critico') ? 'c-vermelho' : ''}
+        sub=${conta('zerado') + conta('critico') ? `${conta('zerado')} zerados · ${conta('critico')} abaixo da segurança` : 'nenhum item em falta'} aoClicar=${() => ir('estoque', { status: 'alerta' })} />`}
       <${Cartao} titulo="Para comprar" valor=${conta('comprar')} cor=${conta('comprar') ? 'c-laranja' : ''} sub="no ponto de pedido" aoClicar=${() => ir('estoque', { status: 'comprar' })} />
       ${verProg && html`<${Cartao} titulo="Programado para hoje" valor=${qu(progHoje.reduce((t, p) => t + Number(p.quantidade), 0), 'receita')}
         sub=${pl(new Set(progHoje.map((p) => p.ficha_id)).size, 'tipo de pão', 'tipos de pão')} aoClicar=${() => ir('programacao')} />`}
-      ${verPedidos && html`<${Cartao} titulo="Pedidos atrasados" valor=${atrasados.length} cor=${atrasados.length ? 'c-vermelho' : ''} aoClicar=${() => ir('pedidos', { filtro: 'atrasados' })} />`}
-      ${verPedidos && html`<${Cartao} titulo="Chegam em 7 dias" valor=${proximos.length} aoClicar=${() => ir('pedidos', { filtro: 'pendentes' })} />`}
-      ${verPedidos && html`<${Cartao} titulo="Recebidos com divergência ou sem pedido" valor=${divPend.length} cor=${divPend.length ? 'c-laranja' : ''}
-        sub=${divPend.length ? 'aguardando ciência do comprador' : 'nenhuma pendente'} aoClicar=${() => ir('pedidos', { pendencias: true })} />`}
+      ${verPedidos && !atrasadosNaLista && html`<${Cartao} titulo="Pedidos atrasados" valor=${atrasados.length} sub="nenhum atraso" aoClicar=${() => ir('pedidos', { filtro: 'atrasados' })} />`}
+      ${verPedidos && html`<${Cartao} titulo="Chegam em 7 dias" valor=${proximos.length} sub="pedidos com entrega prevista" aoClicar=${() => ir('pedidos', { filtro: 'semana' })} />`}
+      ${verPedidos && html`<${Cartao} titulo="Recebimentos a conferir" valor=${divPend.length} cor=${divPend.length ? 'c-laranja' : ''}
+        sub=${divPend.length ? 'com divergência ou sem pedido' : 'nenhum pendente'} aoClicar=${() => ir('pedidos', { pendencias: true })} />`}
     </div>
 
     <h2 class="titulo-bloco">Atalhos</h2>
-    <div class="atalhos">
-      ${atalhos.filter((a) => !a.n).map((a) => html`<button class=${'atalho' + (a.destaque ? ' atalho-destaque' : '')} onClick=${a.f}><${Icone} nome=${a.i} tam=${22} /><span>${a.t}</span></button>`)}
+    <div class="atalhos" id="inicio-atalhos">
+      ${atalhosVisiveis.map((a) => html`<button class=${'atalho' + (a.destaque ? ' atalho-destaque' : '')} onClick=${a.f}><${Icone} nome=${a.i} tam=${22} /><span>${a.t}</span></button>`)}
     </div>
+    ${outrosAtalhos.length > LIMITE_ATALHOS && html`<div class="mais-atalhos"><button type="button" class="btn-link" aria-expanded=${todosAtalhos} aria-controls="inicio-atalhos"
+      onClick=${() => setTodosAtalhos(!todosAtalhos)}>${todosAtalhos ? 'Mostrar menos atalhos' : `Mais atalhos (${outrosAtalhos.length - LIMITE_ATALHOS})`}</button></div>`}
 
     ${podeFazer('previsao_producao') && html`<${ResumoPrevisao} dia=${hoje} aoAbrir=${() => ir('previsao')} />`}
     <div class="duas-colunas">
       <section class="painel">
         <h2>Itens que pedem atenção</h2>
         <${Tabela} linhas=${atencao} max=${12} vazio="Tudo certo: nenhum item zerado, crítico ou no ponto de compra."
-          aoClicar=${() => ir('estoque')}
+          aoClicar=${(p) => ir('estoque', { status: p.status })} aoVerTodos=${() => ir('estoque', { status: 'alerta' })}
           colunas=${[
             { chave: 'descricao', titulo: 'Produto', render: (p) => html`<b>${p.descricao}</b><br /><small>${p.codigo}</small>` },
             { chave: 'saldo', titulo: 'Saldo', num: true, render: (p) => qtdDupla(p, p.saldo) },
-            { chave: 'cobertura', titulo: 'Cobertura', num: true, render: (p) => (p.cobertura === null ? '–' : `${num(p.cobertura, 1)} ${p.cobertura >= 1 && p.cobertura < 2 ? 'dia' : 'dias'}`) },
+            { chave: 'cobertura', titulo: 'Cobertura', num: true, render: (p) => (p.cobertura === null ? '–' : `${num(p.cobertura, 1)} ${p.cobertura < 2 ? 'dia' : 'dias'}`) },
             { chave: 'status_ordem', titulo: 'Situação', render: (p) => html`<${Etiqueta} cor=${STATUS_ESTOQUE[p.status].cor}>${STATUS_ESTOQUE[p.status].rotulo}</${Etiqueta}>` },
           ]} />
       </section>
       ${verPedidos && html`<section class="painel">
         <h2>Entregas pendentes</h2>
         <${Tabela} linhas=${entregas} max=${12} vazio="Nenhum pedido aguardando entrega."
-          aoClicar=${(p) => ir('pedidos', { abrir: p.id })}
+          aoClicar=${(p) => ir('pedidos', { abrir: p.id })} aoVerTodos=${() => ir('pedidos', { filtro: 'pendentes' })}
           colunas=${[
             { chave: 'id', titulo: 'Pedido', render: (p) => html`<b>${numeroPedido(p.id)}</b><br /><small>${mapa.fornecedor.get(p.fornecedor_id)?.nome}</small>` },
             { chave: 'previsao_entrega', titulo: 'Previsão', render: (p) => data(p.previsao_entrega) },

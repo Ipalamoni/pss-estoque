@@ -20,7 +20,7 @@ export function TelaCadastrosProducao() {
 }
 
 function Chips({ itens, sel, aoMudar, rotulo = (x) => x.nome }) {
-  return html`<div class="chips">${itens.map((x) => html`<button type="button" class=${'chip' + (sel.includes(x.id) ? ' ativo' : '')}
+  return html`<div class="chips">${itens.map((x) => html`<button type="button" class=${'chip' + (sel.includes(x.id) ? ' ativo' : '')} aria-pressed=${!!(sel.includes(x.id))}
     onClick=${() => aoMudar(sel.includes(x.id) ? sel.filter((y) => y !== x.id) : [...sel, x.id])}>${rotulo(x)}</button>`)}</div>`;
 }
 

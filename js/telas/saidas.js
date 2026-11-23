@@ -166,7 +166,7 @@ function SaidaAvulsa({ aoConcluir }) {
         rotuloDe=${(x) => `${x.codigo} · ${x.descricao}`} aoMudar=${(id, pr) => { setProdId(id); setUn(pr.unidade_estoque); }} /></${Campo}>
       <${Campo} rotulo="Quantidade" obrigatorio ajuda=${p ? `Neste local: ${qtdDupla(p, saldoLocal(dados, p.id, loc).disponivel)}` : ''}><${QtdUnidade} produto=${p} valor=${q} unidade=${un} desabilitado=${!p} aoMudar=${(v, u) => { setQ(v); setUn(u); }} /></${Campo}>
       <${Campo} rotulo="Justificativa" obrigatorio classe="larga">
-        <div class="chips">${MOTIVOS_RAPIDOS.map((t) => html`<button type="button" class=${'chip' + (obs === t ? ' ativo' : '')} onClick=${() => setObs(t)}>${t}</button>`)}</div>
+        <div class="chips">${MOTIVOS_RAPIDOS.map((t) => html`<button type="button" class=${'chip' + (obs === t ? ' ativo' : '')} aria-pressed=${!!(obs === t)} onClick=${() => setObs(t)}>${t}</button>`)}</div>
         <input class="entrada" value=${obs} onInput=${(e) => setObs(e.target.value)} placeholder="Descreva o motivo" /></${Campo}>
     </div>
     <div class="barra-acao"><button class="btn btn-pri btn-grande" disabled=${ocupado} onClick=${registrar}>${ocupado ? 'Registrando…' : 'Dar saída avulsa'}</button></div>

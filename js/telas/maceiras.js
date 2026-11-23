@@ -324,11 +324,11 @@ function SaidaAvulsaPadeiro({ operador, aoFechar }) {
   return html`<${Modal} titulo="Saída avulsa" aoFechar=${aoFechar}
     rodape=${html`<button class="btn btn-sec" onClick=${aoFechar}>Voltar</button><button class="btn btn-pri btn-grande" disabled=${ocupado} onClick=${ok}>Dar baixa</button>`}>
     <p class="nota">Para o que sai fora da receita (farinha para a máquina, óleo para untar…). Não entra no custo do pão: fica num relatório próprio.</p>
-    <div class="chips">${locais.map((l) => html`<button class=${'chip' + (local === l.id ? ' ativo' : '')} onClick=${() => { setLocal(l.id); setProd(null); }}>${l.nome}</button>`)}</div>
+    <div class="chips">${locais.map((l) => html`<button class=${'chip' + (local === l.id ? ' ativo' : '')} aria-pressed=${!!(local === l.id)} onClick=${() => { setLocal(l.id); setProd(null); }}>${l.nome}</button>`)}</div>
     <${Campo} rotulo="Produto"><${Escolher} itens=${produtos} valor=${prod} aoMudar=${setProd} rotuloDe=${(x) => `${x.descricao}`}
       detalheDe=${(x) => [x.marca, `estoque ${qu(saldoLocal(dados, x.id, local).disponivel, x.unidade_estoque)}`].filter(Boolean).join(' · ')} /></${Campo}>
     <${Campo} rotulo=${`Quantidade${p ? ` (${p.unidade_estoque})` : ''}`}><${Numero} valor=${q} aoMudar=${setQ} /></${Campo}>
-    <div class="chips">${MOTIVOS.map((m) => html`<button class=${'chip' + (motivo === m ? ' ativo' : '')} onClick=${() => setMotivo(m)}>${m}</button>`)}</div>
+    <div class="chips">${MOTIVOS.map((m) => html`<button class=${'chip' + (motivo === m ? ' ativo' : '')} aria-pressed=${!!(motivo === m)} onClick=${() => setMotivo(m)}>${m}</button>`)}</div>
     <${Campo} rotulo="Observação (opcional)"><input class="entrada" value=${obs} onInput=${(e) => setObs(e.target.value)} /></${Campo}>
   </${Modal}>`;
 }

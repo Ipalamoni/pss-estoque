@@ -164,7 +164,7 @@ export function TelaFinanceiro() {
     ${grupo('alerta').length > 0 && html`<div class="aviso-faixa"><span>⚠ <b>${pl(grupo('alerta').length, 'pedido', 'pedidos')}</b> com pagamento vencendo (ou vencido) e a mercadoria ainda não chegou toda. Fale com o comprador antes de pagar.</span>
       <button class="btn btn-destaque btn-peq" onClick=${() => setRapido('alerta')}>Ver</button></div>`}
     <div class="chips">
-      ${Object.entries(RAPIDOS).map(([k, v]) => html`<button class=${'chip' + (rapido === k ? ' ativo' : '')} onClick=${() => setRapido(k)}>${v.t}</button>`)}
+      ${Object.entries(RAPIDOS).map(([k, v]) => html`<button class=${'chip' + (rapido === k ? ' ativo' : '')} aria-pressed=${!!(rapido === k)} onClick=${() => setRapido(k)}>${v.t}</button>`)}
     </div>
     <${Filtros} ativos=${[pedDe, pedAte, venDe, venAte, lanc, ent].filter(Boolean).length} fixo=${html`<${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Nº do pedido ou fornecedor" />`}>
       <label class="campo-inline">Pedido de <input class="entrada" type="date" value=${pedDe} onChange=${(e) => setPedDe(e.target.value)} /></label>

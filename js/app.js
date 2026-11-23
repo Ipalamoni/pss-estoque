@@ -72,12 +72,12 @@ const MENU = [
   { id: 'custos', titulo: 'Central de Custos', papeis: ['admin', 'diretoria'], tela: TelaCustos },
   { id: 'financeiro', titulo: 'Pedidos a pagar', papeis: ['admin', 'financeiro', 'diretoria'], tela: TelaFinanceiro },
   { id: 'previsao', titulo: 'Programado × produzido', papeis: ['admin', 'engenharia', 'diretoria', 'financeiro', 'faturamento'], tela: TelaPrevisao, aoVivo: true },
-  { id: 'painel', titulo: 'Resumo e indicadores', papeis: ['admin', 'diretoria', 'comprador', 'almoxarifado', 'engenharia'], tela: TelaPainel },
+  { id: 'painel', titulo: 'Painel de Estoque e Compras', papeis: ['admin', 'diretoria', 'comprador', 'almoxarifado', 'engenharia'], tela: TelaPainel },
   { grupo: 'Produção' },
   { id: 'maceiras', titulo: 'Produção Maceiras', papeis: ['admin', 'padeiro', 'engenharia', 'diretoria'], tela: TelaMaceiras, aoVivo: true },
   { id: 'programacao', titulo: 'Programação e pesagem', papeis: ['admin', 'engenharia', 'pesagem', 'diretoria'], tela: TelaProgramacao, aoVivo: true },
-  { id: 'finalizar', titulo: 'Finalizar produção', papeis: ['admin', 'engenharia', 'diretoria'], tela: TelaFinalizar, aoVivo: true },
-  { id: 'saidas-producao', titulo: 'Consumo da produção', papeis: ['admin', 'engenharia', 'pesagem', 'almoxarifado', 'diretoria'], tela: TelaSaidasProducao },
+  { id: 'finalizar', titulo: 'Finalizar bateladas', papeis: ['admin', 'engenharia', 'diretoria'], tela: TelaFinalizar, aoVivo: true },
+  { id: 'saidas-producao', titulo: 'Saídas da produção', papeis: ['admin', 'engenharia', 'pesagem', 'almoxarifado', 'diretoria'], tela: TelaSaidasProducao },
   { grupo: 'Estoque' },
   { id: 'estoque-local', titulo: 'Estoque por local', papeis: [...TODOS, 'padeiro'], tela: TelaEstoqueLocal, aoVivo: true },
   { id: 'transferencias', titulo: 'Transferências', papeis: ['admin', 'almoxarifado', 'recebimento', 'pesagem', 'engenharia', 'diretoria', 'padeiro'], tela: TelaTransferencias, aoVivo: true },
@@ -88,7 +88,7 @@ const MENU = [
   { id: 'contagem', titulo: 'Contagem inicial', papeis: ['admin', 'almoxarifado'], tela: TelaContagemInicial },
   { grupo: 'Compras' },
   { id: 'pedidos', titulo: 'Pedidos de compra', papeis: ['admin', 'comprador', 'almoxarifado', 'recebimento', 'diretoria'], tela: TelaPedidos },
-  { id: 'estoque', titulo: 'Posição para compras', papeis: TODOS, tela: TelaEstoque, aoVivo: true },
+  { id: 'estoque', titulo: 'Posição de estoque', papeis: TODOS, tela: TelaEstoque, aoVivo: true },
   { id: 'movimentos', titulo: 'Kardex (movimentações)', papeis: TODOS, tela: TelaMovimentos },
   { id: 'relatorios', titulo: 'Relatórios', papeis: ['admin', 'comprador', 'almoxarifado', 'diretoria'], tela: TelaRelatorios },
   { grupo: 'Cadastros' },
@@ -190,14 +190,19 @@ function Sininho({ dados, papeis, ir }) {
     }
     ant.current = n;
   }, [itens.length]);
+  useEffect(() => {   // Esc fecha a lista de avisos
+    if (!aberto) return undefined;
+    const f = (e) => { if (e.key === 'Escape') setAberto(false); };
+    document.addEventListener('keydown', f); return () => document.removeEventListener('keydown', f);
+  }, [aberto]);
   const podeAvisar = 'Notification' in window && Notification.permission === 'default';
   return html`<div class="sininho">
-    <button class="btn-icone" title=${itens.length ? `${itens.length} pendência(s)` : 'Sem pendências'} aria-label="Avisos" onClick=${() => setAberto(!aberto)}>
+    <button class="btn-icone" title=${itens.length ? `${itens.length} pendência(s)` : 'Sem pendências'} aria-label=${itens.length ? `Avisos: ${pl(itens.length, 'pendência', 'pendências')}` : 'Avisos: nenhuma pendência'} aria-expanded=${aberto} aria-haspopup="true" onClick=${() => setAberto(!aberto)}>
       <${Icone} nome="sino" />${itens.length > 0 && html`<span class="sino-num">${itens.length > 99 ? '99+' : itens.length}</span>`}</button>
     ${aberto && html`<div class="menu-fundo transparente" onClick=${() => setAberto(false)}></div><div class="sino-caixa">
       <b>${itens.length ? `Você tem ${pl(itens.length, 'pendência', 'pendências')}` : 'Nenhuma pendência agora'}</b>
       ${itens.slice(0, 12).map((i) => html`<button class="sino-item" onClick=${() => { setAberto(false); ir(i.rota, { abrir: i }); }}>
-        <span class=${'sino-ico ' + i.tipo}>${i.tipo === 'req' ? '📋' : '🚚'}</span><span><b>${i.texto}</b><small>${i.sub}</small></span></button>`)}
+        <span class=${'sino-ico ' + i.tipo} aria-hidden="true"><${Icone} nome=${i.tipo === 'req' ? 'requisicoes' : 'transferencias'} tam=${18} /></span><span><b>${i.texto}</b><small>${i.sub}</small></span></button>`)}
       ${podeAvisar && html`<button class="btn btn-sec btn-peq" onClick=${() => Notification.requestPermission()}>Ativar avisos neste aparelho</button>`}
     </div>`}
   </div>`;
@@ -510,12 +515,11 @@ function App() {
         <${BotaoTema} />
         ${dados && html`<${Sininho} dados=${dados} papeis=${papeis} ir=${ir} />`}
         ${(real.papeis || []).includes('admin') && html`<button class="btn-icone so-tela" title="Entrar como / ver como outra pessoa" aria-label="Ver como outra pessoa" onClick=${() => setEscolher(true)}><${Icone} nome="usuarios" /></button>`}
-        <img class="selo-palamoni so-tela" src="icons/logo-palamoni-vertical.png" alt="Palamoni Consultoria" title="Produto Palamoni Consultoria Empresarial" />
         ${api.modo !== 'demo' && html`<button class="btn-icone so-tela" title="Trocar senha" aria-label="Trocar senha" onClick=${() => setSenha(true)}><${Icone} nome="chave" /></button>`}
         <button class="btn-icone so-tela" title="Sair" aria-label="Sair" onClick=${sair}><${Icone} nome="sair" /></button>
       </div>
     </header>
-    ${visao && html`<div class="faixa-vendo">👁 Vendo como <b>${visao.nome}</b> (${visao.funcao || papeisTexto(visao.papeis)}). O que você fizer fica registrado em seu nome (${real.nome}).
+    ${visao && html`<div class="faixa-vendo"><${Icone} nome="usuarios" tam=${16} /> Vendo como <b>${visao.nome}</b> (${visao.funcao || papeisTexto(visao.papeis)}). O que você fizer fica registrado em seu nome (${real.nome}).
       <button class="btn btn-sec btn-peq" onClick=${() => escolherVisao(null)}>Voltar ao meu acesso</button></div>`}
     <div class="corpo">
       <nav class=${'menu' + (menuAberto ? ' aberto' : '') + (recolhido ? ' recolhido' : '')}>

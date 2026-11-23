@@ -74,8 +74,8 @@ export function CustoProdutoAcabado() {
       <${Cartao} titulo="Custo padrão (ficha)" valor=${moeda(pad)} />
       <${Cartao} titulo="Real × padrão" valor=${pad > 0 ? `${tot > pad ? '+' : ''}${num(((tot - pad) / pad) * 100, 1)}%` : '–'} cor=${pad > 0 && tot > pad * 1.02 ? 'c-vermelho' : pad > 0 && tot < pad * 0.98 ? 'c-verde' : ''} />
     </div>
-    <div class="filtros"><span class="chips"><button class=${'chip' + (vis === 'receita' ? ' ativo' : '')} onClick=${() => setVis('receita')}>Por receita</button>
-      <button class=${'chip' + (vis === 'batelada' ? ' ativo' : '')} onClick=${() => setVis('batelada')}>Por batelada</button></span>
+    <div class="filtros"><span class="chips"><button class=${'chip' + (vis === 'receita' ? ' ativo' : '')} aria-pressed=${!!(vis === 'receita')} onClick=${() => setVis('receita')}>Por receita</button>
+      <button class=${'chip' + (vis === 'batelada' ? ' ativo' : '')} aria-pressed=${!!(vis === 'batelada')} onClick=${() => setVis('batelada')}>Por batelada</button></span>
       <${Exportar} titulo="Custo do produto acabado" filtros=${`${de} a ${ate}`} arquivo=${`custo-produto-${de}-a-${ate}`} colunas=${vis === 'receita' ? colR : colB} linhas=${vis === 'receita' ? porReceita : lista} /></div>
     ${vis === 'receita' ? html`<${Tabela} linhas=${porReceita} vazio="Nenhuma batelada finalizada no período." colunas=${[
         { chave: 'r', titulo: 'Receita', valor: (r) => f(r.id)?.nome, render: (r) => html`<b>${f(r.id)?.codigo}</b> ${f(r.id)?.nome}` },
