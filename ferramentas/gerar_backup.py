@@ -231,7 +231,7 @@ with r as (
   union all select 'Regras de acesso (RLS)', (select count(*) from pg_policies where schemaname = 'public')::text, '{n_politicas}'
   union all select 'Tabelas', (select count(*) from pg_tables where schemaname = 'public')::text, '{n_tabelas}'
   union all select 'Tabelas no tempo real', (select count(*) from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public')::text, '{n_tempo_real}'
-  union all select 'Versões do banco', (select string_agg(versao, ', ' order by versao) from public.versao_banco), '{versoes}'
+  union all select 'Última versão do banco instalada', (select max(versao) from public.versao_banco where versao = '{ultima}'), '{ultima}'
 )
 select item, valor, esperado, case when valor = esperado then 'OK' else 'ATENÇÃO' end as resultado from r;
 '''
@@ -297,6 +297,7 @@ def main():
     open(os.path.join(pasta, 'CONFERENCIA', 'manifesto-sha256.txt'), 'w', encoding='utf-8').write('\n'.join(sorted(linhas, key=lambda l: l.split('  ', 1)[1])) + '\n')
     open(os.path.join(pasta, 'CONFERENCIA', 'conferir_arquivos.py'), 'w', encoding='utf-8').write(CONFERIR_PY)
     ref = referencia_banco(os.path.join(pasta, 'site', 'banco', '00-instalar-banco-completo.sql'))
+    ref['ultima'] = ref['versoes'].split(', ')[-1]
     open(os.path.join(pasta, 'CONFERENCIA', 'conferir-banco.sql'), 'w', encoding='utf-8').write(CONFERIR_SQL.format(versao=versao, **ref))
     open(os.path.join(pasta, 'PROMPT_RECONSTRUCAO.md'), 'w', encoding='utf-8').write(PROMPT.format(versao=versao, commit=commit, data=data, usuarios=usuarios_md(a.usuarios)))
     if a.usuarios and os.path.exists(a.usuarios): shutil.copy(a.usuarios, os.path.join(pasta, 'usuarios.md'))   # para o próximo backup
