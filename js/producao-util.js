@@ -5,6 +5,7 @@
 // =====================================================================
 import { html, useState, useEffect, useApp, avisar } from './ui.js';
 import { hojeISO, somarDias, mensagemErro, num, operaLocal } from './util.js';
+import { Icone as IconeTempo } from './icones.js';
 
 const inicioDia = (iso) => new Date(iso + 'T00:00:00').toISOString();
 export const minutos = (desde, agora = Date.now()) => (desde ? Math.max(0, Math.round((agora - new Date(desde).getTime()) / 60000)) : null);
@@ -42,6 +43,30 @@ export const somar = (linhas, campo) => linhas.reduce((s, l) => s + Number(l[cam
 export function tempoMedio(dados, fichaId, maceira) {
   const f = dados.mapa.ficha.get(fichaId);
   return Number(f?.tempo_batelada_min || maceira?.tempo_min || dados.params.producao_tempo_padrao_min || 20);
+}
+
+// PRAZO da batelada: tempo da receita + tolerância (da receita ou o padrão de Parâmetros)
+export function prazoBatelada(dados, fichaId, maceira) {
+  const f = dados.mapa.ficha.get(fichaId);
+  const tol = f?.tolerancia_batelada_min ?? Number(dados.params.producao_tolerancia_batelada_min ?? 10);
+  return { tempo: tempoMedio(dados, fichaId, maceira), tol: Number(tol) };
+}
+// duração da batelada (do início ao fim; se ainda está batendo, até agora)
+export const duracaoBatelada = (b, agora = Date.now()) => minutos(b.iniciada_em, b.finalizada_em ? new Date(b.finalizada_em).getTime() : agora);
+// cor fixa com ícone + texto: verde = no prazo · âmbar = atenção (passou do tempo) · vermelho = atrasada (passou da tolerância)
+export const ESTADO_TEMPO = {
+  prazo: { cor: 'verde', rotulo: 'No prazo', icone: 'finalizar' },
+  atencao: { cor: 'ambar', rotulo: 'Atenção', icone: 'relogio' },
+  atraso: { cor: 'vermelho', rotulo: 'Atrasada', icone: 'aviso' },
+};
+export function estadoTempo(min, prazo) {
+  if (min === null || min === undefined) return null;
+  return min <= prazo.tempo ? 'prazo' : min <= prazo.tempo + prazo.tol ? 'atencao' : 'atraso';
+}
+export function SeloTempo({ estado, min, grande }) {
+  if (!estado) return null;
+  const e = ESTADO_TEMPO[estado];
+  return html`<span class=${'selo-tempo t-' + e.cor + (grande ? ' grande' : '')}><${IconeTempo} nome=${e.icone} /> ${e.rotulo}${min !== undefined && min !== null ? html` · <b>${tempoTexto(min)}</b>` : ''}</span>`;
 }
 
 // SEMÁFORO da maceira (só sinalização, nunca trava):

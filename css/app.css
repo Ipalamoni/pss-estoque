@@ -1293,3 +1293,36 @@ html[data-tema="escuro"] {
 [data-tema="escuro"] .texto-laranja { color: #ffb366; }
 .ordem-pesagem .titulo-com-acao { flex-wrap: wrap; gap: 8px; }
 .ordem-pesagem .titulo-com-acao .btn { white-space: normal; max-width: 100%; text-align: left; min-height: 44px; }
+
+/* =====================================================================
+   VERSÃO 2.10 — tempo das bateladas (cor fixa + ícone + texto) e finalizar no tablet
+   âmbar bem diferente do vermelho; texto escuro no âmbar para contraste
+   ===================================================================== */
+.selo-tempo { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 3px 10px; font-size: .85rem; font-weight: 800; white-space: nowrap; border: 2px solid transparent; }
+.selo-tempo.grande { font-size: 1.05rem; padding: 6px 14px; }
+.selo-tempo.t-verde { background: #e3f4ea; color: #145c38; border-color: #1e7d4f; }
+.selo-tempo.t-ambar { background: #ffe9a8; color: #5c4100; border-color: #d99a00; }
+.selo-tempo.t-vermelho { background: #c62828; color: #fff; border-color: #8e1b1b; }
+[data-tema="escuro"] .selo-tempo.t-verde { background: #163828; color: #b8f0d2; border-color: #3fb37a; }
+[data-tema="escuro"] .selo-tempo.t-ambar { background: #4a3a08; color: #ffe08a; border-color: #e0b020; }
+.chips-tempo { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 4px 0 10px; }
+.chips-tempo b { font-size: 1.1rem; margin-right: 8px; }
+.tabela-tempo tr.tt-atraso td { background: rgba(198, 40, 40, .07); }
+.tabela-tempo tr.tt-atencao td { background: rgba(217, 154, 0, .08); }
+.tabela-tempo td { vertical-align: middle; }
+
+/* tablet: o que está batendo agora + botão grande de finalizar */
+.em-producao h3 { margin: 6px 0 8px; font-size: 1.2rem; }
+.ep-lista { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 10px; }
+.ep-item { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; background: var(--cartao); border: 2px solid var(--borda); border-radius: 16px; padding: 12px 14px; }
+.ep-info { display: flex; flex-direction: column; gap: 3px; flex: 1 1 180px; min-width: 0; }
+.ep-info > b { font-size: 1.15rem; text-transform: uppercase; }
+.ep-info small { font-size: 1rem; color: var(--texto-2, inherit); }
+.ep-info span { font-size: 1.15rem; font-weight: 700; }
+.ep-info .selo-tempo { align-self: flex-start; margin-top: 4px; }
+.ep-botao { min-height: 64px; padding: 0 20px; border: 0; border-radius: 14px; background: #157347; color: #fff; font: inherit; font-size: 1.15rem; font-weight: 900;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; flex: 1 1 200px; letter-spacing: .02em; }
+.ep-botao:disabled { opacity: .5; cursor: not-allowed; }
+.ep-botao:focus-visible { outline: 4px solid var(--foco, #0b5cad); outline-offset: 3px; }
+.batida .selo-tempo { margin-left: 6px; }
+@media (max-width: 640px) { .ep-lista { grid-template-columns: 1fr; } }

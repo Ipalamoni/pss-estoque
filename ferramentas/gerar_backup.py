@@ -258,7 +258,7 @@ def referencia_banco(sql):
         n_politicas: await q(`select count(*)::text v from pg_policies where schemaname='public'`),
         n_tabelas: await q(`select count(*)::text v from pg_tables where schemaname='public'`),
         n_tempo_real: await q(`select count(*)::text v from pg_publication_tables where pubname='supabase_realtime' and schemaname='public'`),
-        versoes: await q(`select string_agg(versao, ', ' order by versao) v from public.versao_banco`) }));
+        versoes: await q(`select string_agg(versao, ', ' order by string_to_array(versao, '.')::int[]) v from public.versao_banco`) }));
       process.exit(0); })().catch((e) => { console.error(e.message); process.exit(1); });'''
     tmp = os.path.join(RAIZ, '.ref_banco.cjs'); open(tmp, 'w').write(js)
     try:

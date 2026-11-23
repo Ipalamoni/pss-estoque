@@ -4,7 +4,7 @@
 import { html, useState, useApp, Cabecalho, Abas, Tabela, Etiqueta, Modal, Campo, Numero, Vazio, useAcao, avisar, n } from '../ui.js';
 import { num, pode } from '../util.js';
 import { Icone } from '../icones.js';
-import { tempoMedio } from '../producao-util.js';
+import { prazoBatelada, tempoMedio } from '../producao-util.js';
 
 export function TelaCadastrosProducao() {
   const { papeis } = useApp();
@@ -127,6 +127,7 @@ const TEMPOS = [
   { chave: 'producao_tolerancia_min', rotulo: 'Tolerância para começar (min)', ajuda: 'Depois do início do turno, ou quando chega base numa masseira que estava parada.' },
   { chave: 'producao_tempo_padrao_min', rotulo: 'Tempo padrão da batelada (min)', ajuda: 'Usado quando a receita não tem tempo próprio.' },
   { chave: 'producao_prazo_finalizar_h', rotulo: 'Avisar batelada sem finalizar depois de (horas)', ajuda: 'Na tela Finalizar bateladas.' },
+  { chave: 'producao_tolerancia_batelada_min', rotulo: 'Tolerância padrão da batelada (min)', ajuda: 'Minutos além do tempo da receita antes de a batelada ficar ATRASADA (vermelho). Cada receita pode ter a sua.' },
   { chave: 'mistura_parada_h', rotulo: 'Avisar base parada depois de (horas)', ajuda: 'Base pesada que não foi usada.' },
 ];
 
@@ -157,6 +158,7 @@ function Tempos({ edita }) {
     { chave: 'codigo', titulo: 'Código' }, { chave: 'nome', titulo: 'Receita' },
     { chave: 'l', titulo: 'Linha', render: (f) => dados.mapa.linha.get(f.linha_id)?.nome || '–' },
     { chave: 't', titulo: 'Tempo (min)', num: true, valor: (f) => tempoMedio(dados, f.id), render: (f) => html`${tempoMedio(dados, f.id)}${f.tempo_batelada_min ? '' : html` <small class="texto-cinza">(padrão)</small>`}` },
+    { chave: 'tol', titulo: 'Tolerância (min)', num: true, valor: (f) => prazoBatelada(dados, f.id).tol, render: (f) => html`${prazoBatelada(dados, f.id).tol}${f.tolerancia_batelada_min != null ? '' : html` <small class="texto-cinza">(padrão)</small>`}` },
   ]} />
   <p class="nota">Para mudar o tempo de uma receita, abra a ficha técnica dela.</p>`;
 }

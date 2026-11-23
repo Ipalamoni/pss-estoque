@@ -63,7 +63,8 @@ function FormFicha({ ficha, itens, aoFechar, somenteLeitura, aoUsar }) {
   const [f, setF] = useState({ codigo: ficha.codigo || '', nome: ficha.nome || '', produto_final: ficha.produto_final || '', rendimento: ficha.rendimento || '',
     rendimento_qtd: ficha.rendimento_qtd ? String(Number(ficha.rendimento_qtd)).replace('.', ',') : '', rendimento_unidade: ficha.rendimento_unidade || 'pacotes',
     observacao: ficha.observacao || '', ativo: ficha.ativo !== false, linha_id: ficha.linha_id || null,
-    tempo_batelada_min: ficha.tempo_batelada_min ? String(ficha.tempo_batelada_min) : '' });
+    tempo_batelada_min: ficha.tempo_batelada_min ? String(ficha.tempo_batelada_min) : '',
+    tolerancia_batelada_min: ficha.tolerancia_batelada_min != null ? String(ficha.tolerancia_batelada_min) : '' });
   const [embLinhas, setEmbLinhas] = useState(() => itens.filter((i) => ehEmb(i.produto_id)).map((i) => ({ k: Math.random(), produto_id: i.produto_id, quantidade: String(Number(i.quantidade)).replace('.', ',') })));
   const mudarEmb = (k, ch) => setEmbLinhas((l) => l.map((x) => (x.k === k ? { ...x, ...ch } : x)));
   itens = itens.filter((i) => !ehEmb(i.produto_id));
@@ -85,7 +86,8 @@ function FormFicha({ ficha, itens, aoFechar, somenteLeitura, aoUsar }) {
     if (f.rendimento_qtd && !(rq > 0)) return avisar('O rendimento por receita precisa ser um número maior que zero.', 'erro');
     const rend = rq > 0 ? { rendimento_qtd: rq, rendimento_unidade: String(f.rendimento_unidade || 'un').trim(), rendimento: `${String(f.rendimento_qtd).trim()} ${String(f.rendimento_unidade || 'un').trim()}` }
       : { rendimento_qtd: null, rendimento_unidade: null };
-    const ok = await executar(() => api.rpc('salvar_ficha', { p: { ...f, ...rend, id: ficha.id || null, itens: its, tempo_batelada_min: f.tempo_batelada_min ? Math.round(n(f.tempo_batelada_min)) : null } }), 'Ficha técnica salva.');
+    const ok = await executar(() => api.rpc('salvar_ficha', { p: { ...f, ...rend, id: ficha.id || null, itens: its, tempo_batelada_min: f.tempo_batelada_min ? Math.round(n(f.tempo_batelada_min)) : null,
+      tolerancia_batelada_min: f.tolerancia_batelada_min !== '' && f.tolerancia_batelada_min != null && n(f.tolerancia_batelada_min) !== null ? Math.round(n(f.tolerancia_batelada_min)) : null } }), 'Ficha técnica salva.');
     if (ok) { await recarregar(); aoFechar(); }
   }
   async function alternarAtivo() {
@@ -115,8 +117,10 @@ function FormFicha({ ficha, itens, aoFechar, somenteLeitura, aoUsar }) {
       <${Campo} rotulo="Linha de produção" ajuda="Ajuda a sugerir a masseira na programação.">
         <select class="entrada" value=${f.linha_id || ''} onChange=${(e) => set('linha_id')(e.target.value ? Number(e.target.value) : null)}>
           <option value="">–</option>${dados.linhas.filter((l) => l.ativo || l.id === f.linha_id).map((l) => html`<option value=${l.id}>${l.nome}</option>`)}</select></${Campo}>
-      <${Campo} rotulo="Tempo médio de 1 batelada (min)" ajuda=${`Usado no semáforo das masseiras. Vazio = padrão (${dados.params.producao_tempo_padrao_min || 20} min).`}>
+      <${Campo} rotulo="Tempo normal de 1 batelada (min)" ajuda=${`Do início até finalizar. Passou disso: fica em ATENÇÃO. Vazio = padrão (${dados.params.producao_tempo_padrao_min || 20} min).`}>
         <input class="entrada" inputmode="numeric" value=${f.tempo_batelada_min} onInput=${set('tempo_batelada_min')} placeholder=${String(dados.params.producao_tempo_padrao_min || 20)} /></${Campo}>
+      <${Campo} rotulo="Tolerância (min)" ajuda=${`Minutos a mais permitidos (ex.: panetone com 2 fases tem tolerância maior). Passou do tempo + tolerância: ATRASADA. Vazio = padrão (${dados.params.producao_tolerancia_batelada_min ?? 10} min).`}>
+        <input class="entrada" inputmode="numeric" value=${f.tolerancia_batelada_min} onInput=${set('tolerancia_batelada_min')} placeholder=${String(dados.params.producao_tolerancia_batelada_min ?? 10)} /></${Campo}>
       <${Campo} rotulo="Observação" classe="larga"><textarea class="entrada" rows="2" value=${f.observacao} onInput=${set('observacao')}></textarea></${Campo}>
     </fieldset>
     <h3>Ingredientes (quantidade para 1 receita)</h3>

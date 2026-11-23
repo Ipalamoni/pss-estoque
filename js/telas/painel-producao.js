@@ -5,7 +5,7 @@
 import { html, useState, useMemo, useApp, Cabecalho, Carregando, Vazio, Etiqueta, Modal } from '../ui.js';
 import { num, hojeISO, somarDias, data, pl, qtd } from '../util.js';
 import { Colunas, BarrasH } from '../graficos.js';
-import { useFluxo, ETAPAS, somar, semaforo, tempoTexto, tempoMedio, useRelogio, diaDe, minutos, hora } from '../producao-util.js';
+import { useFluxo, ETAPAS, somar, semaforo, tempoTexto, tempoMedio, useRelogio, diaDe, minutos, hora, prazoBatelada, duracaoBatelada, estadoTempo, SeloTempo, ESTADO_TEMPO } from '../producao-util.js';
 import { Exportar } from '../exportar.js';
 
 const DIAS = [{ id: -1, t: 'Ontem' }, { id: 0, t: 'Hoje' }, { id: 1, t: 'Amanhã' }];
@@ -43,6 +43,8 @@ export function TelaPainelProducao() {
   const bats = fluxo.bateladas.filter((b) => b.situacao !== 'cancelada' && diaDe(b.iniciada_em) === dia);
   const semFinalizar = fluxo.bateladas.filter((b) => b.situacao === 'em_producao' && minutos(b.iniciada_em, agora) > Number(dados.params.producao_prazo_finalizar_h || 12) * 60);
   const misturaParada = linhas.filter((l) => l.na_pesagem > 0);
+  const batendoAtrasadas = desloc === 0 ? fluxo.bateladas.filter((b) => b.situacao === 'em_producao'
+    && estadoTempo(duracaoBatelada(b, agora), prazoBatelada(dados, b.ficha_id, dados.mapa.maceira.get(b.maceira_id))) === 'atraso') : [];
   // avisos de mudança que o tablet ainda não confirmou (por masseira)
   const naoVistos = desloc === 0 ? [...(dados.avisos || []).filter((a) => !a.ciente_em).reduce((m, a) => { const k = a.setor === 'pesagem' ? 'pesagem' : a.maceira_id; return m.set(k, [...(m.get(k) || []), a]); }, new Map()).entries()] : [];
 
@@ -63,7 +65,9 @@ export function TelaPainelProducao() {
       <div class="kpi laranja"><small>Em produção</small><b>${num(tot.em_producao, 0)}</b><span>iniciadas, aguardando finalizar</span></div>
       <div class="kpi"><small>Andamento</small><b>${num(pct, 0)}%</b><span class="kpi-barra" role="img" aria-label=${`${num(pct, 0)}% finalizado`}><i style=${{ width: `${Math.min(pct, 100)}%` }}></i></span><span>finalizado · ${num(pctIni, 0)}% iniciado</span></div>
       <div class="kpi azul"><small>Previsão de término</small><b>${fim ? fim.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : desloc === 0 ? 'Concluído' : '–'}</b><span>${fim ? 'no ritmo do tempo médio' : ''}</span></div>
-      <div class=${'kpi ' + (atrasadas.length ? 'vermelho' : 'verde')}><small>Atrasos</small><b>${atrasadas.length}</b><span>${atrasadas.length ? atrasadas.map((x) => x.m.nome).join(', ') : 'tudo no ritmo'}</span></div>
+      <div class=${'kpi ' + (atrasadas.length || batendoAtrasadas.length ? 'vermelho' : 'verde')}><small>Atrasos</small><b>${atrasadas.length + batendoAtrasadas.length}</b>
+        <span>${!atrasadas.length && !batendoAtrasadas.length ? 'tudo no ritmo' : [batendoAtrasadas.length ? pl(batendoAtrasadas.length, 'batelada atrasada', 'bateladas atrasadas') : '',
+          atrasadas.length ? `${atrasadas.map((x) => x.m.nome).join(', ')} parada${atrasadas.length > 1 ? 's' : ''}` : ''].filter(Boolean).join(' · ')}</span></div>
     </div>
 
     <section class="painel">
@@ -89,7 +93,8 @@ export function TelaPainelProducao() {
     <section class="painel">
         <h2>Ritmo do dia</h2>
         <${Ritmo} bats=${bats} linhas=${linhas} />
-        ${(semFinalizar.length > 0 || atrasadas.length > 0 || misturaParada.length > 0 || naoVistos.length > 0) && html`<h3>Alertas</h3><ul class="alertas-lista">
+        ${(semFinalizar.length > 0 || atrasadas.length > 0 || misturaParada.length > 0 || naoVistos.length > 0 || batendoAtrasadas.length > 0) && html`<h3>Alertas</h3><ul class="alertas-lista">
+          ${batendoAtrasadas.map((b) => { const pz = prazoBatelada(dados, b.ficha_id, dados.mapa.maceira.get(b.maceira_id)); return html`<li class="al-vermelho"><b>${dados.mapa.maceira.get(b.maceira_id)?.nome || 'Masseira'}${b.operador_id ? ` (${dados.mapa.operador.get(b.operador_id)?.nome || ''})` : ''}</b>: batelada de ${dados.mapa.ficha.get(b.ficha_id)?.nome} ATRASADA — ${tempoTexto(duracaoBatelada(b, agora))} (prazo ${pz.tempo} + ${pz.tol} min)</li>`; })}
           ${naoVistos.map(([mid, l]) => html`<li class="al-laranja"><b>${mid === 'pesagem' ? 'Pesagem' : dados.mapa.maceira.get(mid)?.nome || 'Produção'}</b>: ${l.length === 1 ? 'mudança na programação ainda não vista' : `${l.length} mudanças ainda não vistas`} ${mid === 'pesagem' ? 'pela pesagem' : 'no tablet'} (desde ${hora(l[0].criado_em)})</li>`)}
           ${atrasadas.map((x) => html`<li class=${'al-' + x.s.cor}><b>${x.m.nome}</b>: ${x.s.rotulo.toLowerCase()} (${tempoTexto(x.s.min)} sem iniciar)</li>`)}
           ${semFinalizar.length > 0 && html`<li class="al-laranja"><b>${pl(semFinalizar.length, 'batelada', 'bateladas')}</b> em produção há mais de ${dados.params.producao_prazo_finalizar_h || 12} h sem finalizar</li>`}
@@ -106,6 +111,7 @@ export function TelaPainelProducao() {
       <${ProgPrioridade} linhas=${linhas} dados=${dados} />
     </section>
 
+    <${TempoBateladas} bats=${bats} dados=${dados} agora=${agora} dia=${dia} />
     <${Indicadores} bats=${bats} dados=${dados} />
     `}
   </div>`;
@@ -145,6 +151,44 @@ function Ritmo({ bats, linhas }) {
   const ini = Math.max(5, Math.min(...ativas) - 1); const fimH = Math.min(20, Math.max(...ativas, new Date().getHours()) + 1);
   const cats = horas.filter((h) => h >= ini && h <= fimH);
   return html`<${Colunas} categorias=${cats.map((h) => `${h}h`)} series=${[{ nome: 'Bateladas iniciadas', valores: cats.map((h) => real[horas.indexOf(h)]) }]} formatar=${(v) => num(v, 0)} altura=${180} />`;
+}
+
+// TEMPO DAS BATELADAS: início, fim, duração e cor (no prazo / atenção / atrasada) — padeiro não vê esta tela
+function TempoBateladas({ bats, dados, agora, dia }) {
+  if (!bats.length) return null;
+  const linhas = [...bats].sort((a, b) => (dados.mapa.maceira.get(a.maceira_id)?.ordem ?? 999) - (dados.mapa.maceira.get(b.maceira_id)?.ordem ?? 999)
+    || String(a.iniciada_em).localeCompare(String(b.iniciada_em))).map((b) => {
+    const m = dados.mapa.maceira.get(b.maceira_id); const pz = prazoBatelada(dados, b.ficha_id, m); const min = duracaoBatelada(b, agora);
+    return { b, m, pz, min, est: estadoTempo(min, pz) };
+  });
+  const nMac = new Map();
+  linhas.forEach((x) => { nMac.set(x.b.maceira_id, (nMac.get(x.b.maceira_id) || 0) + 1); x.n = nMac.get(x.b.maceira_id); });
+  const conta = (e) => linhas.filter((x) => x.est === e).length;
+  const nomeOp = (id) => dados.mapa.operador.get(id)?.nome || '';
+  return html`<section class="painel">
+    <div class="painel-topo"><h2>Tempo das bateladas</h2>
+      <${Exportar} titulo="Tempo das bateladas" filtros=${data(dia)} arquivo=${`tempo-bateladas-${dia}`} linhas=${linhas} colunas=${[
+        { titulo: 'Masseira', valor: (x) => x.m?.nome || '' }, { titulo: 'Nº no dia', valor: (x) => x.n, num: true },
+        { titulo: 'Receita', valor: (x) => dados.mapa.ficha.get(x.b.ficha_id)?.nome, largura: 30 },
+        { titulo: 'Padeiro (iniciou)', valor: (x) => nomeOp(x.b.operador_id) }, { titulo: 'Padeiro (finalizou)', valor: (x) => nomeOp(x.b.finalizada_operador_id) },
+        { titulo: 'Início', valor: (x) => hora(x.b.iniciada_em) }, { titulo: 'Fim', valor: (x) => (x.b.finalizada_em ? hora(x.b.finalizada_em) : 'batendo') },
+        { titulo: 'Duração (min)', valor: (x) => x.min, num: true }, { titulo: 'Tempo da receita (min)', valor: (x) => x.pz.tempo, num: true },
+        { titulo: 'Tolerância (min)', valor: (x) => x.pz.tol, num: true }, { titulo: 'Situação', valor: (x) => ESTADO_TEMPO[x.est]?.rotulo || '' }]} /></div>
+    <div class="chips-tempo">
+      <${SeloTempo} estado="prazo" /> <b>${conta('prazo')}</b>
+      <${SeloTempo} estado="atencao" /> <b>${conta('atencao')}</b>
+      <${SeloTempo} estado="atraso" /> <b>${conta('atraso')}</b>
+    </div>
+    <div class="tabela-rolagem"><table class="tabela tabela-tempo">
+      <thead><tr><th>Masseira</th><th>Nº</th><th>Receita</th><th>Padeiro</th><th>Início</th><th>Fim</th><th class="num">Duração</th><th class="num">Prazo</th><th>Situação</th></tr></thead>
+      <tbody>${linhas.map((x) => html`<tr key=${x.b.id} class=${'tt-' + x.est}>
+        <td>${x.m?.nome || '–'}</td><td>${x.n}ª</td><td>${dados.mapa.ficha.get(x.b.ficha_id)?.nome}</td>
+        <td>${nomeOp(x.b.operador_id)}${x.b.finalizada_operador_id && x.b.finalizada_operador_id !== x.b.operador_id ? html`<br /><small>finalizou: ${nomeOp(x.b.finalizada_operador_id)}</small>` : ''}</td>
+        <td>${hora(x.b.iniciada_em)}</td><td>${x.b.finalizada_em ? hora(x.b.finalizada_em) : html`<i>batendo</i>`}</td>
+        <td class="num"><b>${tempoTexto(x.min)}</b></td><td class="num">${x.pz.tempo} + ${x.pz.tol} min</td>
+        <td><${SeloTempo} estado=${x.est} /></td></tr>`)}</tbody></table></div>
+    <p class="nota">No prazo: até o tempo da receita · Atenção: passou do tempo, dentro da tolerância · Atrasada: passou do tempo + tolerância. O tempo e a tolerância de cada receita ficam em Fichas técnicas.</p>
+  </section>`;
 }
 
 function Indicadores({ bats, dados }) {

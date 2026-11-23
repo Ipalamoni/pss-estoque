@@ -14,7 +14,7 @@ const inicioDia = (iso) => new Date(iso + 'T00:00:00').toISOString();
 export function TelaFinalizar() {
   const [aba, setAba] = useState('abertas');
   return html`
-    <${Cabecalho} titulo="Finalizar bateladas" sub="Confira quanto cada batelada rendeu e finalize. O estoque da embalagem e o custo do produto saem daqui." />
+    <${Cabecalho} titulo="Finalizar bateladas" sub="O padeiro finaliza no tablet (com o rendimento médio da receita). Use esta tela só para bateladas esquecidas abertas ou para corrigir." />
     <${Abas} abas=${[{ id: 'abertas', titulo: 'Em produção' }, { id: 'finalizadas', titulo: 'Finalizadas' }]} ativa=${aba} aoMudar=${setAba} />
     ${aba === 'abertas' ? html`<${Abertas} />` : html`<${Finalizadas} />`}`;
 }

@@ -93,8 +93,8 @@ export function TelaHistoricoProducao() {
       const rec = M.ficha.get(b.ficha_id)?.nome;
       add({ k: `ini${b.id}`, quando: b.iniciada_em, acao: 'iniciou', padeiro: padeiro(b.operador_id), usuario: pessoa(b.usuario_id), masseira: masseira(b.maceira_id),
         receita: rec, qtd: '1 batelada', obs: `nº ${b.id}`, fora: b.fora_da_ordem });
-      if (b.situacao === 'finalizada') add({ k: `fin${b.id}`, quando: b.finalizada_em, acao: 'finalizou', usuario: pessoa(b.finalizada_por), masseira: masseira(b.maceira_id),
-        receita: rec, qtd: `${num(b.quantidade_produzida, 0)} un.`, obs: `nº ${b.id}` });
+      if (b.situacao === 'finalizada') add({ k: `fin${b.id}`, quando: b.finalizada_em, acao: 'finalizou', padeiro: padeiro(b.finalizada_operador_id), usuario: pessoa(b.finalizada_por), masseira: masseira(b.maceira_id),
+        receita: rec, qtd: `${num(b.quantidade_produzida, 0)} un.`, obs: `nº ${b.id}${b.iniciada_em && b.finalizada_em ? ` · ${Math.round((new Date(b.finalizada_em) - new Date(b.iniciada_em)) / 60000)} min` : ''}${b.finalizada_operador_id ? ' · finalizada no tablet (rendimento médio)' : ''}` });
       if (b.situacao === 'cancelada') add({ k: `can${b.id}`, quando: b.finalizada_em, acao: 'cancelou', usuario: pessoa(b.finalizada_por), masseira: masseira(b.maceira_id),
         receita: rec, qtd: '1 batelada', obs: `nº ${b.id} · ${b.cancelada_motivo || ''}` });
     });

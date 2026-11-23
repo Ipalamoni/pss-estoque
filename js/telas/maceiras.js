@@ -8,7 +8,7 @@ import { html, useState, useEffect, useRef, useApp, Cabecalho, Modal, Campo, Num
 import { qtd, num, qu, hojeISO, pl, mensagemErro } from '../util.js';
 import { Icone } from '../icones.js';
 import { FaixaAviso, useAlertaSonoro, avisosPendentes } from '../aviso-producao.js';
-import { useFluxo, semaforo, saldoLocal, localTipo, misturaDaFicha, tempoTexto, useRelogio, somar, minutos, useEventos, LinhaTempo, hora, diaDe } from '../producao-util.js';
+import { prazoBatelada, duracaoBatelada, estadoTempo, SeloTempo, useFluxo, semaforo, saldoLocal, localTipo, misturaDaFicha, tempoTexto, useRelogio, somar, minutos, useEventos, LinhaTempo, hora, diaDe } from '../producao-util.js';
 
 const ehFermento = (p) => /ferment/i.test(`${p?.grupo || ''} ${p?.descricao || ''}`);
 const ehFarinha = (p) => /farinha/i.test(`${p?.grupo || ''} ${p?.descricao || ''}`);
@@ -31,6 +31,7 @@ export function TelaMaceiras() {
   }, [operador]);
   const [aberta, setAberta] = useState(null);
   const [iniciar, setIniciar] = useState(null);
+  const [finalizar, setFinalizar] = useState(null);   // { b, depois? }
   const [receber, setReceber] = useState(false);
   const [avulsa, setAvulsa] = useState(false);
   const [ciente, setCiente] = useState(false);   // "Entendi" do aviso: escolher nome + senha
@@ -44,6 +45,8 @@ export function TelaMaceiras() {
   const chegando = dados.transferencias.filter((t) => t.situacao === 'enviada' && t.destino_id === mac.id);
   const qChegando = dados.transfItens.filter((i) => chegando.some((t) => t.id === i.transferencia_id)).reduce((s, i) => s + Number(i.quantidade), 0);
   const hoje = fluxo.fluxo.filter((l) => l.data === hojeISO());
+  // bateladas batendo agora (as de hoje e as esquecidas de ontem)
+  const emProd = fluxo.bateladas.filter((b) => b.situacao === 'em_producao').sort((a, b) => String(a.iniciada_em).localeCompare(String(b.iniciada_em)));
   const resumoChegando = [...dados.transfItens.filter((i) => chegando.some((t) => t.id === i.transferencia_id))
     .reduce((m, i) => { const d = dados.mapa.produto.get(i.produto_id)?.descricao || 'Base'; return m.set(d, (m.get(d) || 0) + Number(i.quantidade)); }, new Map()).entries()];
   const exigir = (f) => () => { if (!opera) return avisar('Só o padeiro (ou o PCP) opera esta tela.', 'aviso'); if (!operador) return setTrocar(true); f(); };
@@ -55,6 +58,18 @@ export function TelaMaceiras() {
       <div class="fr-texto"><${Icone} nome="caminhao" tam=${40} /><div><b>CHEGOU BASE DA PESAGEM</b>
         <ul>${resumoChegando.map(([d, q]) => html`<li key=${d}><b>${num(q, 0)}</b> × ${d.replace(/^Base – /, '')}</li>`)}</ul></div></div>
       <button class="fr-botao" onClick=${exigir(() => setReceber(true))}><${Icone} nome="finalizar" tam=${30} /> RECEBER BASE</button>
+    </section>`}
+    ${emProd.length > 0 && html`<section class="em-producao" aria-label="Batendo agora">
+      <h3>Batendo agora</h3>
+      <div class="ep-lista">${emProd.map((b) => {
+        const m = dados.mapa.maceira.get(b.maceira_id); const min = duracaoBatelada(b, agora);
+        return html`<div class="ep-item" key=${b.id}>
+          <div class="ep-info"><b>${m?.nome || 'Masseira'}</b><span>${dados.mapa.ficha.get(b.ficha_id)?.nome}</span>
+            <small>começou ${hora(b.iniciada_em)}${b.operador_id ? ` · ${dados.mapa.operador.get(b.operador_id)?.nome || ''}` : ''}</small>
+            <${SeloTempo} estado=${estadoTempo(min, prazoBatelada(dados, b.ficha_id, m))} min=${min} grande /></div>
+          <button class="ep-botao" disabled=${!opera} onClick=${exigir(() => setFinalizar({ b }))}><${Icone} nome="finalizar" tam=${28} /> FINALIZAR BATELADA</button>
+        </div>`;
+      })}</div>
     </section>`}
     <div class="mac-topo">
       <div class="mac-quem">
@@ -98,7 +113,13 @@ export function TelaMaceiras() {
     ${ciente && html`<${EntrarOperador} titulo="Quem viu o aviso?" aoFechar=${() => setCiente(false)}
       aoEntrar=${async (o) => { const r = await confirmarAvisos({ api, recarregar }, o, avisos); if (r !== null) { setCiente(false); setOperador(o); ultimo.current = Date.now(); } }} />`}
     ${aberta && html`<${MaceiraAberta} m=${aberta} fluxo=${fluxo} agora=${agora} opera=${opera} aoFechar=${() => setAberta(null)}
-      aoIniciar=${exigir2(opera, operador, setTrocar, (p) => { setIniciar({ prog: p, maceira: aberta }); })} operador=${operador} />`}
+      aoIniciar=${exigir2(opera, operador, setTrocar, (p) => {
+        const anterior = emProd.find((b) => b.maceira_id === aberta.id);
+        if (anterior) setFinalizar({ b: anterior, depois: () => setIniciar({ prog: p, maceira: aberta }) });
+        else setIniciar({ prog: p, maceira: aberta });
+      })} operador=${operador} />`}
+    ${finalizar && html`<${FinalizarBatelada} b=${finalizar.b} operador=${operador} antes=${!!finalizar.depois}
+      aoFechar=${(ok) => { const d = finalizar.depois; setFinalizar(null); if (ok && d) d(); }} />`}
     ${iniciar && html`<${IniciarBatelada} prog=${iniciar.prog} maceira=${iniciar.maceira} operador=${operador} fluxo=${fluxo} agora=${agora}
       aoFechar=${(ok) => { setIniciar(null); if (ok) setAberta(null); }} />`}
     ${receber && html`<${ReceberMisturas} chegando=${chegando} operador=${operador} aoFechar=${() => setReceber(false)} />`}
@@ -203,8 +224,8 @@ function MaceiraAberta({ m, fluxo, agora, opera, aoFechar, aoIniciar, operador }
       })}</div>`}
     <h3>Bateladas de hoje nesta masseira</h3>
     ${batidas.length ? html`<div class="batidas">${batidas.slice(0, 12).map((b, i) => html`<span class=${'batida ' + b.situacao}>
-      <b>${batidas.length - i}ª</b> · iniciada ${hora(b.iniciada_em)} · ${dados.mapa.ficha.get(b.ficha_id)?.nome} · ${dados.mapa.operador.get(b.operador_id)?.nome || ''}
-      ${b.situacao === 'finalizada' ? ' ✔' : ''}</span>`)}</div>` : html`<p class="nota">Nenhuma batelada iniciada hoje.</p>`}
+      <b>${batidas.length - i}ª</b> · ${dados.mapa.ficha.get(b.ficha_id)?.nome} · ${hora(b.iniciada_em)}${b.finalizada_em ? ` → ${hora(b.finalizada_em)}` : ' → batendo'} · ${dados.mapa.operador.get(b.operador_id)?.nome || ''}
+      <${SeloTempo} estado=${estadoTempo(duracaoBatelada(b, agora), prazoBatelada(dados, b.ficha_id, m))} min=${duracaoBatelada(b, agora)} /></span>`)}</div>` : html`<p class="nota">Nenhuma batelada iniciada hoje.</p>`}
     ${acao && html`<${DevolverPerda} l=${acao} operador=${operador} aoFechar=${() => setAcao(null)} />`}
     ${foraOrdem && html`<${Modal} semProtecao titulo="Atenção: esta não é a 1ª da fila" aoFechar=${() => setForaOrdem(null)}>
       <div class="fora-ordem">
@@ -297,6 +318,28 @@ function TrocarFarinha({ atual, aoFechar, aoEscolher }) {
       <span><b>${p.descricao}</b><small>${[p.marca, p.classificacao && `classificação ${p.classificacao}`].filter(Boolean).join(' · ')} · estoque ${qu(s, p.unidade_estoque)}</small></span></button>`)}</div>
     ${!opcoes.length && html`<${Vazio} texto="Não há outra opção cadastrada." />`}
   </${Modal}>`;
+}
+
+// ------------------------- finalizar batelada (padeiro: um toque, sem quantidade) -------------------------
+// O padeiro vira a massa na divisora e toca em SIM. O sistema registra o rendimento médio da receita
+// (definido pelo engenheiro); a quantidade NÃO aparece aqui.
+function FinalizarBatelada({ b, operador, antes, aoFechar }) {
+  const { dados, api, recarregar } = useApp();
+  const [ocupado, executar] = useAcao();
+  const m = dados.mapa.maceira.get(b.maceira_id);
+  async function sim() {
+    const r = await executar(() => api.rpc('finalizar_batelada_padeiro', { p: { id: b.id, operador_id: operador.id, pin: operador.pin } }),
+      `Batelada finalizada. Obrigado, ${operador.nome.split(' ')[0]}!`);
+    if (r !== null) { await recarregar(true); aoFechar(true); }
+  }
+  return html`<${Modal} semProtecao titulo=${antes ? 'Antes de começar a próxima' : 'Finalizar batelada'} aoFechar=${() => aoFechar(false)}>
+    <div class="fora-ordem">
+      <p class="fo-pergunta">${antes ? html`A batelada de <b>${dados.mapa.ficha.get(b.ficha_id)?.nome}</b> já terminou?` : html`Terminou a batelada de <b>${dados.mapa.ficha.get(b.ficha_id)?.nome}</b>?`}</p>
+      <p>${m?.nome} · começou às ${hora(b.iniciada_em)}. Já virou a massa na divisora?</p>
+      <button class="btn btn-pri btn-gigante btn-bloco" disabled=${ocupado} onClick=${sim}><${Icone} nome="finalizar" tam=${24} /> SIM, TERMINOU</button>
+      <button class="btn btn-sec btn-gigante btn-bloco" disabled=${ocupado} onClick=${() => aoFechar(false)}>NÃO, voltar</button>
+      <p class="nota">Fica registrado quem finalizou, o dia e a hora.</p>
+    </div></${Modal}>`;
 }
 
 // ------------------------- receber bases da pesagem -------------------------
