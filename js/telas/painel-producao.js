@@ -70,12 +70,12 @@ export function TelaPainelProducao() {
     </section>
 
     <section class="painel">
-        <h2>Maceiras</h2>
+        <h2>Masseiras</h2>
         <div class="tabela-rolagem"><table class="tabela tabela-mac">
-          <thead><tr><th>Maceira</th><th>Situação</th><th>Padeiro</th><th>Agora</th><th class="n">Programado</th><th class="n">Iniciado</th><th class="n">Pronto</th><th class="n">Na pesagem</th><th>Horários</th></tr></thead>
+          <thead><tr><th>Masseira</th><th>Situação</th><th>Padeiro</th><th>Agora</th><th class="n">Programado</th><th class="n">Iniciado</th><th class="n">Pronto</th><th class="n">Na pesagem</th><th>Horários</th></tr></thead>
           <tbody>${sems.map(({ m, s }) => {
             const ult = s.ultima;
-            return html`<tr key=${m.id}><td data-rotulo="Maceira"><b>${m.nome}</b></td>
+            return html`<tr key=${m.id}><td data-rotulo="Masseira"><b>${m.nome}</b></td>
               <td data-rotulo="Situação"><span class=${'semaf s-' + s.cor}><i></i>${desloc === 0 ? s.rotulo : '–'}</span></td>
               <td data-rotulo="Padeiro">${ult ? dados.mapa.operador.get(ult.operador_id)?.nome : '–'}</td>
               <td data-rotulo="Agora">${s.batendo ? html`${dados.mapa.ficha.get(s.batendo.ficha_id)?.nome} <small>há ${tempoTexto(s.batendo.min)}</small>` : s.min !== null && desloc === 0 && s.cor !== 'cinza' ? html`<small>${tempoTexto(s.min)} sem iniciar</small>` : '–'}</td>
@@ -97,7 +97,7 @@ export function TelaPainelProducao() {
     <section class="painel">
       <div class="painel-topo"><h2>Programações na ordem de prioridade</h2>
         <${Exportar} titulo="Painel de Produção" filtros=${data(dia)} arquivo=${`painel-producao-${dia}`} linhas=${linhas} colunas=${[
-          { titulo: 'Maceira', valor: (l) => dados.mapa.maceira.get(l.maceira_id)?.nome || 'Sem maceira' }, { titulo: 'Prioridade', valor: (l) => l.prioridade },
+          { titulo: 'Masseira', valor: (l) => dados.mapa.maceira.get(l.maceira_id)?.nome || 'Sem masseira' }, { titulo: 'Prioridade', valor: (l) => l.prioridade },
           { titulo: 'Receita', valor: (l) => dados.mapa.ficha.get(l.ficha_id)?.nome, largura: 30 }, { titulo: 'Programado', valor: (l) => l.programado, num: true },
           ...ETAPAS.map((e) => ({ titulo: e.titulo, valor: (l) => l[e.id], num: true })), { titulo: 'Produzido (un.)', valor: (l) => l.produzido, num: true }]} /></div>
       <${ProgPrioridade} linhas=${linhas} dados=${dados} />
@@ -121,10 +121,10 @@ function ProgPrioridade({ linhas, dados }) {
   [...linhas].sort((a, b) => (dados.mapa.maceira.get(a.maceira_id)?.ordem ?? 999) - (dados.mapa.maceira.get(b.maceira_id)?.ordem ?? 999) || a.prioridade - b.prioridade)
     .forEach((l) => { const k = l.maceira_id || 0; if (!grupos.has(k)) grupos.set(k, []); grupos.get(k).push(l); });
   return html`<div class="prog-grupos">${[...grupos.entries()].map(([mid, ls]) => html`<div class="prog-grupo">
-    <h3>${dados.mapa.maceira.get(mid)?.nome || 'Sem maceira definida'}</h3>
+    <h3>${dados.mapa.maceira.get(mid)?.nome || 'Sem masseira definida'}</h3>
     ${ls.map((l) => {
       const f = dados.mapa.ficha.get(l.ficha_id);
-      const sit = l.finalizada ? ['verde', 'Finalizada'] : l.finalizado >= l.programado ? ['verde', 'Pronta para fechar'] : l.em_producao > 0 || l.iniciado > 0 ? ['laranja', 'Em produção'] : l.pronto > 0 ? ['roxo', 'Aguardando a maceira'] : l.pesado > 0 ? ['azul', 'Na pesagem / a caminho'] : ['cinza', 'A pesar'];
+      const sit = l.finalizada ? ['verde', 'Finalizada'] : l.finalizado >= l.programado ? ['verde', 'Pronta para fechar'] : l.em_producao > 0 || l.iniciado > 0 ? ['laranja', 'Em produção'] : l.pronto > 0 ? ['roxo', 'Aguardando a masseira'] : l.pesado > 0 ? ['azul', 'Na pesagem / a caminho'] : ['cinza', 'A pesar'];
       return html`<div class="prog-linha" key=${l.programacao_id}>
         <span class="prog-pri">${l.prioridade || '–'}º</span>
         <div class="prog-info"><b>${f?.nome}</b><small>${num(l.programado, 0)} bateladas${l.operador_id ? ` · ${dados.mapa.operador.get(l.operador_id)?.nome}` : ''}${l.produzido ? ` · ${num(l.produzido, 0)} ${f?.rendimento_unidade || 'un.'}` : ''}</small></div>

@@ -12,7 +12,7 @@ export const PAPEIS = {
   diretoria: 'Diretoria (consulta)',
   financeiro: 'Financeiro (pedidos e pagamentos)',
   faturamento: 'Faturamento (previsão de produção)',
-  padeiro: 'Padeiro (tablet da Produção Maceiras)',
+  padeiro: 'Padeiro (tablet da Produção Masseiras)',
 };
 
 export const CATEGORIAS = {
@@ -34,7 +34,7 @@ export const TIPOS_PRODUTO = {
 export const tipoProduto = (p) => (['escritorio', 'limpeza', 'outros'].includes(p?.categoria) ? 'uso' : p?.categoria);
 
 export const TIPOS_LOCAL = {
-  almoxarifado: 'Almoxarifado', deposito: 'Depósito', pesagem: 'Pesagem', maceiras: 'Produção (maceiras)',
+  almoxarifado: 'Almoxarifado', deposito: 'Depósito', pesagem: 'Pesagem', maceiras: 'Produção (masseiras)',
   pcp: 'PCP / engenharia', expedicao: 'Expedição', outro: 'Outro',
 };
 export const ETAPAS_TRANSF = {

@@ -34,7 +34,7 @@ export function TelaMaceiras() {
   const [avulsa, setAvulsa] = useState(false);
   const mac = localTipo(dados, 'maceiras');
   const maceiras = dados.maceiras.filter((m) => m.ativa);
-  if (!mac) return html`<${Vazio} texto="Cadastre o local Produção Maceiras em Configurações." />`;
+  if (!mac) return html`<${Vazio} texto="Cadastre o local Produção Masseiras em Configurações." />`;
   if (!fluxo) return html`<${Carregando} texto="Carregando a produção de hoje…" />`;
 
   const chegando = dados.transferencias.filter((t) => t.situacao === 'enviada' && t.destino_id === mac.id);
@@ -42,7 +42,7 @@ export function TelaMaceiras() {
   const hoje = fluxo.fluxo.filter((l) => l.data === hojeISO());
   const exigir = (f) => () => { if (!opera) return avisar('Só o padeiro (ou o PCP) opera esta tela.', 'aviso'); if (!operador) return setTrocar(true); f(); };
 
-  return html`<${Cabecalho} titulo="Produção Maceiras" semVoltar=${soPadeiro} semTrilha=${soPadeiro} />
+  return html`<${Cabecalho} titulo="Produção Masseiras" semVoltar=${soPadeiro} semTrilha=${soPadeiro} />
   <div class="maceiras-tela">
     <div class="mac-topo">
       <div class="mac-quem">
@@ -111,7 +111,7 @@ function EntrarOperador({ aoFechar, aoEntrar }) {
   return html`<${Modal} titulo=${quem ? `Senha de ${quem.nome}` : 'Quem está trabalhando?'} aoFechar=${aoFechar} largo>
     ${!quem ? html`<div class="op-grade">${ops.map((o) => html`<button class="op-botao" onClick=${() => { setQuem(o); setPin(''); }}>
         <span class="mac-avatar grande">${o.nome.slice(0, 1)}</span><b>${o.nome}</b></button>`)}</div>
-      ${!ops.length && html`<${Vazio} texto="Nenhum padeiro cadastrado. O PCP cadastra em Cadastros › Maceiras, linhas e padeiros." />`}`
+      ${!ops.length && html`<${Vazio} texto="Nenhum padeiro cadastrado. O PCP cadastra em Cadastros › Masseiras, linhas e padeiros." />`}`
     : html`<div class="pin">
         <div class="pin-pontos">${[0, 1, 2, 3, 4, 5].map((i) => html`<span class=${i < pin.length ? 'cheio' : ''}></span>`)}</div>
         <div class="pin-teclado">${['1', '2', '3', '4', '5', '6', '7', '8', '9', 'voltar', '0', 'apagar'].map((d) => d === 'voltar'
@@ -136,14 +136,14 @@ function MaceiraAberta({ m, fluxo, agora, opera, aoFechar, aoIniciar, operador }
   return html`<${Modal} titulo=${m.nome} aoFechar=${aoFechar} largo>
     <div class=${'mac-faixa s-' + s.cor}><span class="mac-luz"></span><b>${s.rotulo}</b>
       <span>${s.batendo ? `começou há ${tempoTexto(s.batendo.min)}` : s.min !== null && s.cor !== 'cinza' ? `${tempoTexto(s.min)} sem iniciar` : ''} · tempo médio ${s.T} min</span></div>
-    <div class="titulo-com-acao"><h3>${outras ? 'Outras maceiras (para emergência: máquina parada, falta de gente…)' : 'Fila desta maceira (ordem do PCP)'}</h3>
-      <button class="btn btn-sec" onClick=${() => setOutras(!outras)}>${outras ? '‹ Voltar para esta maceira' : 'Outras produções'}</button></div>
-    ${!fila.length ? html`<${Vazio} texto=${outras ? 'Nenhuma outra produção hoje.' : 'Nada programado para esta maceira hoje. Veja "Outras produções".'} />`
+    <div class="titulo-com-acao"><h3>${outras ? 'Outras masseiras (para emergência: máquina parada, falta de gente…)' : 'Fila desta masseira (ordem do PCP)'}</h3>
+      <button class="btn btn-sec" onClick=${() => setOutras(!outras)}>${outras ? '‹ Voltar para esta masseira' : 'Outras produções'}</button></div>
+    ${!fila.length ? html`<${Vazio} texto=${outras ? 'Nenhuma outra produção hoje.' : 'Nada programado para esta masseira hoje. Veja "Outras produções".'} />`
       : html`<div class="fila">${fila.map((l, i) => {
         const f = dados.mapa.ficha.get(l.ficha_id);
         const podeIniciar = l.pronto > 0;
         return html`<div class=${'fila-item' + (podeIniciar ? ' pronto' : '')} key=${l.programacao_id}>
-          <div class="fila-pos">${outras ? dados.mapa.maceira.get(l.maceira_id)?.nome?.replace('Maceira ', 'M') || '–' : `${i + 1}º`}</div>
+          <div class="fila-pos">${outras ? dados.mapa.maceira.get(l.maceira_id)?.nome?.replace(/^ma(?:ss|c)eira\s+/i, 'M') || '–' : `${i + 1}º`}</div>
           <div class="fila-info"><b>${f?.nome}</b>
             <div class="fila-nums">
               <span>Programado <b>${num(l.programado, 0)}</b></span>
@@ -163,7 +163,7 @@ function MaceiraAberta({ m, fluxo, agora, opera, aoFechar, aoIniciar, operador }
           </div>
         </div>`;
       })}</div>`}
-    <h3>Bateladas de hoje nesta maceira</h3>
+    <h3>Bateladas de hoje nesta masseira</h3>
     ${batidas.length ? html`<div class="batidas">${batidas.slice(0, 12).map((b, i) => html`<span class=${'batida ' + b.situacao}>
       <b>${batidas.length - i}ª</b> · iniciada ${hora(b.iniciada_em)} · ${dados.mapa.ficha.get(b.ficha_id)?.nome} · ${dados.mapa.operador.get(b.operador_id)?.nome || ''}
       ${b.situacao === 'finalizada' ? ' ✔' : ''}</span>`)}</div>` : html`<p class="nota">Nenhuma batelada iniciada hoje.</p>`}
@@ -206,7 +206,7 @@ function IniciarBatelada({ prog, maceira, operador, fluxo, agora, aoFechar }) {
     <div class="ini-cab"><span>👤 <b>${operador?.nome}</b></span><span>🛢 <b>${m.nome}</b>${m.capacidade_kg ? ` (${num(m.capacidade_kg, 0)} kg)` : ''}</span>
       ${prog.receber && html`<${Etiqueta} cor="laranja">vai receber a mistura que está a caminho</${Etiqueta}>`}</div>
     ${pg?.itens_alterados && html`<div class="alerta">O PCP alterou a receita nesta programação.</div>`}
-    <p class="nota">Pegue no Depósito Produção e coloque na maceira:</p>
+    <p class="nota">Pegue no Depósito Produção e coloque na masseira:</p>
     <div class="ini-itens">${itens.map((i, k) => {
       const p = mp.get(i.produto_id);
       const sal = dep ? saldoLocal(dados, i.produto_id, dep.id).disponivel : null;
@@ -228,7 +228,7 @@ function IniciarBatelada({ prog, maceira, operador, fluxo, agora, aoFechar }) {
           </div>`}
       </div>`;
     })}</div>
-    ${!itens.length && html`<p class="nota">Esta receita não tem itens marcados como "usado na maceira" (farinha/fermento).</p>`}
+    ${!itens.length && html`<p class="nota">Esta receita não tem itens marcados como "usado na masseira" (farinha/fermento).</p>`}
     ${trocando !== null && html`<${TrocarFarinha} atual=${itens[trocando]} aoFechar=${() => setTrocando(null)}
       aoEscolher=${(id) => { mudar(trocando, { produto_id: id }); setTrocando(null); }} />`}
   </${Modal}>`;
@@ -282,7 +282,7 @@ function DevolverPerda({ l, operador, aoFechar }) {
   async function devolver() {
     if (!(n(q) > 0) || n(q) > l.pronto) return avisar(`Informe de 1 a ${num(l.pronto, 0)}.`, 'erro');
     const r = await executar(() => api.rpc('criar_transferencia', { p: { origem_id: mac.id, destino_id: pes.id, enviar: true, operador_id: operador.id, pin: operador.pin,
-      observacao: motivo || 'Devolvido pela maceira', itens: [{ produto_id: mis.id, quantidade: n(q), programacao_id: l.programacao_id }] } }), 'Devolvido para a pesagem.');
+      observacao: motivo || 'Devolvido pela masseira', itens: [{ produto_id: mis.id, quantidade: n(q), programacao_id: l.programacao_id }] } }), 'Devolvido para a pesagem.');
     if (r) { await recarregar(true); aoFechar(); }
   }
   async function perda() {

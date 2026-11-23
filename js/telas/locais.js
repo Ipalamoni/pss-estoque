@@ -58,7 +58,7 @@ function EditarLocal({ l, aoFechar }) {
       <${Campo} rotulo="Nome" obrigatorio><input class="entrada" value=${v.nome} onInput=${(e) => setV({ ...v, nome: e.target.value })} /></${Campo}>
       <${Campo} rotulo="Unidade"><select class="entrada" value=${v.unidade_id} onChange=${(e) => setV({ ...v, unidade_id: Number(e.target.value) })}>
         ${dados.unidades.map((u) => html`<option value=${u.id}>${u.nome}</option>`)}</select></${Campo}>
-      <${Campo} rotulo="Tipo" ajuda="O sistema usa o tipo para achar a Pesagem, as Maceiras, o PCP etc."><select class="entrada" value=${v.tipo} onChange=${(e) => setV({ ...v, tipo: e.target.value })}>
+      <${Campo} rotulo="Tipo" ajuda="O sistema usa o tipo para achar a Pesagem, as Masseiras, o PCP etc."><select class="entrada" value=${v.tipo} onChange=${(e) => setV({ ...v, tipo: e.target.value })}>
         ${Object.entries(TIPOS_LOCAL).map(([k, t]) => html`<option value=${k}>${t}</option>`)}</select></${Campo}>
       <${Campo} rotulo="Ordem"><input class="entrada" inputmode="numeric" value=${v.ordem} onInput=${(e) => setV({ ...v, ordem: e.target.value.replace(/\D/g, '') })} /></${Campo}>
     </div>

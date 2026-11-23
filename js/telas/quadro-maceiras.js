@@ -16,7 +16,7 @@ export function QuadroMaceiras({ dia, setDia, SeletorDia }) {
   const [ocupado, executar] = useAcao();
   const fx = new Map((fluxo?.fluxo || []).map((x) => [x.programacao_id, x]));
   const progs = dados.programacoes.filter((p) => p.data === dia && p.situacao === 'ativa' && !p.finalizada_em);
-  const cols = [...dados.maceiras.filter((m) => m.ativa), { id: null, nome: 'Sem maceira' }];
+  const cols = [...dados.maceiras.filter((m) => m.ativa), { id: null, nome: 'Sem masseira' }];
   const daCol = (id) => progs.filter((p) => (p.maceira_id || null) === id).sort((a, b) => (a.prioridade ?? 999) - (b.prioridade ?? 999) || a.id - b.id);
   const eventos = useEventos(progs.map((p) => p.id));
   const travada = (p) => { const f = fx.get(p.id); return f && f.iniciado > 0 && f.iniciado >= Number(p.quantidade) - 0.0001; };
@@ -43,7 +43,7 @@ export function QuadroMaceiras({ dia, setDia, SeletorDia }) {
 
   return html`
     <${SeletorDia} dia=${dia} setDia=${setDia} />
-    <p class="nota">Arraste os cartões para trocar de maceira ou mudar a ordem (o de cima é o próximo). No tablet/celular use as setas. O padeiro vê esta ordem.</p>
+    <p class="nota">Arraste os cartões para trocar de masseira ou mudar a ordem (o de cima é o próximo). No tablet/celular use as setas. O padeiro vê esta ordem.</p>
     ${!fluxo ? html`<${Carregando} />` : html`
     <div class="quadro">${cols.map((m) => { const itens = daCol(m.id); const tot = itens.reduce((s, p) => s + Number(p.quantidade), 0);
       return html`<section class=${'quadro-col' + (m.id ? '' : ' sem')} key=${m.id ?? 'sem'} ...${alvo(m.id, itens.length)}>
@@ -60,7 +60,7 @@ export function QuadroMaceiras({ dia, setDia, SeletorDia }) {
             <div class="qc-acoes">
               <button class="btn-icone" title="Subir" disabled=${ocupado || i === 0} onClick=${() => mover(p.id, m.id, i - 1)}>▲</button>
               <button class="btn-icone" title="Descer" disabled=${ocupado || i === itens.length - 1} onClick=${() => mover(p.id, m.id, i + 1)}>▼</button>
-              <select class="entrada qc-mover" value=${m.id ?? ''} disabled=${ocupado || trav} title="Mudar de maceira" onChange=${(e) => mover(p.id, e.target.value ? Number(e.target.value) : null, 999)}>
+              <select class="entrada qc-mover" value=${m.id ?? ''} disabled=${ocupado || trav} title="Mudar de masseira" onChange=${(e) => mover(p.id, e.target.value ? Number(e.target.value) : null, 999)}>
                 ${cols.map((c) => html`<option value=${c.id ?? ''}>${c.nome}</option>`)}</select>
               ${Number(p.quantidade) > 1 && html`<button class="btn btn-sec btn-peq" disabled=${ocupado} onClick=${() => setDividir(p)}>Dividir</button>`}
             </div>
@@ -79,16 +79,16 @@ function Dividir({ p, fl, aoFechar }) {
   const [ocupado, executar] = useAcao();
   const f = dados.mapa.ficha.get(p.ficha_id);
   async function ok() {
-    if (!(n(q) > 0)) return avisar('Informe quantas receitas vão para a outra maceira.', 'erro');
+    if (!(n(q) > 0)) return avisar('Informe quantas receitas vão para a outra masseira.', 'erro');
     if (await executar(() => api.rpc('dividir_programacao', { p_id: p.id, p_qtd: n(q), p_maceira: mac || null }), 'Programação dividida.')) { await recarregar(true); aoFechar(); }
   }
   return html`<${Modal} titulo=${`Dividir ${f?.codigo} ${f?.nome}`} aoFechar=${aoFechar}
     rodape=${html`<button class="btn btn-sec" onClick=${aoFechar}>Voltar</button><button class="btn btn-pri" disabled=${ocupado} onClick=${ok}>Dividir</button>`}>
-    <p>Programado <b>${num(p.quantidade, 1)}</b> receitas na <b>${dados.mapa.maceira.get(p.maceira_id)?.nome || 'sem maceira'}</b>. Ainda não pesadas: <b>${num(livre, 1)}</b>.</p>
+    <p>Programado <b>${num(p.quantidade, 1)}</b> receitas na <b>${dados.mapa.maceira.get(p.maceira_id)?.nome || 'sem masseira'}</b>. Ainda não pesadas: <b>${num(livre, 1)}</b>.</p>
     <div class="grade">
       <${Campo} rotulo="Quantas receitas passar"><${Numero} valor=${q} aoMudar=${setQ} /></${Campo}>
-      <${Campo} rotulo="Para a maceira"><select class="entrada" value=${mac} onChange=${(e) => setMac(e.target.value ? Number(e.target.value) : '')}>
-        <option value="">Sem maceira</option>${dados.maceiras.filter((m) => m.ativa).map((m) => html`<option value=${m.id}>${m.nome}</option>`)}</select></${Campo}>
+      <${Campo} rotulo="Para a masseira"><select class="entrada" value=${mac} onChange=${(e) => setMac(e.target.value ? Number(e.target.value) : '')}>
+        <option value="">Sem masseira</option>${dados.maceiras.filter((m) => m.ativa).map((m) => html`<option value=${m.id}>${m.nome}</option>`)}</select></${Campo}>
     </div>
   </${Modal}>`;
 }

@@ -65,7 +65,7 @@ function Abertas() {
   return html`<${AreaProtegida} rotulo="rendimento das bateladas">
     ${atrasadas > 0 && html`<div class="alerta-faixa laranja"><${Icone} nome="relogio" tam=${18} /> ${atrasadas} batelada(s) iniciada(s) há mais de ${tempoTexto(prazo)} ainda sem finalizar.</div>`}
     <div class="filtros fin-barra">
-      <select class="entrada" value=${filtroMac} onChange=${(e) => setFiltroMac(e.target.value)}><option value="">Todas as maceiras</option>${macs.map((m) => html`<option value=${m.id}>${m.nome}</option>`)}</select>
+      <select class="entrada" value=${filtroMac} onChange=${(e) => setFiltroMac(e.target.value)}><option value="">Todas as masseiras</option>${macs.map((m) => html`<option value=${m.id}>${m.nome}</option>`)}</select>
       <span class="flex1"></span>
       ${podeFin && html`<button class="btn btn-sec" disabled=${ocupado || !sel.size} onClick=${() => finalizar([...sel])}>Finalizar selecionadas (${sel.size})</button>
         <button class="btn btn-pri" disabled=${ocupado || !vis.length} onClick=${() => finalizar(vis.map((b) => b.id))}><${Icone} nome="finalizar" tam=${16} /> Finalizar todas (${vis.length})</button>`}
@@ -74,7 +74,7 @@ function Abertas() {
     <div class="tabela-rolagem"><table class="tabela fin-tabela">
       <thead><tr>
         ${podeFin && html`<th class="col-check"><input type="checkbox" checked=${todos} onChange=${(e) => setSel(e.target.checked ? new Set(vis.map((b) => b.id)) : new Set())} /></th>`}
-        <th>Nº</th><th>Início</th><th>Maceira</th><th>Padeiro</th><th>Receita</th><th class="n">Padrão</th><th class="n col-rend">Rendeu</th>${podeFin && html`<th></th>`}
+        <th>Nº</th><th>Início</th><th>Masseira</th><th>Padeiro</th><th>Receita</th><th class="n">Padrão</th><th class="n col-rend">Rendeu</th>${podeFin && html`<th></th>`}
       </tr></thead>
       <tbody>${vis.map((b) => { const f = ficha(b); const m = minutos(b.iniciada_em); const alt = alterou(b);
         return html`<tr key=${b.id} class=${(sel.has(b.id) ? 'sel ' : '') + (m > prazo ? 'linha-alerta' : '')}>
@@ -113,7 +113,7 @@ function Finalizadas() {
   const pes = (u) => dados.mapa.perfil.get(u)?.nome || '';
   const dif = (b) => (b.situacao === 'finalizada' && b.rendimento_padrao != null ? Number(b.quantidade_produzida) - Number(b.rendimento_padrao) : null);
   const colunasExp = [
-    { titulo: 'Nº', valor: (b) => b.id }, { titulo: 'Início', valor: (b) => dataHora(b.iniciada_em) }, { titulo: 'Maceira', valor: (b) => dados.mapa.maceira.get(b.maceira_id)?.nome || '' },
+    { titulo: 'Nº', valor: (b) => b.id }, { titulo: 'Início', valor: (b) => dataHora(b.iniciada_em) }, { titulo: 'Masseira', valor: (b) => dados.mapa.maceira.get(b.maceira_id)?.nome || '' },
     { titulo: 'Padeiro', valor: (b) => dados.mapa.operador.get(b.operador_id)?.nome || '' }, { titulo: 'Receita', valor: (b) => `${f(b)?.codigo} ${f(b)?.nome}` },
     { titulo: 'Situação', valor: (b) => (b.situacao === 'finalizada' ? 'Finalizada' : 'Cancelada') },
     { titulo: 'Padrão', valor: (b) => Number(b.rendimento_padrao || 0), num: true }, { titulo: 'Produzido', valor: (b) => Number(b.quantidade_produzida || 0), num: true },
@@ -124,7 +124,7 @@ function Finalizadas() {
     ${!lista ? html`<${Carregando} />` : html`<${Tabela} linhas=${lista} vazio="Nenhuma batelada finalizada no período." colunas=${[
       { chave: 'id', titulo: 'Nº', num: true },
       { chave: 'ini', titulo: 'Início', valor: (b) => b.iniciada_em, render: (b) => dataHora(b.iniciada_em) },
-      { chave: 'mac', titulo: 'Maceira', render: (b) => dados.mapa.maceira.get(b.maceira_id)?.nome || '–' },
+      { chave: 'mac', titulo: 'Masseira', render: (b) => dados.mapa.maceira.get(b.maceira_id)?.nome || '–' },
       { chave: 'op', titulo: 'Padeiro', render: (b) => dados.mapa.operador.get(b.operador_id)?.nome || '–' },
       { chave: 'f', titulo: 'Receita', render: (b) => `${f(b)?.codigo} ${f(b)?.nome}` },
       { chave: 'q', titulo: 'Produzido', num: true, valor: (b) => Number(b.quantidade_produzida || 0),

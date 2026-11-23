@@ -94,8 +94,8 @@ export function TelaProgramacao() {
   const pesagem = podeFazer('saida_receita');
   return html`
     <${Cabecalho} titulo="Programação de produção"
-      sub=${engenharia ? 'Programe as receitas do dia, a maceira e a ordem. A pesagem pesa os pós e manda a mistura para as maceiras.' : 'O que o PCP programou. Pese os pós de cada receita e envie a mistura para as maceiras.'} />
-    <${Abas} abas=${[{ id: 'dia', titulo: 'Programação do dia' }, ...(engenharia ? [{ id: 'quadro', titulo: 'Quadro das maceiras' }] : []), { id: 'periodo', titulo: 'Programado × produzido (período)' }]} ativa=${aba} aoMudar=${setAba} />
+      sub=${engenharia ? 'Programe as receitas do dia, a masseira e a ordem. A pesagem pesa os pós e manda a mistura para as masseiras.' : 'O que o PCP programou. Pese os pós de cada receita e envie a mistura para as masseiras.'} />
+    <${Abas} abas=${[{ id: 'dia', titulo: 'Programação do dia' }, ...(engenharia ? [{ id: 'quadro', titulo: 'Quadro das masseiras' }] : []), { id: 'periodo', titulo: 'Programado × produzido (período)' }]} ativa=${aba} aoMudar=${setAba} />
     ${aba === 'quadro' ? html`<${QuadroMaceiras} dia=${dia} setDia=${setDia} SeletorDia=${SeletorDia} />` : aba === 'dia' ? html`<${ProgramacaoDia} dia=${dia} setDia=${setDia} engenharia=${engenharia} pesagem=${pesagem} />
       ${podeFazer('previsao_producao') && html`<${ResumoPrevisao} dia=${dia} />`}`
       : html`<${ProgramacaoPeriodo} aoAbrirDia=${(d) => { setDia(d); setAba('dia'); }} />`}`;
@@ -183,7 +183,7 @@ function ProgramacaoDia({ dia, setDia, engenharia, pesagem }) {
         { chave: 'r', titulo: 'Receita', valor: (p) => ficha(p.ficha_id)?.nome, render: (p) => html`<b>${ficha(p.ficha_id)?.codigo} · ${ficha(p.ficha_id)?.nome}</b>
           ${p.itens_alterados && html` <${Etiqueta} cor="laranja" titulo=${textoAlteracao(p, dados)}>receita alterada</${Etiqueta}>`}
           ${p.observacao && html`<br /><small>${p.observacao}</small>`}` },
-        { chave: 'mac', titulo: 'Maceira', valor: (p) => dados.mapa.maceira.get(p.maceira_id)?.nome || '', render: (p) => html`${dados.mapa.maceira.get(p.maceira_id)?.nome || html`<small class="texto-cinza">sem maceira</small>`}${p.operador_id ? html`<br /><small>${dados.mapa.operador.get(p.operador_id)?.nome}</small>` : ''}` },
+        { chave: 'mac', titulo: 'Masseira', valor: (p) => dados.mapa.maceira.get(p.maceira_id)?.nome || '', render: (p) => html`${dados.mapa.maceira.get(p.maceira_id)?.nome || html`<small class="texto-cinza">sem masseira</small>`}${p.operador_id ? html`<br /><small>${dados.mapa.operador.get(p.operador_id)?.nome}</small>` : ''}` },
         { chave: 'quantidade', titulo: 'Programado', num: true, valor: (p) => Number(p.quantidade), render: (p) => num(p.quantidade, 3) },
         { chave: 'feito', titulo: 'Pesado', num: true, render: (p) => html`<b>${num(p.feito, 3)}</b>` },
         { chave: 'etapas', titulo: 'Onde está', ordenar: false, render: (p) => html`<${EtapasMini} f=${fx.get(p.id)} />
@@ -291,8 +291,8 @@ function ModalProgramar({ pg, inicial, feito, aoFechar }) {
       <${Campo} rotulo="Receita" obrigatorio><${Escolher} itens=${dados.fichas.filter((f) => f.ativo)} valor=${fichaId} desabilitado=${travado}
         aoMudar=${(id) => { setFichaId(id); setLinhas(daFicha(id)); }} rotuloDe=${(f) => `${f.codigo} · ${f.nome}`} detalheDe=${(f) => f.produto_final || ''} /></${Campo}>
       <${Campo} rotulo="Quantas receitas" obrigatorio ajuda=${travado ? `mínimo ${num(feito, 3)} (já feitas)` : ''}><${Numero} valor=${q} aoMudar=${setQ} /></${Campo}>
-      <${Campo} rotulo="Maceira" ajuda=${pg ? '' : 'Vazio = o sistema sugere pela linha da receita.'}><select class="entrada" value=${mac} onChange=${(e) => setMac(e.target.value ? Number(e.target.value) : '')}>
-        <option value="">${pg ? 'Sem maceira' : 'Sugerir automaticamente'}</option>${dados.maceiras.filter((m) => m.ativa).map((m) => html`<option value=${m.id}>${m.nome}</option>`)}</select></${Campo}>
+      <${Campo} rotulo="Masseira" ajuda=${pg ? '' : 'Vazio = o sistema sugere pela linha da receita.'}><select class="entrada" value=${mac} onChange=${(e) => setMac(e.target.value ? Number(e.target.value) : '')}>
+        <option value="">${pg ? 'Sem masseira' : 'Sugerir automaticamente'}</option>${dados.maceiras.filter((m) => m.ativa).map((m) => html`<option value=${m.id}>${m.nome}</option>`)}</select></${Campo}>
       <${Campo} rotulo="Padeiro sugerido (opcional)"><select class="entrada" value=${op} onChange=${(e) => setOp(e.target.value ? Number(e.target.value) : '')}>
         <option value="">Qualquer padeiro</option>${dados.operadores.filter((o) => o.ativo).map((o) => html`<option value=${o.id}>${o.nome}</option>`)}</select></${Campo}>
     </div>
@@ -340,7 +340,7 @@ function ModalBaixa({ pg, feito, aoFechar }) {
     const texto = alterar ? `Alterada na pesagem: ${resumoAlt || 'mesmos ingredientes'}.` : pg.itens_alterados ? `Receita alterada (programação): ${textoAlteracao(pg, dados)}.` : '';
     const r = await executar(() => api.rpc('registrar_producao', { p: { programacao_id: pg.id, ficha_id: pg.ficha_id, multiplicador: m,
       alterada: alterar, itens: alterar ? itensAlt : undefined, observacao: [texto, obs].filter(Boolean).join(' '), enviar } }),
-      `Pesado: ${rec(m)} de ${f.nome}${enviar ? ' — mistura enviada para as maceiras' : ' — mistura ficou na pesagem'}.`);
+      `Pesado: ${rec(m)} de ${f.nome}${enviar ? ' — mistura enviada para as masseiras' : ' — mistura ficou na pesagem'}.`);
     if (r) { await recarregar(); aoFechar(); }
   }
   return html`<${Modal} titulo=${`Pesar · ${f.codigo} ${f.nome}`} aoFechar=${aoFechar} largo
@@ -376,9 +376,9 @@ function ModalBaixa({ pg, feito, aoFechar }) {
         return html`<tr><td data-rotulo="Ingrediente"><b>${p?.descricao}</b></td><td class="n" data-rotulo="Por receita">${qu(e.base, p?.unidade_estoque)}</td>
           <td class="n" data-rotulo="Total"><b>${qu(total, p?.unidade_estoque)}</b></td>
           <td class=${'n' + (falta ? ' texto-vermelho' : '')} data-rotulo="Na pesagem">${qu(sl, p?.unidade_estoque)}${falta ? ' ⚠' : ''}</td></tr>`; })}</tbody></table></div>
-    ${its.some((e) => !ehPesagem(e.produto_id)) && html`<p class="nota">Ficam para a maceira (não pesa aqui): ${its.filter((e) => !ehPesagem(e.produto_id)).map((e) => `${mp.get(e.produto_id)?.descricao} ${qu(e.base * m, mp.get(e.produto_id)?.unidade_estoque)}`).join(' · ')}.</p>`}
+    ${its.some((e) => !ehPesagem(e.produto_id)) && html`<p class="nota">Ficam para a masseira (não pesa aqui): ${its.filter((e) => !ehPesagem(e.produto_id)).map((e) => `${mp.get(e.produto_id)?.descricao} ${qu(e.base * m, mp.get(e.produto_id)?.unidade_estoque)}`).join(' · ')}.</p>`}
     <label class="check destaque"><input type="checkbox" checked=${enviar} onChange=${(e) => setEnviar(e.target.checked)} />
-      Enviar já a mistura para a <b>Produção Maceiras</b> (o padeiro recebe no tablet). Desmarque se a mistura vai ficar na pesagem por enquanto.</label>
+      Enviar já a mistura para a <b>Produção Masseiras</b> (o padeiro recebe no tablet). Desmarque se a mistura vai ficar na pesagem por enquanto.</label>
     <${Campo} rotulo="Observação (opcional)"><input class="entrada" value=${obs} onInput=${(e) => setObs(e.target.value)} /></${Campo}>
   </${Modal}>`;
 }
@@ -465,10 +465,10 @@ function EnviarMisturas({ fluxo }) {
     const disp = new Map(); itens.forEach((i) => disp.set(i.produto_id, saldoLocal(dados, i.produto_id, pes.id).disponivel));
     const ok = itens.filter((i) => { const d = disp.get(i.produto_id); const q = Math.min(i.quantidade, d); disp.set(i.produto_id, d - q); i.quantidade = q; return q > 0.0001; });
     if (!ok.length) return avisar('Não há mistura disponível na pesagem para enviar.', 'erro');
-    if (await executar(() => api.rpc('criar_transferencia', { p: { origem_id: pes.id, destino_id: mac.id, enviar: true, observacao: 'Misturas da pesagem', itens: ok } }), 'Misturas enviadas para as maceiras.')) await recarregar(true);
+    if (await executar(() => api.rpc('criar_transferencia', { p: { origem_id: pes.id, destino_id: mac.id, enviar: true, observacao: 'Misturas da pesagem', itens: ok } }), 'Misturas enviadas para as masseiras.')) await recarregar(true);
   }
   return html`<div class="aviso-faixa azul"><span><${Icone} nome="caminhao" tam=${18} /> <b>${rec(total)}</b> pesada(s) e ainda na pesagem: ${pend.map((f) => `${dados.mapa.ficha.get(f.ficha_id)?.codigo} (${num(f.na_pesagem, 1)})`).join(', ')}</span>
-    <button class="btn btn-pri btn-peq" disabled=${ocupado} onClick=${enviar}>Enviar para as maceiras</button></div>`;
+    <button class="btn btn-pri btn-peq" disabled=${ocupado} onClick=${enviar}>Enviar para as masseiras</button></div>`;
 }
 
 // Etapas da programação em miniatura (a pesar → finalizado)

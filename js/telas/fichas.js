@@ -112,10 +112,10 @@ function FormFicha({ ficha, itens, aoFechar, somenteLeitura, aoUsar }) {
         <div class="linha-campo"><input class="entrada" inputmode="decimal" placeholder="ex.: 180" value=${f.rendimento_qtd} onInput=${set('rendimento_qtd')} />
           <input class="entrada" list="unidades-rendimento" placeholder="pacotes" value=${f.rendimento_unidade} onInput=${set('rendimento_unidade')} />
           <datalist id="unidades-rendimento"><option value="pacotes" /><option value="unidades" /><option value="pães" /><option value="kg" /><option value="caixas" /></datalist></div></${Campo}>
-      <${Campo} rotulo="Linha de produção" ajuda="Ajuda a sugerir a maceira na programação.">
+      <${Campo} rotulo="Linha de produção" ajuda="Ajuda a sugerir a masseira na programação.">
         <select class="entrada" value=${f.linha_id || ''} onChange=${(e) => set('linha_id')(e.target.value ? Number(e.target.value) : null)}>
           <option value="">–</option>${dados.linhas.filter((l) => l.ativo || l.id === f.linha_id).map((l) => html`<option value=${l.id}>${l.nome}</option>`)}</select></${Campo}>
-      <${Campo} rotulo="Tempo médio de 1 batelada (min)" ajuda=${`Usado no semáforo das maceiras. Vazio = padrão (${dados.params.producao_tempo_padrao_min || 20} min).`}>
+      <${Campo} rotulo="Tempo médio de 1 batelada (min)" ajuda=${`Usado no semáforo das masseiras. Vazio = padrão (${dados.params.producao_tempo_padrao_min || 20} min).`}>
         <input class="entrada" inputmode="numeric" value=${f.tempo_batelada_min} onInput=${set('tempo_batelada_min')} placeholder=${String(dados.params.producao_tempo_padrao_min || 20)} /></${Campo}>
       <${Campo} rotulo="Observação" classe="larga"><textarea class="entrada" rows="2" value=${f.observacao} onInput=${set('observacao')}></textarea></${Campo}>
     </fieldset>

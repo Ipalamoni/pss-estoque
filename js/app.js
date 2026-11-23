@@ -74,7 +74,7 @@ const MENU = [
   { id: 'previsao', titulo: 'Programado × produzido', papeis: ['admin', 'engenharia', 'diretoria', 'financeiro', 'faturamento'], tela: TelaPrevisao, aoVivo: true },
   { id: 'painel', titulo: 'Painel de Estoque e Compras', papeis: ['admin', 'diretoria', 'comprador', 'almoxarifado', 'engenharia'], tela: TelaPainel },
   { grupo: 'Produção' },
-  { id: 'maceiras', titulo: 'Produção Maceiras', papeis: ['admin', 'padeiro', 'engenharia', 'diretoria'], tela: TelaMaceiras, aoVivo: true },
+  { id: 'maceiras', titulo: 'Produção Masseiras', papeis: ['admin', 'padeiro', 'engenharia', 'diretoria'], tela: TelaMaceiras, aoVivo: true },
   { id: 'programacao', titulo: 'Programação e pesagem', papeis: ['admin', 'engenharia', 'pesagem', 'diretoria'], tela: TelaProgramacao, aoVivo: true },
   { id: 'finalizar', titulo: 'Finalizar bateladas', papeis: ['admin', 'engenharia', 'diretoria'], tela: TelaFinalizar, aoVivo: true },
   { id: 'saidas-producao', titulo: 'Saídas da produção', papeis: ['admin', 'engenharia', 'pesagem', 'almoxarifado', 'diretoria'], tela: TelaSaidasProducao },
@@ -95,7 +95,7 @@ const MENU = [
   { id: 'produtos', titulo: 'Produtos', papeis: TODOS, tela: TelaProdutos },
   { id: 'fornecedores', titulo: 'Fornecedores', papeis: ['admin', 'comprador', 'almoxarifado', 'recebimento', 'diretoria'], tela: TelaFornecedores },
   { id: 'fichas', titulo: 'Fichas técnicas', papeis: ['admin', 'engenharia', 'pesagem', 'almoxarifado', 'diretoria'], tela: TelaFichas },
-  { id: 'cadastros-producao', titulo: 'Maceiras e padeiros', papeis: ['admin', 'engenharia', 'diretoria'], tela: TelaCadastrosProducao },
+  { id: 'cadastros-producao', titulo: 'Masseiras e padeiros', papeis: ['admin', 'engenharia', 'diretoria'], tela: TelaCadastrosProducao },
   { grupo: 'Administração', papeis: ['admin', 'diretoria'] },
   { id: 'usuarios', titulo: 'Usuários e acessos', papeis: ['admin'], tela: TelaUsuarios },
   { id: 'configuracoes', titulo: 'Configurações e locais', papeis: ['admin'], tela: TelaConfiguracoes },
@@ -323,7 +323,7 @@ function BarraInferior({ papeis, visiveis, atual, dados, abrirMenu, menuAberto }
     { id: papeis.some((p) => ['almoxarifado', 'recebimento'].includes(p)) ? um('requisicoes', 'receber') : papeis.includes('comprador') ? um('pedidos') : um('transferencias', 'custos', 'financeiro'),
       t: null },
   ].filter((x) => x.id).filter((x, i, l) => l.findIndex((y) => y.id === x.id) === i).slice(0, 4);
-  const nome = (id) => ({ 'painel-producao': 'Produção', maceiras: 'Maceiras', programacao: 'Pesagem', previsao: 'Produção', 'estoque-local': 'Estoque', estoque: 'Estoque',
+  const nome = (id) => ({ 'painel-producao': 'Produção', maceiras: 'Masseiras', programacao: 'Pesagem', previsao: 'Produção', 'estoque-local': 'Estoque', estoque: 'Estoque',
     requisicoes: 'Requisições', receber: 'Receber', pedidos: 'Pedidos', transferencias: 'Transferir', custos: 'Custos', financeiro: 'A pagar', inicio: 'Início' })[id];
   const conta = (id) => (id === 'requisicoes' ? nReq : id === 'transferencias' ? nTransf : 0);
   return html`<nav class="barra-inferior" aria-label="Atalhos">

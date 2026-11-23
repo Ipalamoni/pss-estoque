@@ -74,7 +74,7 @@ function InicioOperacao() {
   const gestao = papeis.some((x) => ['admin', 'diretoria', 'engenharia'].includes(x));
   const atalhos = [
     gestao && { t: 'Painel de Produção', i: 'painel-producao', f: () => ir('painel-producao'), destaque: true },
-    papeis.some((x) => ['admin', 'padeiro', 'engenharia'].includes(x)) && { t: 'Produção Maceiras', i: 'maceiras', f: () => ir('maceiras') },
+    papeis.some((x) => ['admin', 'padeiro', 'engenharia'].includes(x)) && { t: 'Produção Masseiras', i: 'maceiras', f: () => ir('maceiras') },
     podeFazer('finalizar_batelada') && { t: 'Finalizar bateladas', i: 'finalizar', f: () => ir('finalizar') },
     nReq > 0 && { t: 'Requisições para atender', i: 'requisicoes', f: () => ir('requisicoes'), n: nReq },
     nChegando > 0 && { t: 'Receber transferências', i: 'transferencias', f: () => ir('transferencias'), n: nChegando },

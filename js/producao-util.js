@@ -32,7 +32,7 @@ export const ETAPAS = [
   { id: 'a_pesar', titulo: 'A pesar', curto: 'a pesar', cor: '#94a3b8' },
   { id: 'na_pesagem', titulo: 'Pesado, não enviado', curto: 'na pesagem', cor: '#d9a441' },
   { id: 'a_caminho', titulo: 'A caminho', curto: 'a caminho', cor: '#3b82c4' },
-  { id: 'pronto', titulo: 'Na maceira (pronto)', curto: 'prontas', cor: '#8b5cf6' },
+  { id: 'pronto', titulo: 'Na masseira (pronto)', curto: 'prontas', cor: '#8b5cf6' },
   { id: 'em_producao', titulo: 'Em produção', curto: 'batendo', cor: '#f08c00' },
   { id: 'finalizado', titulo: 'Finalizado', curto: 'finalizadas', cor: '#1e7d4f' },
 ];

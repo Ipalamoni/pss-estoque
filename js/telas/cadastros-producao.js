@@ -11,8 +11,8 @@ export function TelaCadastrosProducao() {
   const [aba, setAba] = useState('maceiras');
   const edita = pode(papeis, 'producao_config');
   return html`
-    <${Cabecalho} titulo="Cadastros da produção" sub="Maceiras, linhas, padeiros e os tempos que acendem o semáforo." />
-    <${Abas} abas=${[{ id: 'maceiras', titulo: 'Maceiras' }, { id: 'padeiros', titulo: 'Padeiros' }, { id: 'linhas', titulo: 'Linhas' }, { id: 'tempos', titulo: 'Tempos e semáforo' }]} ativa=${aba} aoMudar=${setAba} />
+    <${Cabecalho} titulo="Cadastros da produção" sub="Masseiras, linhas, padeiros e os tempos que acendem o semáforo." />
+    <${Abas} abas=${[{ id: 'maceiras', titulo: 'Masseiras' }, { id: 'padeiros', titulo: 'Padeiros' }, { id: 'linhas', titulo: 'Linhas' }, { id: 'tempos', titulo: 'Tempos e semáforo' }]} ativa=${aba} aoMudar=${setAba} />
     ${aba === 'maceiras' && html`<${Maceiras} edita=${edita} />`}
     ${aba === 'padeiros' && html`<${Padeiros} edita=${edita} />`}
     ${aba === 'linhas' && html`<${Linhas} edita=${edita} />`}
@@ -29,8 +29,8 @@ function Maceiras({ edita }) {
   const [ed, setEd] = useState(null);
   const nomes = (ids, mapa) => (ids || []).map((id) => mapa.get(id)?.nome).filter(Boolean).join(', ');
   return html`
-    ${edita && html`<div class="titulo-com-acao"><span></span><button class="btn btn-pri" onClick=${() => setEd({})}><${Icone} nome="mais" tam=${16} /> Nova maceira</button></div>`}
-    ${!dados.maceiras.length ? html`<${Vazio} texto="Nenhuma maceira cadastrada." />` : html`<div class="grade-cartoes-mac">${dados.maceiras.map((m) => html`
+    ${edita && html`<div class="titulo-com-acao"><span></span><button class="btn btn-pri" onClick=${() => setEd({})}><${Icone} nome="mais" tam=${16} /> Nova masseira</button></div>`}
+    ${!dados.maceiras.length ? html`<${Vazio} texto="Nenhuma masseira cadastrada." />` : html`<div class="grade-cartoes-mac">${dados.maceiras.map((m) => html`
       <button class=${'mac-cad' + (m.ativa ? '' : ' inativa')} key=${m.id} onClick=${() => edita && setEd(m)} disabled=${!edita}>
         <div class="mac-cad-topo"><b>${m.nome}</b>${!m.ativa && html`<${Etiqueta} cor="cinza">inativa</${Etiqueta}>`}</div>
         <div class="mac-cad-info"><span><small>Capacidade</small>${m.capacidade_kg ? `${num(m.capacidade_kg, 0)} kg` : '–'}</span>
@@ -38,7 +38,7 @@ function Maceiras({ edita }) {
         <div class="mac-cad-linha"><small>Linhas</small>${nomes(m.linhas, dados.mapa.linha) || '–'}</div>
         <div class="mac-cad-linha"><small>Padeiros habituais</small>${nomes(m.operadores, dados.mapa.operador) || '–'}</div>
       </button>`)}</div>`}
-    <p class="nota">Os padeiros habituais servem só de orientação: qualquer padeiro pode trabalhar em qualquer maceira.</p>
+    <p class="nota">Os padeiros habituais servem só de orientação: qualquer padeiro pode trabalhar em qualquer masseira.</p>
     ${ed && html`<${EditarMaceira} m=${ed} aoFechar=${() => setEd(null)} />`}`;
 }
 
@@ -50,12 +50,12 @@ function EditarMaceira({ m, aoFechar }) {
   async function salvar() {
     const p = { id: m.id || null, nome: v.nome, capacidade_kg: n(v.capacidade_kg), tempo_min: v.tempo_min ? Math.round(n(v.tempo_min)) : null,
       ordem: v.ordem === '' ? null : Math.round(n(v.ordem)), linhas: v.linhas, operadores: v.operadores, ativa: v.ativa };
-    if (await executar(() => api.rpc('salvar_maceira', { p }), 'Maceira salva.')) { await recarregar(true); aoFechar(); }
+    if (await executar(() => api.rpc('salvar_maceira', { p }), 'Masseira salva.')) { await recarregar(true); aoFechar(); }
   }
-  return html`<${Modal} titulo=${m.id ? `Maceira ${m.nome}` : 'Nova maceira'} aoFechar=${aoFechar}
+  return html`<${Modal} titulo=${m.id ? `Masseira ${m.nome}` : 'Nova masseira'} aoFechar=${aoFechar}
     rodape=${html`<button class="btn btn-sec" onClick=${aoFechar}>Voltar</button><button class="btn btn-pri" disabled=${ocupado} onClick=${salvar}>Salvar</button>`}>
     <div class="grade">
-      <${Campo} rotulo="Nome" obrigatorio><input class="entrada" value=${v.nome} onInput=${(e) => setV({ ...v, nome: e.target.value })} placeholder="ex.: Maceira 1" /></${Campo}>
+      <${Campo} rotulo="Nome" obrigatorio><input class="entrada" value=${v.nome} onInput=${(e) => setV({ ...v, nome: e.target.value })} placeholder="ex.: Masseira 1" /></${Campo}>
       <${Campo} rotulo="Capacidade (kg de farinha por batelada)"><${Numero} valor=${v.capacidade_kg} aoMudar=${(x) => setV({ ...v, capacidade_kg: x })} /></${Campo}>
       <${Campo} rotulo="Tempo próprio (min)" ajuda="Deixe vazio para usar o tempo de cada receita."><${Numero} valor=${v.tempo_min} aoMudar=${(x) => setV({ ...v, tempo_min: x })} /></${Campo}>
       <${Campo} rotulo="Ordem na tela"><${Numero} valor=${v.ordem} aoMudar=${(x) => setV({ ...v, ordem: x })} /></${Campo}>
@@ -74,10 +74,10 @@ function Padeiros({ edita }) {
     ${edita && html`<div class="titulo-com-acao"><span></span><button class="btn btn-pri" onClick=${() => setEd({})}><${Icone} nome="mais" tam=${16} /> Novo padeiro</button></div>`}
     <${Tabela} linhas=${dados.operadores} aoClicar=${edita ? setEd : null} vazio="Nenhum padeiro cadastrado." colunas=${[
       { chave: 'nome', titulo: 'Nome' },
-      { chave: 'mac', titulo: 'Maceiras habituais', render: (o) => macs(o.id) || '–' },
+      { chave: 'mac', titulo: 'Masseiras habituais', render: (o) => macs(o.id) || '–' },
       { chave: 'ativo', titulo: 'Situação', render: (o) => (o.ativo ? html`<${Etiqueta} cor="verde">ativo</${Etiqueta}>` : html`<${Etiqueta} cor="cinza">inativo</${Etiqueta}>`) },
     ]} />
-    <p class="nota">No tablet das maceiras fica um usuário “Maceiras”. Cada padeiro toca em <b>Trocar</b>, escolhe o nome e digita a senha de 6 números. Assim cada batelada fica com o nome de quem bateu.</p>
+    <p class="nota">No tablet das masseiras fica um usuário “Masseiras”. Cada padeiro toca em <b>Trocar</b>, escolhe o nome e digita a senha de 6 números. Assim cada batelada fica com o nome de quem bateu.</p>
     ${ed && html`<${EditarPadeiro} o=${ed} aoFechar=${() => setEd(null)} />`}`;
 }
 
@@ -115,16 +115,16 @@ function Linhas({ edita }) {
     <${Tabela} linhas=${dados.linhas} vazio="Nenhuma linha cadastrada." colunas=${[
       { chave: 'nome', titulo: 'Linha' },
       { chave: 'f', titulo: 'Receitas', num: true, valor: (l) => fichas(l.id), render: (l) => fichas(l.id) },
-      { chave: 'm', titulo: 'Maceiras', render: (l) => dados.maceiras.filter((m) => (m.linhas || []).includes(l.id)).map((m) => m.nome).join(', ') || '–' },
+      { chave: 'm', titulo: 'Masseiras', render: (l) => dados.maceiras.filter((m) => (m.linhas || []).includes(l.id)).map((m) => m.nome).join(', ') || '–' },
       { chave: 'ativo', titulo: '', ordenar: false, render: (l) => (edita ? html`<button class="btn btn-sec btn-peq" disabled=${ocupado} onClick=${(e) => { e.stopPropagation(); salvar({ id: l.id, nome: l.nome, ativo: !l.ativo }); }}>${l.ativo ? 'Desativar' : 'Ativar'}</button>`
         : l.ativo ? 'ativa' : 'inativa') },
     ]} />
-    <p class="nota">A linha da receita (na ficha técnica) ajuda a sugerir a maceira na programação.</p>`;
+    <p class="nota">A linha da receita (na ficha técnica) ajuda a sugerir a masseira na programação.</p>`;
 }
 
 const TEMPOS = [
-  { chave: 'producao_inicio_turno', rotulo: 'Início do turno das maceiras', ajuda: 'Antes da 1ª batelada do dia o semáforo não corre. Se passar dessa hora + a tolerância e ninguém iniciar, a maceira fica laranja “Ainda não iniciou”.', hora: true },
-  { chave: 'producao_tolerancia_min', rotulo: 'Tolerância para começar (min)', ajuda: 'Depois do início do turno, ou quando chega mistura numa maceira que estava parada.' },
+  { chave: 'producao_inicio_turno', rotulo: 'Início do turno das masseiras', ajuda: 'Antes da 1ª batelada do dia o semáforo não corre. Se passar dessa hora + a tolerância e ninguém iniciar, a masseira fica laranja “Ainda não iniciou”.', hora: true },
+  { chave: 'producao_tolerancia_min', rotulo: 'Tolerância para começar (min)', ajuda: 'Depois do início do turno, ou quando chega mistura numa masseira que estava parada.' },
   { chave: 'producao_tempo_padrao_min', rotulo: 'Tempo padrão da batelada (min)', ajuda: 'Usado quando a receita não tem tempo próprio.' },
   { chave: 'producao_prazo_finalizar_h', rotulo: 'Avisar batelada sem finalizar depois de (horas)', ajuda: 'Na tela Finalizar bateladas.' },
   { chave: 'mistura_parada_h', rotulo: 'Avisar mistura parada depois de (horas)', ajuda: 'Mistura pesada que não foi usada.' },

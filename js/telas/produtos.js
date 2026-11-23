@@ -161,8 +161,8 @@ function FormProduto({ produto, aoFechar, somenteLeitura }) {
           ${f.categoria === 'embalagem' && f.baixa_producao && html`<p class="nota">Embalagem com baixa pela produção: ao finalizar a batelada, o sistema baixa pela ficha (nº de embalagens × peso médio).</p>`}`
           : html`<p class="nota">Não controla estoque: aparece no pedido e no recebimento, mas não tem saldo nem baixa.</p>`}
         <div class="grade">
-          ${f.categoria === 'materia_prima' && html`<${Campo} rotulo="Usado na" ajuda="Pós vão para a pesagem. Farinha e fermento são usados direto na maceira.">
-            <select class="entrada" value=${f.usado_na} onChange=${set('usado_na')}><option value="pesagem">Pesagem (pós)</option><option value="maceira">Maceira (farinha, fermento)</option></select></${Campo}>`}
+          ${f.categoria === 'materia_prima' && html`<${Campo} rotulo="Usado na" ajuda="Pós vão para a pesagem. Farinha e fermento são usados direto na masseira.">
+            <select class="entrada" value=${f.usado_na} onChange=${set('usado_na')}><option value="pesagem">Pesagem (pós)</option><option value="maceira">Masseira (farinha, fermento)</option></select></${Campo}>`}
           <${Campo} rotulo="Local padrão" ajuda="Onde o produto entra no recebimento. Vazio = automático (pesados → Depósito Produção, pós → Pesagem, resto → Almoxarifado).">
             <select class="entrada" value=${f.local_padrao_id || ''} onChange=${(e) => set('local_padrao_id')(e.target.value ? Number(e.target.value) : null)}>
               <option value="">Automático</option>${dados.locais.filter((l) => l.ativo).map((l) => html`<option value=${l.id}>${l.nome}</option>`)}</select></${Campo}>

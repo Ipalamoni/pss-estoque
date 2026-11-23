@@ -63,7 +63,7 @@ export function CustoProdutoAcabado() {
     { titulo: 'Real × padrão (%)', valor: (r) => (r.dif === null ? '' : Math.round(r.dif * 10) / 10), num: true }];
   const colB = [
     { titulo: 'Batelada', valor: (b) => b.batelada_id }, { titulo: 'Dia', valor: (b) => b.data }, { titulo: 'Receita', valor: (b) => `${f(b.ficha_id)?.codigo} ${f(b.ficha_id)?.nome}` },
-    { titulo: 'Maceira', valor: (b) => dados.mapa.maceira.get(b.maceira_id)?.nome || '' }, { titulo: 'Padeiro', valor: (b) => dados.mapa.operador.get(b.operador_id)?.nome || '' },
+    { titulo: 'Masseira', valor: (b) => dados.mapa.maceira.get(b.maceira_id)?.nome || '' }, { titulo: 'Padeiro', valor: (b) => dados.mapa.operador.get(b.operador_id)?.nome || '' },
     { titulo: 'Produzido', valor: (b) => b.q, num: true }, { titulo: 'Custo mistura', valor: (b) => b.mis, num: true }, { titulo: 'Custo farinha/fermento', valor: (b) => b.mac, num: true },
     { titulo: 'Custo embalagem', valor: (b) => b.emb, num: true }, { titulo: 'Custo total', valor: (b) => b.tot, num: true },
     { titulo: 'Custo unitário', valor: (b) => Number(b.custo_unitario || 0), texto: (b) => m4(b.custo_unitario), num: true }, { titulo: 'Custo padrão', valor: (b) => b.pad, num: true }];
@@ -95,13 +95,13 @@ export function CustoProdutoAcabado() {
       : html`<${Tabela} linhas=${lista} chave="batelada_id" vazio="Nenhuma batelada finalizada no período." max=${400} colunas=${[
         { chave: 'batelada_id', titulo: 'Nº', num: true }, { chave: 'data', titulo: 'Dia' },
         { chave: 'f', titulo: 'Receita', render: (b) => `${f(b.ficha_id)?.codigo} ${f(b.ficha_id)?.nome}` },
-        { chave: 'mac', titulo: 'Maceira', render: (b) => dados.mapa.maceira.get(b.maceira_id)?.nome || '–' },
+        { chave: 'mac', titulo: 'Masseira', render: (b) => dados.mapa.maceira.get(b.maceira_id)?.nome || '–' },
         { chave: 'q', titulo: 'Produzido', num: true, render: (b) => num(b.q, 0) },
         { chave: 'tot', titulo: 'Custo', num: true, render: (b) => moeda(b.tot) },
         { chave: 'custo_unitario', titulo: 'Unitário', num: true, render: (b) => m4(b.custo_unitario) },
         { chave: 'pad', titulo: 'Padrão', num: true, render: (b) => moeda(b.pad) },
       ]} />`}
-    <p class="nota">Custo da batelada = mistura (pós, ao custo médio na pesagem) + farinha e fermento usados na maceira + embalagem (pela ficha × peso médio × custo médio; simulada enquanto a embalagem sair por requisição). Média do período ponderada pela quantidade produzida. Saídas avulsas e perdas não entram aqui.</p>`;
+    <p class="nota">Custo da batelada = mistura (pós, ao custo médio na pesagem) + farinha e fermento usados na masseira + embalagem (pela ficha × peso médio × custo médio; simulada enquanto a embalagem sair por requisição). Média do período ponderada pela quantidade produzida. Saídas avulsas e perdas não entram aqui.</p>`;
 }
 
 // ------------------------------ ESTOQUE VALORIZADO -------------------
