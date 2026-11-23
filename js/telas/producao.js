@@ -54,7 +54,7 @@ function ingredientes(pg, dados) {
 function textoAlteracao(pg, dados) {
   if (!pg.itens_alterados) return '';
   const mp = dados.mapa.produto;
-  const orig = new Map(dados.fichaItens.filter((i) => i.ficha_id === pg.ficha_id).map((i) => [i.produto_id, Number(i.quantidade)]));
+  const orig = new Map(dados.fichaItens.filter((i) => i.ficha_id === pg.ficha_id && mp.get(i.produto_id)?.categoria === 'materia_prima').map((i) => [i.produto_id, Number(i.quantidade)]));
   const novo = new Map(); ingredientes(pg, dados).forEach((e) => novo.set(e.produto_id, (novo.get(e.produto_id) || 0) + e.base));
   const out = [];
   for (const [id, q] of orig) { const p = mp.get(id); if (!novo.has(id)) out.push(`retirou ${p?.descricao}`); else if (Math.abs(novo.get(id) - q) > 0.00005) out.push(`${p?.descricao}: ${qtd(q)} → ${qu(novo.get(id), p?.unidade_estoque)}`); }
@@ -255,7 +255,7 @@ function ModalProgramar({ pg, inicial, feito, aoFechar }) {
   const [alterar, setAlterar] = useState(!!(pg?.itens_alterados || inicial.alterar));
   const [mac, setMac] = useState(pg ? pg.maceira_id || '' : inicial.maceira_id || '');
   const [op, setOp] = useState(pg?.operador_id || '');
-  const daFicha = (id) => dados.fichaItens.filter((i) => i.ficha_id === id).map((i) => ({ k: Math.random(), produto_id: i.produto_id, quantidade: virg(i.quantidade), unidade: mp.get(i.produto_id)?.unidade_estoque }));
+  const daFicha = (id) => dados.fichaItens.filter((i) => i.ficha_id === id && mp.get(i.produto_id)?.categoria === 'materia_prima').map((i) => ({ k: Math.random(), produto_id: i.produto_id, quantidade: virg(i.quantidade), unidade: mp.get(i.produto_id)?.unidade_estoque }));
   const [linhas, setLinhas] = useState(() => (pg?.itens_alterados ? pg.itens_alterados.map((i) => ({ k: Math.random(), produto_id: i.produto_id, quantidade: virg(i.quantidade), unidade: i.unidade }))
     : inicial.ficha_id ? daFicha(inicial.ficha_id) : []));
   const [ocupado, executar] = useAcao();

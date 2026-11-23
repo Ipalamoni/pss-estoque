@@ -449,6 +449,7 @@ function App() {
     const desligar = api.aoMudar(TABELAS_AO_VIVO, () => { clearTimeout(t); t = setTimeout(() => { if (!document.hidden) recarregarLeve(); }, 1200); });
     const ciclo = setInterval(() => { if (!document.hidden && rotaViva.current) recarregarLeve(); }, 30000);
     const visivel = () => { if (!document.hidden && rotaViva.current) recarregarLeve(); };
+    window.__pssAtualizar = recarregarLeve;   // usado nos testes automáticos (força a atualização automática)
     document.addEventListener('visibilitychange', visivel);
     return () => { clearTimeout(t); clearInterval(ciclo); desligar && desligar(); document.removeEventListener('visibilitychange', visivel); };
   }, [usuario?.user_id]);

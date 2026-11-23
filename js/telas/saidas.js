@@ -38,7 +38,7 @@ function SaidaReceita({ fichaInicial, aoConcluir }) {
   const [obs, setObs] = useState('');
   const [ocupado, executar] = useAcao();
   const ficha = dados.mapa.ficha.get(fichaId);
-  const originais = useMemo(() => dados.fichaItens.filter((i) => i.ficha_id === fichaId), [fichaId, dados]);
+  const originais = useMemo(() => dados.fichaItens.filter((i) => i.ficha_id === fichaId && mp.get(i.produto_id)?.categoria === 'materia_prima'), [fichaId, dados]);
   const fichas = dados.fichas.filter((f) => f.ativo && contem(`${f.codigo} ${f.nome} ${f.produto_final}`, busca));
   const m = n(mult) || 0;
   // programação de hoje desta receita (para a saída contar como baixa)
@@ -58,7 +58,7 @@ function SaidaReceita({ fichaInicial, aoConcluir }) {
 
   function escolher(id) {
     setFichaId(id); setAlterar(false); setObs(''); setMult('1');
-    setLinhas(dados.fichaItens.filter((i) => i.ficha_id === id).map((i) => ({ k: Math.random(), produto_id: i.produto_id, quantidade: virg(i.quantidade), unidade: mp.get(i.produto_id)?.unidade_estoque })));
+    setLinhas(dados.fichaItens.filter((i) => i.ficha_id === id && mp.get(i.produto_id)?.categoria === 'materia_prima').map((i) => ({ k: Math.random(), produto_id: i.produto_id, quantidade: virg(i.quantidade), unidade: mp.get(i.produto_id)?.unidade_estoque })));
   }
   useEffect(() => { if (fichaInicial) escolher(fichaInicial); }, []);
   const mudar = (k, ch) => setLinhas((l) => l.map((x) => (x.k === k ? { ...x, ...ch } : x)));

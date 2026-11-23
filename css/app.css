@@ -1089,3 +1089,7 @@ html[data-tema="escuro"] {
   .cabecalho { gap: 8px; }
   .cabecalho > :last-child:not(.cabecalho-titulo) { flex-wrap: wrap; }
 }
+
+/* v2.3.2 — tema escuro: rótulos dos campos e cabeçalhos de tabela legíveis */
+[data-tema="escuro"] .campo-rotulo { color: #f1f3f5; }
+[data-tema="escuro"] .tabela th { color: #c9d0d6; }
