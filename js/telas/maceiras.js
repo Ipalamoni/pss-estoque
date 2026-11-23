@@ -20,6 +20,7 @@ export function TelaMaceiras() {
   const opera = podeFazer('batelada');
   const [operador, setOperador] = useState(null);       // { id, nome, pin }
   const [trocar, setTrocar] = useState(false);
+  const pendente = useRef(null);   // o que o padeiro tocou antes de entrar: continua sozinho depois da senha
   const fluxo = useFluxo(hojeISO());
   const agora = useRelogio(20);
   const ultimo = useRef(Date.now());
@@ -49,7 +50,7 @@ export function TelaMaceiras() {
   const emProd = fluxo.bateladas.filter((b) => b.situacao === 'em_producao').sort((a, b) => String(a.iniciada_em).localeCompare(String(b.iniciada_em)));
   const resumoChegando = [...dados.transfItens.filter((i) => chegando.some((t) => t.id === i.transferencia_id))
     .reduce((m, i) => { const d = dados.mapa.produto.get(i.produto_id)?.descricao || 'Base'; return m.set(d, (m.get(d) || 0) + Number(i.quantidade)); }, new Map()).entries()];
-  const exigir = (f) => () => { if (!opera) return avisar('Só o padeiro (ou o PCP) opera esta tela.', 'aviso'); if (!operador) return setTrocar(true); f(); };
+  const exigir = (f) => () => { if (!opera) return avisar('Só o padeiro (ou o PCP) opera esta tela.', 'aviso'); if (!operador) { pendente.current = f; return setTrocar(true); } f(); };
 
   return html`<${Cabecalho} titulo="Produção Masseiras" semVoltar=${soPadeiro} semTrilha=${soPadeiro} />
   <div class="maceiras-tela">
@@ -67,7 +68,7 @@ export function TelaMaceiras() {
           <div class="ep-info"><b>${m?.nome || 'Masseira'}</b><span>${dados.mapa.ficha.get(b.ficha_id)?.nome}</span>
             <small>começou ${hora(b.iniciada_em)}${b.operador_id ? ` · ${dados.mapa.operador.get(b.operador_id)?.nome || ''}` : ''}</small>
             <${SeloTempo} estado=${estadoTempo(min, prazoBatelada(dados, b.ficha_id, m))} min=${min} grande /></div>
-          <button class="ep-botao" disabled=${!opera} onClick=${exigir(() => setFinalizar({ b }))}><${Icone} nome="finalizar" tam=${28} /> FINALIZAR BATELADA</button>
+          <button class="ep-botao" disabled=${!opera} onClick=${exigir(() => setFinalizar({ bs: [b] }))}><${Icone} nome="finalizar" tam=${28} /> FINALIZAR BATELADA</button>
         </div>`;
       })}</div>
     </section>`}
@@ -109,21 +110,23 @@ export function TelaMaceiras() {
     </div>
     <p class="nota">Semáforo: <span class="leg s-azul"></span> pronta para começar · <span class="leg s-verde"></span> no ritmo · <span class="leg s-laranja"></span> tempo médio em atraso · <span class="leg s-vermelho"></span> produção em atraso · <span class="leg s-cinza"></span> aguardando. É só um sinal: nada fica travado.</p>
 
-    ${trocar && html`<${EntrarOperador} aoFechar=${() => setTrocar(false)} aoEntrar=${(o) => { setOperador(o); setTrocar(false); ultimo.current = Date.now(); }} />`}
-    ${ciente && html`<${EntrarOperador} titulo="Quem viu o aviso?" aoFechar=${() => setCiente(false)}
-      aoEntrar=${async (o) => { const r = await confirmarAvisos({ api, recarregar }, o, avisos); if (r !== null) { setCiente(false); setOperador(o); ultimo.current = Date.now(); } }} />`}
     ${aberta && html`<${MaceiraAberta} m=${aberta} fluxo=${fluxo} agora=${agora} opera=${opera} aoFechar=${() => setAberta(null)}
       aoIniciar=${exigir2(opera, operador, setTrocar, (p) => {
-        const anterior = emProd.find((b) => b.maceira_id === aberta.id);
-        if (anterior) setFinalizar({ b: anterior, depois: () => setIniciar({ prog: p, maceira: aberta }) });
+        const abertas = emProd.filter((b) => b.maceira_id === aberta.id);
+        if (abertas.length) setFinalizar({ bs: abertas, depois: () => setIniciar({ prog: p, maceira: aberta }) });
         else setIniciar({ prog: p, maceira: aberta });
-      })} operador=${operador} />`}
-    ${finalizar && html`<${FinalizarBatelada} b=${finalizar.b} operador=${operador} antes=${!!finalizar.depois}
+      }, pendente)} operador=${operador} />`}
+    ${finalizar && html`<${FinalizarBatelada} bs=${finalizar.bs} operador=${operador} antes=${!!finalizar.depois}
       aoFechar=${(ok) => { const d = finalizar.depois; setFinalizar(null); if (ok && d) d(); }} />`}
     ${iniciar && html`<${IniciarBatelada} prog=${iniciar.prog} maceira=${iniciar.maceira} operador=${operador} fluxo=${fluxo} agora=${agora}
       aoFechar=${(ok) => { setIniciar(null); if (ok) setAberta(null); }} />`}
     ${receber && html`<${ReceberMisturas} chegando=${chegando} operador=${operador} aoFechar=${() => setReceber(false)} />`}
     ${avulsa && html`<${SaidaAvulsaPadeiro} operador=${operador} aoFechar=${() => setAvulsa(false)} />`}
+    ${/* telas de nome + senha por ÚLTIMO: abrem por cima de qualquer janela */''}
+    ${trocar && html`<${EntrarOperador} aoFechar=${() => { pendente.current = null; setTrocar(false); }}
+      aoEntrar=${(o) => { setOperador(o); setTrocar(false); ultimo.current = Date.now(); const f = pendente.current; pendente.current = null; if (f) setTimeout(f, 0); }} />`}
+    ${ciente && html`<${EntrarOperador} titulo="Quem viu o aviso?" aoFechar=${() => setCiente(false)}
+      aoEntrar=${async (o) => { const r = await confirmarAvisos({ api, recarregar }, o, avisos); if (r !== null) { setCiente(false); setOperador(o); ultimo.current = Date.now(); } }} />`}
   </div>`;
 }
 async function confirmarAvisos({ api, recarregar }, o, avisos) {
@@ -142,7 +145,7 @@ const etapaFila = (l) => (l.iniciado >= l.programado ? 3 : l.pronto > 0 ? 0 : l.
 const pri = (l) => l.prioridade ?? 999;
 const filaReal = (progs) => progs.filter((l) => !l.finalizada).sort((a, b) => etapaFila(a) - etapaFila(b) || pri(a) - pri(b));
 
-const exigir2 = (opera, operador, setTrocar, f) => (...a) => { if (!opera) return avisar('Só o padeiro (ou o PCP) opera esta tela.', 'aviso'); if (!operador) return setTrocar(true); return f(...a); };
+const exigir2 = (opera, operador, setTrocar, f, pendente) => (...a) => { if (!opera) return avisar('Só o padeiro (ou o PCP) opera esta tela.', 'aviso'); if (!operador) { if (pendente) pendente.current = () => f(...a); return setTrocar(true); } return f(...a); };
 
 // ------------------------- entrar: nome + senha de 6 números -------------------------
 function EntrarOperador({ aoFechar, aoEntrar, titulo }) {
@@ -255,13 +258,11 @@ function IniciarBatelada({ prog, maceira, operador, fluxo, agora, aoFechar }) {
   const [itens, setItens] = useState(() => base.map((i) => ({ ...i, padrao: i.quantidade, original: i.produto_id, editar: false, txt: String(i.quantidade).replace('.', ',') })));
   const [trocando, setTrocando] = useState(null);
   const [ocupado, executar] = useAcao();
-  const s = semaforo(dados, m, fluxo.fluxo, fluxo.bateladas, agora);
   const totalKg = itens.reduce((t, i) => t + (['kg'].includes(mp.get(i.produto_id)?.unidade_estoque) ? Number(i.quantidade) : 0), 0)
     + dados.fichaItens.filter((i) => i.ficha_id === prog.ficha_id && mp.get(i.produto_id)?.usado_na !== 'maceira' && mp.get(i.produto_id)?.categoria === 'materia_prima' && mp.get(i.produto_id)?.unidade_estoque === 'kg').reduce((t, i) => t + Number(i.quantidade), 0);
   const mudar = (k, ch) => setItens((l) => l.map((x, j) => (j === k ? { ...x, ...ch } : x)));
   const passo = (q) => (q >= 10 ? 0.5 : 0.1);
   async function ok() {
-    if (s.batendo && !(await confirmar({ titulo: `${m.nome} já está batendo`, ok: 'Iniciar mesmo assim', mensagem: `Começou ${dados.mapa.ficha.get(s.batendo.ficha_id)?.nome} há ${tempoTexto(s.batendo.min)}. Confirma que vai iniciar outra batelada agora?` }))) return;
     if (m.capacidade_kg && totalKg > Number(m.capacidade_kg) * 1.001
       && !(await confirmar({ titulo: 'Acima da capacidade', ok: 'Iniciar mesmo assim', mensagem: `A massa tem cerca de ${num(totalKg, 0)} kg e a ${m.nome} é de ${num(m.capacidade_kg, 0)} kg.` }))) return;
     const r = await executar(() => api.rpc('iniciar_batelada', { p: { programacao_id: prog.programacao_id, maceira_id: m.id, operador_id: operador.id, pin: operador.pin,
@@ -323,20 +324,29 @@ function TrocarFarinha({ atual, aoFechar, aoEscolher }) {
 // ------------------------- finalizar batelada (padeiro: um toque, sem quantidade) -------------------------
 // O padeiro vira a massa na divisora e toca em SIM. O sistema registra o rendimento médio da receita
 // (definido pelo engenheiro); a quantidade NÃO aparece aqui.
-function FinalizarBatelada({ b, operador, antes, aoFechar }) {
+function FinalizarBatelada({ bs, operador, antes, aoFechar }) {
   const { dados, api, recarregar } = useApp();
   const [ocupado, executar] = useAcao();
+  const b = bs[0]; const varias = bs.length > 1;
   const m = dados.mapa.maceira.get(b.maceira_id);
+  const nome = (x) => dados.mapa.ficha.get(x.ficha_id)?.nome;
   async function sim() {
-    const r = await executar(() => api.rpc('finalizar_batelada_padeiro', { p: { id: b.id, operador_id: operador.id, pin: operador.pin } }),
-      `Batelada finalizada. Obrigado, ${operador.nome.split(' ')[0]}!`);
-    if (r !== null) { await recarregar(true); aoFechar(true); }
+    let ok = true;
+    for (const x of bs) {   // uma por vez: se uma falhar, para e avisa
+      const r = await executar(() => api.rpc('finalizar_batelada_padeiro', { p: { id: x.id, operador_id: operador.id, pin: operador.pin } }));
+      if (r === null) { ok = false; break; }
+    }
+    await recarregar(true);
+    if (ok) { avisar(`${varias ? `${bs.length} bateladas finalizadas` : 'Batelada finalizada'}. Obrigado, ${operador.nome.split(' ')[0]}!`); aoFechar(true); }
   }
   return html`<${Modal} semProtecao titulo=${antes ? 'Antes de começar a próxima' : 'Finalizar batelada'} aoFechar=${() => aoFechar(false)}>
     <div class="fora-ordem">
-      <p class="fo-pergunta">${antes ? html`A batelada de <b>${dados.mapa.ficha.get(b.ficha_id)?.nome}</b> já terminou?` : html`Terminou a batelada de <b>${dados.mapa.ficha.get(b.ficha_id)?.nome}</b>?`}</p>
-      <p>${m?.nome} · começou às ${hora(b.iniciada_em)}. Já virou a massa na divisora?</p>
-      <button class="btn btn-pri btn-gigante btn-bloco" disabled=${ocupado} onClick=${sim}><${Icone} nome="finalizar" tam=${24} /> SIM, TERMINOU</button>
+      ${varias
+        ? html`<p class="fo-pergunta">A ${m?.nome} tem <b>${bs.length} bateladas abertas</b>. Todas já terminaram?</p>
+          <ul class="fo-lista">${bs.map((x) => html`<li key=${x.id}><b>${nome(x)}</b> · começou às ${hora(x.iniciada_em)}</li>`)}</ul>`
+        : html`<p class="fo-pergunta">${antes ? html`A batelada de <b>${nome(b)}</b> já terminou?` : html`Terminou a batelada de <b>${nome(b)}</b>?`}</p>
+          <p>${m?.nome} · começou às ${hora(b.iniciada_em)}. Já virou a massa na divisora?</p>`}
+      <button class="btn btn-pri btn-gigante btn-bloco" disabled=${ocupado} onClick=${sim}><${Icone} nome="finalizar" tam=${24} /> ${varias ? 'SIM, TODAS TERMINARAM' : 'SIM, TERMINOU'}</button>
       <button class="btn btn-sec btn-gigante btn-bloco" disabled=${ocupado} onClick=${() => aoFechar(false)}>NÃO, voltar</button>
       <p class="nota">Fica registrado quem finalizou, o dia e a hora.</p>
     </div></${Modal}>`;

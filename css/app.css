@@ -1371,3 +1371,4 @@ html[data-tema="escuro"] {
 .sino-ico.pre { background: #fff0d6; color: #7a3d00; }
 .sino-ico.atraso { background: #c62828; color: #fff; }
 [data-tema="escuro"] .sino-ico.pre { background: #3a2a12; color: #ffd9a8; }
+.fo-lista { margin: 0; padding-left: 1.2em; font-size: 1.1rem; line-height: 1.5; }
