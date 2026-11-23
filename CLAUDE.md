@@ -30,6 +30,15 @@ Valem para TODA alteração neste projeto, sem precisar o dono pedir de novo.
 - Textos claros e iguais em todo lugar (o nome no menu = título da tela = atalho). Botões dizem a ação ("Salvar pedido", não "OK").
 - Cartões e atalhos levam ao lugar certo já filtrado. Sem informação repetida na mesma tela.
 
+### 2.1 Telas da PRODUÇÃO (padeiros, pesagem, operários): simplicidade acima de tudo
+- Quem usa tem pouca familiaridade com informática (muitos não usam computador). Pensar como aplicativo de celular feito para quem tem dificuldade.
+- Botões GRANDES (≥ 56 px de altura no tablet), de apertar com o dedo; uma ação principal por tela; nada de menus escondidos, teclado ou digitação além da senha de 6 números.
+- Textos curtos, diretos, em português simples; números grandes; cores com significado fixo (verde = pode seguir, laranja = atenção, vermelho = parar) e sempre com ícone + texto (nunca só cor).
+- Avisos importantes (ex.: mudança na programação) são faixas grandes e chamativas que só somem com "Entendi" + nome e senha do padeiro (fica registrado quem viu e quando).
+- Nunca travar a produção em andamento: avisar e pedir confirmação simples, registrar e deixar o engenheiro corrigir depois.
+- Toda ação do padeiro registra data, hora, padeiro (pela senha) e tablet; correções são feitas só por engenheiro/gestor da produção/admin, com motivo, sem apagar o original.
+- Quem pode mudar ordem/masseira da produção e corrigir: admin, engenharia e "Gestor da produção".
+
 ## 3. Desempenho, atualização e falhas
 - Nada que a pessoa digitou pode se perder: formulários longos usam `useRascunho`; formulários na página usam `AreaProtegida`; janelas (`Modal`) já perguntam antes de fechar.
 - As telas se atualizam sozinhas quando um dado delas muda (fila única em `app.js`); a atualização nunca apaga campo em edição (`useFiltroMudou`).
