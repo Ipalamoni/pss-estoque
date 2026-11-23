@@ -63,7 +63,7 @@ function InicioOperacao() {
   const atrasados = abertos.filter((p) => p.previsao_entrega && p.previsao_entrega < hoje);
   const proximos = abertos.filter((p) => p.previsao_entrega && p.previsao_entrega >= hoje && p.previsao_entrega <= somarDias(hoje, 7));
   const divPend = (dados.recebimentos || []).filter((r) => r.divergencia && !r.ciente_por);
-  const valorPedido = (id) => pedidoItens.filter((i) => i.pedido_id === id).reduce((s, i) => s + Number(i.valor_total), 0);
+  const valorPedido = (id) => (mapa.itensPedido.get(id) || []).reduce((s, i) => s + Number(i.valor_total), 0);
 
   const verProg = papeis.some((x) => ['admin', 'engenharia', 'pesagem', 'diretoria'].includes(x));
   const meus = new Set(dados.locais.filter((l) => operaLocal(papeis, l)).map((l) => l.id));

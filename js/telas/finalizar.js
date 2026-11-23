@@ -2,7 +2,7 @@
 // FINALIZAR BATELADAS (engenharia, normalmente à tarde, todas juntas)
 // Lista na ordem de produção, rendimento editável na última coluna, finaliza 1, algumas ou todas.
 // =====================================================================
-import { html, useState, useEffect, useApp, Cabecalho, Abas, Tabela, Etiqueta, Campo, Numero, Vazio, Carregando, useAcao, confirmar, avisar, n, useFiltroMudou } from '../ui.js';
+import { html, AreaProtegida, useState, useEffect, useApp, Cabecalho, Abas, Tabela, Etiqueta, Campo, Numero, Vazio, Carregando, useAcao, confirmar, avisar, n, useFiltroMudou } from '../ui.js';
 import { num, dataHora, hojeISO, somarDias, pode, mensagemErro } from '../util.js';
 import { Icone } from '../icones.js';
 import { minutos, tempoTexto, diaDe } from '../producao-util.js';
@@ -62,7 +62,7 @@ function Abertas() {
     if (ok && (await executar(() => api.rpc('cancelar_batelada', { p_id: b.id, p_motivo: motivo }), 'Batelada cancelada.')) !== null) await recarregar(true);
   }
   const macs = [...new Set(lista.map((b) => b.maceira_id))].map((id) => dados.mapa.maceira.get(id)).filter(Boolean);
-  return html`
+  return html`<${AreaProtegida} rotulo="rendimento das bateladas">
     ${atrasadas > 0 && html`<div class="alerta-faixa laranja"><${Icone} nome="relogio" tam=${18} /> ${atrasadas} batelada(s) iniciada(s) há mais de ${tempoTexto(prazo)} ainda sem finalizar.</div>`}
     <div class="filtros fin-barra">
       <select class="entrada" value=${filtroMac} onChange=${(e) => setFiltroMac(e.target.value)}><option value="">Todas as maceiras</option>${macs.map((m) => html`<option value=${m.id}>${m.nome}</option>`)}</select>
@@ -93,7 +93,7 @@ function Abertas() {
       <tfoot><tr>${podeFin && html`<td></td>`}<td colspan="5"><b>${vis.length} batelada(s)</b></td>
         <td class="n">${num(vis.reduce((s, b) => s + Number(b.rendimento_padrao || 0), 0), 0)}</td>
         <td class="n col-rend"><b>${num(vis.reduce((s, b) => s + (n(rend[b.id]) || 0), 0), 0)}</b></td>${podeFin && html`<td></td>`}</tr></tfoot>
-    </table></div>`}`;
+    </table></div>`}</${AreaProtegida}>`;
 }
 
 function Finalizadas() {

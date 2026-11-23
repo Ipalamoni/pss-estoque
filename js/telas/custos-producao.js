@@ -109,12 +109,12 @@ export function EstoqueValorizado() {
   const { dados } = useApp();
   const [tipo, setTipo] = useState('');
   const [busca, setBusca] = useState('');
-  const transito = useMemo(() => { const m = new Map(); dados.transfItens.forEach((i) => { const t = dados.transferencias.find((x) => x.id === i.transferencia_id);
+  const transito = useMemo(() => { const m = new Map(); const tm = new Map(dados.transferencias.map((x) => [x.id, x])); dados.transfItens.forEach((i) => { const t = tm.get(i.transferencia_id);
     if (t && t.situacao === 'enviada') m.set(i.produto_id, (m.get(i.produto_id) || 0) + Number(i.quantidade)); }); return m; }, [dados]);
   const locais = dados.locais.filter((l) => l.ativo);
   const linhas = dados.produtos.filter((p) => p.controla_estoque !== false && (!tipo || tipoProduto(p) === tipo) && contem(`${p.codigo} ${p.descricao}`, busca)).map((p) => {
     const cm = Number(p.custo_medio || 0); const por = {}; let fis = 0;
-    locais.forEach((l) => { const e = dados.estoqueLocal.find((x) => x.produto_id === p.id && x.local_id === l.id); const q = e ? Number(e.disponivel) + Number(e.separado) : 0; por[l.id] = q; fis += q; });
+    locais.forEach((l) => { const e = dados.mapa.saldoLocal.get(`${p.id}|${l.id}`); const q = e ? Number(e.disponivel) + Number(e.separado) : 0; por[l.id] = q; fis += q; });
     const tr = transito.get(p.id) || 0;
     return { ...p, cm, por, fis, tr, valor: (fis + tr) * cm };
   }).filter((p) => Math.abs(p.fis) > 0.0001 || p.tr > 0.0001);

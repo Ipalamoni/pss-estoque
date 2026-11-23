@@ -6,7 +6,7 @@
 //     (Configurações › Implantação de saldo › "Trazer contagem do almoxarifado")
 // A contagem NÃO mexe no estoque até ser implantada.
 // =====================================================================
-import { html, useState, useMemo, useEffect, useApp, QtdUnidade, Busca, Etiqueta, Cabecalho, Cartao, Tabela, Carregando, useAcao, confirmar, avisar, n } from '../ui.js';
+import { html, useRascunho, useState, useMemo, useEffect, useApp, QtdUnidade, Busca, Etiqueta, Cabecalho, Cartao, Tabela, Carregando, useAcao, confirmar, avisar, n } from '../ui.js';
 import { CATEGORIAS, contem, dataHora, hojeISO, qu, pl, nomeUsuario, mensagemErro } from '../util.js';
 import { Exportar } from '../exportar.js';
 
@@ -27,7 +27,8 @@ export function TelaContagemInicial() {
   const [cat, setCat] = useState('materia_prima');
   const [busca, setBusca] = useState('');
   const [filtro, setFiltro] = useState('todos');
-  const [v, setV] = useState({});            // produto_id -> { q, un, obs }
+  // rascunho automático: o que foi digitado e ainda não enviado fica guardado neste aparelho
+  const [v, setV, limparV] = useRascunho('contagem-inicial', {}, { aoRecuperar: (t) => avisar(`Contagem recuperada (rascunho de ${dataHora(new Date(t))}).`, 'aviso') });   // produto_id -> { q, un, obs }
   const [ocupado, executar] = useAcao();
   const perfil = (id) => dados.mapa.perfil.get(id);
 
@@ -50,7 +51,7 @@ export function TelaContagemInicial() {
     if (!ok) return;
     const r = await executar(() => api.rpc('salvar_contagem_inicial', { p: { itens: digitados.map(([id, x]) => ({ produto_id: Number(id), quantidade: n(x.q), unidade: x.un, observacao: x.obs || null })) } }),
       'Contagem salva.');
-    if (r) { setV({}); await recarregar(); }
+    if (r) { limparV(); setV({}); await recarregar(); }
   }
 
   const folha = [

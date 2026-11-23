@@ -104,7 +104,7 @@ function criarApiSupabase() {
     // TEMPO REAL: avisa a tela quando alguém muda algo nas tabelas (sem ficar consultando o banco)
     aoMudar(tabelas, f) {
       const canal = sb.channel('mudancas-' + Math.random().toString(36).slice(2));
-      tabelas.forEach((t) => canal.on('postgres_changes', { event: '*', schema: 'public', table: t }, () => f([t])));
+      tabelas.forEach((t) => canal.on('postgres_changes', { event: '*', schema: 'public', table: t }, (carga) => f([t], carga)));
       canal.subscribe();
       return () => { try { sb.removeChannel(canal); } catch { /* ignora */ } };
     },

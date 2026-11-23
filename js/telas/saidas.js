@@ -1,5 +1,5 @@
 // Saídas: por receita (ficha técnica), avulsa de matéria-prima e do almoxarifado
-import { html, useState, useMemo, useEffect, useApp, Campo, Numero, Escolher, QtdUnidade, Busca, Etiqueta, Cabecalho, Abas, Vazio, Tabela, useAcao, confirmar, avisar, n } from '../ui.js';
+import { html, AreaProtegida, useState, useMemo, useEffect, useApp, Campo, Numero, Escolher, QtdUnidade, Busca, Etiqueta, Cabecalho, Abas, Vazio, Tabela, useAcao, confirmar, avisar, n } from '../ui.js';
 import { qtd, num, moeda, contem, fator, qtdDupla, hojeISO, dataHora, TIPOS_MOV, DESTINOS, mensagemErro, qu, plural, pl, nomeUsuario } from '../util.js';
 import { SeletorLocal, useLocalInicial, saldoLocal } from '../producao-util.js';
 import { CorrigirMovimento } from './movimentos.js';
@@ -103,7 +103,7 @@ function SaidaReceita({ fichaInicial, aoConcluir }) {
           <small>${f.codigo}</small><b>${f.nome}</b><small>${f.produto_final || ''}</small>
           ${programadasHoje.get(f.id) > 0.0005 && html`<${Etiqueta} cor="verde">hoje: faltam ${num(programadasHoje.get(f.id), 3)}</${Etiqueta}>`}</button>`)}</div>`}`;
 
-  return html`<section class="painel">
+  return html`<${AreaProtegida} classe="painel" rotulo="saída por receita">
     <div class="ficha-topo">
       <div><small>Receita</small><h2>${ficha.nome}</h2>${ficha.rendimento && html`<small>Rendimento por receita: ${ficha.rendimento}</small>`}</div>
       <button class="btn btn-sec" onClick=${() => setFichaId(null)}>Trocar receita</button>
@@ -138,7 +138,7 @@ function SaidaReceita({ fichaInicial, aoConcluir }) {
     <${Campo} rotulo=${alterar ? 'Motivo da alteração / observação' : 'Observação (opcional)'}>
       <input class="entrada" value=${obs} placeholder=${alterar ? 'ex.: faltou farinha especial no turno' : ''} onInput=${(e) => setObs(e.target.value)} /></${Campo}>
     <div class="barra-acao"><button class="btn btn-pri btn-grande" disabled=${ocupado || !(m > 0)} onClick=${registrar}>${ocupado ? 'Registrando…' : `Dar saída de ${qu(m, 'receita')}`}</button></div>
-  </section>`;
+  </${AreaProtegida}>`;
 }
 
 // ------------------------------ AVULSA -------------------------------
@@ -158,7 +158,7 @@ function SaidaAvulsa({ aoConcluir }) {
     const r = await executar(() => api.rpc('registrar_saida', { p: { tipo: 'saida_avulsa', observacao: obs, local_id: loc, itens: [{ produto_id: prodId, quantidade: n(q), unidade: un }] } }), 'Saída avulsa registrada.');
     if (r) { await recarregar(); setQ(''); setObs(''); setProdId(null); aoConcluir(); }
   }
-  return html`<section class="painel">
+  return html`<${AreaProtegida} classe="painel" rotulo="saída avulsa">
     <p class="nota">Use para saída de uma matéria-prima fora da receita (ex.: massa que caiu). A justificativa é obrigatória. Não entra no custo do produto.</p>
     <div class="filtros"><${SeletorLocal} valor=${loc} aoMudar=${setLoc} rotulo="Sai de" /></div>
     <div class="grade">
@@ -170,7 +170,7 @@ function SaidaAvulsa({ aoConcluir }) {
         <input class="entrada" value=${obs} onInput=${(e) => setObs(e.target.value)} placeholder="Descreva o motivo" /></${Campo}>
     </div>
     <div class="barra-acao"><button class="btn btn-pri btn-grande" disabled=${ocupado} onClick=${registrar}>${ocupado ? 'Registrando…' : 'Dar saída avulsa'}</button></div>
-  </section>`;
+  </${AreaProtegida}>`;
 }
 
 // ------------------------------ ALMOXARIFADO -------------------------
@@ -189,7 +189,7 @@ function SaidaAlmox({ aoConcluir }) {
       itens: its.map((l) => ({ produto_id: l.produto_id, quantidade: n(l.quantidade), unidade: l.unidade })) } }), `Saída registrada (${pl(its.length, 'item', 'itens')}).`);
     if (r) { await recarregar(); setLinhas([{ k: Math.random(), produto_id: null, quantidade: '', unidade: null }]); setObs(''); aoConcluir(); }
   }
-  return html`<section class="painel">
+  return html`<${AreaProtegida} classe="painel" rotulo="saída do almoxarifado">
     <p class="nota">Material de escritório, limpeza e outros entregues a um setor. Embalagem para a produção vai por <b>Requisições</b> (o PCP pede, o almoxarifado envia).</p>
     <div class="grade">
       <${Campo} rotulo="Sai de"><${SeletorLocal} valor=${loc} aoMudar=${setLoc} rotulo="" /></${Campo}>
@@ -204,7 +204,7 @@ function SaidaAlmox({ aoConcluir }) {
       <button class="btn-icone" onClick=${() => setLinhas((x) => x.filter((y) => y.k !== l.k))}>✕</button></div>`; })}</div>
     <button class="btn btn-sec" onClick=${() => setLinhas((x) => [...x, { k: Math.random(), produto_id: null, quantidade: '', unidade: null }])}>+ Item</button>
     <div class="barra-acao"><button class="btn btn-pri btn-grande" disabled=${ocupado} onClick=${registrar}>${ocupado ? 'Registrando…' : 'Dar saída'}</button></div>
-  </section>`;
+  </${AreaProtegida}>`;
 }
 
 // ------------------------------ LANÇAMENTOS DE HOJE ------------------

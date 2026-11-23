@@ -1,5 +1,5 @@
 // Pedidos de compra: lista, cadastro, detalhe, divergências, PDF / Excel / impressão
-import { html, useState, useMemo, useEffect, useApp, Tabela, Modal, Campo, Numero, Escolher, QtdUnidade, Busca, Etiqueta, Cabecalho, useAcao, confirmar, avisar, n, useHistorico, Filtros } from '../ui.js';
+import { html, useRascunho, confirmarDescarte, useState, useMemo, useEffect, useApp, Tabela, Modal, Campo, Numero, Escolher, QtdUnidade, Busca, Etiqueta, Cabecalho, useAcao, confirmar, avisar, n, useHistorico, Filtros } from '../ui.js';
 import { STATUS_PEDIDO, numeroPedido, data, dataHora, hojeISO, somarDias, diasEntre, moeda, qtd, num, contem, fator, qu, pl, plural, nomeUsuario, mensagemErro } from '../util.js';
 import { pdfPedido, pdfTabela, salvarPDF, imprimirPDF, excel, pdfBlob, compartilhar } from '../export.js';
 import { Exportar } from '../exportar.js';
@@ -9,8 +9,10 @@ import { Icone } from '../icones.js';
 export const COR_STATUS = { aberto: 'azul', parcial: 'laranja', recebido: 'verde', cancelado: 'cinza', encerrado: 'cinza' };
 
 export function resumoPedido(pedido, dados) {
-  const itens = dados.pedidoItens.filter((i) => i.pedido_id === pedido.id);
-  const recebimentos = (dados.recebimentos || []).filter((r) => r.pedido_id === pedido.id).sort((a, b) => b.id - a.id);
+  // pelo índice montado na carga (antes varria todos os itens/recebimentos para cada pedido)
+  const itens = dados.mapa?.itensPedido ? (dados.mapa.itensPedido.get(pedido.id) || []) : dados.pedidoItens.filter((i) => i.pedido_id === pedido.id);
+  const recebimentos = (dados.mapa?.recPedido ? (dados.mapa.recPedido.get(pedido.id) || []) : (dados.recebimentos || []).filter((r) => r.pedido_id === pedido.id))
+    .slice().sort((a, b) => b.id - a.id);
   const valor = itens.reduce((s, i) => s + Number(i.valor_total), 0);
   const base = itens.reduce((s, i) => s + Number(i.quantidade_base), 0);
   const rec = itens.reduce((s, i) => s + Math.min(Number(i.qtd_recebida_base), Number(i.quantidade_base)), 0);
@@ -291,14 +293,20 @@ function FormPedido({ pedido, aoFechar }) {
   useHistorico(somarDias(hojeISO(), -365));   // último preço de itens comprados há mais tempo
   const novo = !pedido.id;
   const hoje = hojeISO();
-  const itensAtuais = novo ? [] : dados.pedidoItens.filter((i) => i.pedido_id === pedido.id);
-  const [f, setF] = useState({ fornecedor_id: pedido.fornecedor_id || null, data_pedido: pedido.data_pedido || hoje,
-    previsao_entrega: pedido.previsao_entrega || '', previsao_pagamento: pedido.previsao_pagamento || '', condicao_pagamento: pedido.condicao_pagamento || '', observacao: pedido.observacao || '' });
+  const itensAtuais = novo ? [] : (dados.mapa.itensPedido.get(pedido.id) || []);
+  // pedido NOVO tem rascunho automático (fechar o app ou a janela sem querer não perde o pedido)
+  const chaveRasc = novo && !pedido.fornecedor_id ? 'pedido-novo' : null;
+  const [f, setF, limparF] = useRascunho(chaveRasc, () => ({ fornecedor_id: pedido.fornecedor_id || null, data_pedido: pedido.data_pedido || hoje,
+    previsao_entrega: pedido.previsao_entrega || '', previsao_pagamento: pedido.previsao_pagamento || '', condicao_pagamento: pedido.condicao_pagamento || '', observacao: pedido.observacao || '' }),
+    { aoRecuperar: (t) => avisar(`Pedido recuperado (rascunho de ${dataHora(new Date(t))}). Confira e salve.`, 'aviso') });
   const [prevManual, setPrevManual] = useState(!novo);
   const [historico, setHistorico] = useState(null);
-  const [linhas, setLinhas] = useState(() => itensAtuais.length ? itensAtuais.map((i) => ({ k: i.id, id: i.id, produto_id: i.produto_id,
+  const [linhas, setLinhas, limparL] = useRascunho(chaveRasc && 'pedido-novo-itens', () => (itensAtuais.length ? itensAtuais.map((i) => ({ k: i.id, id: i.id, produto_id: i.produto_id,
     quantidade: virgula(i.quantidade), unidade: i.unidade, preco: virgula(i.preco_unitario), recebido: i.qtd_recebida_base > 0 }))
-    : [{ k: Math.random(), produto_id: null, quantidade: '', unidade: null, preco: '' }]);
+    : [{ k: 1, produto_id: null, quantidade: '', unidade: null, preco: '' }]));
+  const descartar = () => { limparF(); limparL(); };
+  // "Cancelar" com algo digitado: pergunta e, se confirmar, apaga o rascunho
+  const cancelar = () => confirmarDescarte('O pedido ainda não foi salvo. Se cancelar, o que foi digitado será descartado.').then((ok) => { if (ok) { descartar(); aoFechar(null); } });
   const [ocupado, executar] = useAcao();
   const set = (k) => (e) => setF((x) => ({ ...x, [k]: e?.target ? e.target.value : e }));
   const mudar = (k, ch) => setLinhas((l) => l.map((x) => (x.k === k ? { ...x, ...ch } : x)));
@@ -327,14 +335,14 @@ function FormPedido({ pedido, aoFechar }) {
     if (!f.previsao_pagamento) return avisar('Informe a previsão de pagamento: o financeiro usa para lançar no contas a pagar.', 'erro');
     const id = await executar(() => api.rpc('salvar_pedido', { p: { ...f, id: pedido.id || null, previsao_entrega: f.previsao_entrega || null, itens } }),
       novo ? 'Pedido criado.' : 'Pedido alterado.');
-    if (id) { await recarregar(); aoFechar(pedido.id || id); }
+    if (id) { descartar(); await recarregar(); aoFechar(pedido.id || id); }
   }
 
   // sugestão de pagamento: 1º número da condição (ex.: "28 dias", "28/35/42") contado da entrega (ou do pedido)
   const diasCond = (() => { const m = String(f.condicao_pagamento || '').match(/\d+/); return m ? Number(m[0]) : null; })();
   const sugestaoPgto = diasCond !== null && (f.previsao_entrega || f.data_pedido) ? somarDias(f.previsao_entrega || f.data_pedido, diasCond) : null;
   return html`<${Modal} titulo=${novo ? 'Novo pedido de compra' : `Editar ${numeroPedido(pedido.id)}`} aoFechar=${() => aoFechar(null)} largo
-    rodape=${html`<button class="btn btn-sec" onClick=${() => aoFechar(null)}>Cancelar</button>
+    rodape=${html`<button class="btn btn-sec" onClick=${cancelar}>Cancelar</button>
       <button class="btn btn-pri" disabled=${ocupado} onClick=${salvar}>${ocupado ? 'Salvando…' : 'Salvar pedido'}</button>`}>
     <div class="grade">
       <${Campo} rotulo="Fornecedor" obrigatorio classe="larga">

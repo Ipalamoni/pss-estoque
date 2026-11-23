@@ -96,8 +96,11 @@ export function diaDe(ts) {
 }
 
 // saldo de um produto num local (disponível + separado)
+// registro de estoque de um produto num local (pelo índice; sem índice, procura na lista)
+export const registroLocal = (dados, produtoId, localId) => (dados.mapa?.saldoLocal
+  ? dados.mapa.saldoLocal.get(`${produtoId}|${localId}`) : dados.estoqueLocal.find((x) => x.produto_id === produtoId && x.local_id === localId));
 export function saldoLocal(dados, produtoId, localId) {
-  const e = dados.estoqueLocal.find((x) => x.produto_id === produtoId && x.local_id === localId);
+  const e = registroLocal(dados, produtoId, localId);
   return e ? { disponivel: Number(e.disponivel), separado: Number(e.separado), qtd2: Number(e.qtd2_disponivel), qtd2sep: Number(e.qtd2_separado) }
     : { disponivel: 0, separado: 0, qtd2: 0, qtd2sep: 0 };
 }
@@ -114,7 +117,13 @@ export const pctTxt = (a, b) => (b > 0 ? `${num((a / b) * 100, 0)}%` : '–');
 // Relógio que força a tela a se redesenhar a cada X segundos (tempo do semáforo)
 export function useRelogio(seg = 30) {
   const [t, setT] = useState(Date.now());
-  useEffect(() => { const i = setInterval(() => setT(Date.now()), seg * 1000); return () => clearInterval(i); }, [seg]);
+  // com a aba/app em segundo plano não redesenha a tela (economiza bateria do tablet/celular); ao voltar, acerta na hora
+  useEffect(() => {
+    const i = setInterval(() => { if (!document.hidden) setT(Date.now()); }, seg * 1000);
+    const v = () => { if (!document.hidden) setT(Date.now()); };
+    document.addEventListener('visibilitychange', v);
+    return () => { clearInterval(i); document.removeEventListener('visibilitychange', v); };
+  }, [seg]);
   return t;
 }
 

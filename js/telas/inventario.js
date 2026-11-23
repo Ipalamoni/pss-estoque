@@ -1,5 +1,5 @@
 // Inventário: contagem física pelo celular e ajuste das diferenças
-import { html, useState, useMemo, useEffect, useApp, Modal, Campo, QtdUnidade, Busca, Etiqueta, Cabecalho, Abas, Tabela, Carregando, useAcao, confirmar, avisar, n, Filtros } from '../ui.js';
+import { html, useRascunho, useState, useMemo, useEffect, useApp, Modal, Campo, QtdUnidade, Busca, Etiqueta, Cabecalho, Abas, Tabela, Carregando, useAcao, confirmar, avisar, n, Filtros } from '../ui.js';
 import { CATEGORIAS, MOTIVOS_INVENTARIO, qtd, moeda, num, contem, fator, qtdDupla, dataHora, mensagemErro, qu, plural, pl, nomeUsuario, hojeISO } from '../util.js';
 import { Exportar } from '../exportar.js';
 import { SeletorLocal, useLocalInicial } from '../producao-util.js';
@@ -17,13 +17,15 @@ function Contagem({ aoConcluir }) {
   const [cats, setCats] = useState(new Set(['materia_prima']));
   const [busca, setBusca] = useState('');
   const [so, setSo] = useState(false);
-  const [cont, setCont] = useState({});   // produto_id -> { q, un, motivo, obs }
-  const [obsGeral, setObsGeral] = useState('');
   const [ocupado, executar] = useAcao();
   const [loc, setLoc] = useLocalInicial('almoxarifado');
+  // rascunho automático por local: fechar o app, trocar de tela ou de local não perde a contagem
+  const recuperou = (t) => avisar(`Contagem recuperada (rascunho de ${dataHora(new Date(t))}). Continue de onde parou.`, 'aviso');
+  const [cont, setCont, limparCont] = useRascunho(`inventario:${loc || ''}`, {}, { aoRecuperar: recuperou });   // produto_id -> { q, un, motivo, obs }
+  const [obsGeral, setObsGeral, limparObs] = useRascunho(`inventario-obs:${loc || ''}`, '');
   const mpBase = dados.mapa.ind;
   // saldo físico NO LOCAL (disponível + separado) — o inventário é por local
-  const aqui = (p) => { const e = dados.estoqueLocal.find((x) => x.produto_id === p.id && x.local_id === loc); return e ? Number(e.disponivel) + Number(e.separado) : 0; };
+  const aqui = (p) => { const e = dados.mapa.saldoLocal.get(`${p.id}|${loc}`); return e ? Number(e.disponivel) + Number(e.separado) : 0; };
   const mp = useMemo(() => new Map([...mpBase].map(([id, p]) => [id, { ...p, saldo: loc ? aqui(p) : p.saldo }])), [dados, loc]);
 
   const itens = useMemo(() => [...mp.values()].filter((p) => p.ativo && p.controla_estoque !== false && cats.has(p.categoria) && contem(`${p.codigo} ${p.descricao}`, busca)
@@ -47,11 +49,11 @@ function Contagem({ aoConcluir }) {
     if (!ok) return;
     const r = await executar(() => api.rpc('registrar_inventario', { p: { observacao: obsGeral, local_id: loc, itens: contados.map(([id, c]) => ({ produto_id: Number(id), contado: n(c.q), unidade: c.un, motivo: c.motivo || null, observacao: c.obs || null })) } }),
       'Inventário registrado e estoque ajustado.');
-    if (r) { await recarregar(); setCont({}); aoConcluir(); }
+    if (r) { limparCont(); limparObs(); setCont({}); setObsGeral(''); await recarregar(); aoConcluir(); }
   }
 
   return html`
-    <div class="filtros"><${SeletorLocal} valor=${loc} aoMudar=${(v) => { setLoc(v); setCont({}); }} rotulo="Contando o local" /></div>
+    <div class="filtros"><${SeletorLocal} valor=${loc} aoMudar=${(v) => setLoc(v)} rotulo="Contando o local" /></div>
     <${Filtros} ativos=${cats.size < Object.keys(CATEGORIAS).length ? 1 : 0} fixo=${html`<${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Buscar item" />`}>
       <div class="grupo-checks">${Object.entries(CATEGORIAS).map(([k, v]) => html`<label class="check"><input type="checkbox" checked=${cats.has(k)} onChange=${() => alternar(k)} /> ${v}</label>`)}</div>
     </${Filtros}>
@@ -94,11 +96,18 @@ function Historico() {
   const [itens, setItens] = useState([]);
   const [aberto, setAberto] = useState(null);
   useEffect(() => {
-    Promise.all([api.listar('inventarios', { ordem: ['id', 'desc'], limite: 200 }), api.listar('inventario_itens')])
+    // DESEMPENHO: só os itens das 200 contagens mostradas (antes baixava os itens de TODAS as contagens a cada atualização)
+    api.listar('inventarios', { ordem: ['id', 'desc'], limite: 200 }).then(async (a) => {
+      const ids = a.map((x) => x.id); const partes = [];
+      for (let i = 0; i < ids.length; i += 150) partes.push(ids.slice(i, i + 150));
+      const b = (await Promise.all(partes.map((pt) => api.listar('inventario_itens', { em: { inventario_id: pt } })))).flat();
+      return [a, b];
+    })
       .then(([a, b]) => { setInvs(a); setItens(b); }).catch((e) => { avisar(mensagemErro(e), 'erro'); setInvs([]); });
   }, [dados.carregadoEm]);
   if (!invs) return html`<${Carregando} />`;
-  const de = (id) => itens.filter((i) => i.inventario_id === id);
+  const porInv = useMemo(() => { const m = new Map(); itens.forEach((i) => { const l = m.get(i.inventario_id); if (l) l.push(i); else m.set(i.inventario_id, [i]); }); return m; }, [itens]);
+  const de = (id) => porInv.get(id) || [];
   const valor = (id) => de(id).reduce((s, i) => s + Number(i.diferenca) * Number(dados.mapa.produto.get(i.produto_id)?.custo_medio || 0), 0);
   const inv = aberto && invs.find((x) => x.id === aberto);
   return html`

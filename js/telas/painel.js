@@ -262,7 +262,7 @@ function calcCompras(dados, movs, P, seisMeses) {
   // prazo real e pontualidade (1º recebimento de cada pedido no período)
   const prazos = []; let noPrazo = 0;
   for (const p of pedidos) {
-    const rs = (dados.recebimentos || []).filter((r) => r.pedido_id === p.id).sort((a, b) => a.id - b.id);
+    const rs = (dados.mapa.recPedido.get(p.id) || []).slice().sort((a, b) => a.id - b.id);
     if (!rs.length || !naData(diaLocal(rs[0].data_hora))) continue;
     const d1 = diaLocal(rs[0].data_hora); prazos.push(diasEntre(p.data_pedido, d1));
     if (!p.previsao_entrega || d1 <= p.previsao_entrega) noPrazo += 1;

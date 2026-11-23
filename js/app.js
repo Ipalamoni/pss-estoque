@@ -1,7 +1,7 @@
 // =====================================================================
 // app.js — esqueleto do sistema: login, menu, navegação e dados comuns
 // =====================================================================
-import { html, render, useState, useEffect, useRef, Ctx, Avisos, HostConfirmacao, avisar, Carregando, Modal, Campo } from './ui.js';
+import { html, render, useState, useEffect, useRef, Ctx, Avisos, HostConfirmacao, avisar, Carregando, Modal, Campo, haEdicao, confirmarDescarte, protegido } from './ui.js';
 import { api } from './api.js';
 import { PAPEIS, pode, porId, mensagemErro, papeisTexto, operaLocal, pl } from './util.js';
 import { indicadores } from './calc.js';
@@ -102,7 +102,16 @@ const MENU = [
   { id: 'auditoria', titulo: 'Auditoria (log)', papeis: ['admin', 'diretoria'], tela: TelaAuditoria },
 ];
 // tabelas que, quando mudam, atualizam as telas abertas (tempo real)
-const TABELAS_AO_VIVO = ['movimentos', 'estoque_local', 'transferencias', 'requisicoes', 'bateladas', 'programacoes', 'producoes'];
+// OPERACAO: atualização leve (saldos, transferências, requisições, programação)
+// BASE: atualização completa (pedidos, recebimentos, cadastros) — só chegam aqui se a tabela estiver na
+// publicação de tempo real do Supabase; sem isso, a conferência periódica (abaixo) cobre.
+const TABELAS_OPERACAO = ['movimentos', 'estoque_local', 'transferencias', 'requisicoes', 'bateladas', 'programacoes', 'producoes'];
+const TABELAS_BASE = ['pedidos', 'pedido_itens', 'recebimentos', 'produtos', 'fornecedores', 'fichas_tecnicas', 'ficha_itens', 'parametros',
+  'perfis', 'locais', 'unidades', 'maceiras', 'operadores', 'linhas_producao'];
+const TABELAS_AO_VIVO = [...TABELAS_OPERACAO, ...TABELAS_BASE];
+// conferência periódica (só com a aba visível): telas "ao vivo" a cada 30 s, as demais a cada 90 s;
+// a carga completa (pedidos, recebimentos, cadastros) a cada 3 min; consumo médio (estatística pesada) a cada 15 min
+const CICLO_VIVO_MS = 30000, CICLO_OUTRAS_MS = 90000, CICLO_COMPLETO_MS = 180000, CICLO_STATS_MS = 900000;
 
 
 // ------------------------- Carregamento dos dados comuns ------------
@@ -110,6 +119,7 @@ const TABELAS_AO_VIVO = ['movimentos', 'estoque_local', 'transferencias', 'requi
 // é buscado quando alguém pesquisa (useHistorico). A atualização automática é "leve": só o que muda na operação.
 const HISTORICO_DIAS = 60;
 const hojeMenos = (d) => { const x = new Date(); x.setDate(x.getDate() - d); return x.toISOString().slice(0, 10); };
+const agrupar = (lista, campo) => { const m = new Map(); for (const x of lista) { const k = x[campo]; if (k === null || k === undefined) continue; const l = m.get(k); if (l) l.push(x); else m.set(k, [x]); } return m; };
 const unir = (...listas) => { const m = new Map(); listas.flat().forEach((x) => m.set(x.id, x)); return [...m.values()].sort((a, b) => a.id - b.id); };
 async function porIds(tabela, campo, ids, seguro) {
   const partes = []; for (let i = 0; i < ids.length; i += 150) partes.push(ids.slice(i, i + 150));
@@ -127,41 +137,53 @@ async function carregarDados(anterior, opcoes = {}) {
     seguro(api.listar('requisicoes', { em: { situacao: ['pendente', 'parcial'] } })),
     Promise.all([api.listar('programacoes', { campoData: 'data', desde }), api.listar('programacoes', { eq: { situacao: 'ativa' }, nulo: ['finalizada_em'] })]).then((x) => unir(...x)),
   ]);
+  // DESEMPENHO: a parte da operação começa junto com o resto (antes esperava tudo terminar);
+  // a carga completa vai em 2 rodadas paralelas (antes eram 4 em sequência)
+  const opP = operacao();
+  opP.catch(() => {});   // o erro é tratado no await abaixo
   let base;
   if (leve) {
     base = anterior;
   } else {
-    const parametros = await api.listar('parametros');
-    const params = Object.fromEntries(parametros.map((p) => [p.chave, p.valor]));
-    const [fornecedores, fichas, fichaItens, pedidos, perfis, stats, unidades, locais, linhas, maceiras, operadores] = await Promise.all([
-      api.listar('fornecedores'), api.listar('fichas_tecnicas'), api.listar('ficha_itens'),
+    const [parametros, fornecedores, fichas, fichaItens, pedidos, perfis, unidades, locais, linhas, maceiras, operadores] = await Promise.all([
+      api.listar('parametros'), api.listar('fornecedores'), api.listar('fichas_tecnicas'), api.listar('ficha_itens'),
       Promise.all([api.listar('pedidos', { campoData: 'data_pedido', desde }), api.listar('pedidos', { em: { status: ['aberto', 'parcial'] } })]).then((x) => unir(...x)),
       api.listar('perfis'),
-      anterior ? Promise.resolve(anterior.stats) : api.rpc('estatisticas_estoque', { p_janela: Number(params.janela_consumo_dias || 90) }),
       seguro(api.listar('unidades')), seguro(api.listar('locais')), seguro(api.listar('linhas_producao')),
       seguro(api.listar('maceiras')), seguro(api.listar('operadores')),
     ]);
+    const params = Object.fromEntries(parametros.map((p) => [p.chave, p.valor]));
     const ids = pedidos.map((p) => p.id);
-    const [pedidoItens, recebimentos] = await Promise.all([
+    const statsVelhas = anterior && !opcoes.renovarStats ? anterior.stats : null;
+    const [pedidoItens, recebimentos, stats] = await Promise.all([
       porIds('pedido_itens', 'pedido_id', ids, seguro),
       Promise.all([api.listar('recebimentos', { desde: ini }), porIds('recebimentos', 'pedido_id', ids, seguro),
         seguro(api.listar('recebimentos', { eq: { divergencia: true }, nulo: ['ciente_por'] }))]).then((x) => unir(...x)),
+      statsVelhas ? Promise.resolve(statsVelhas) : api.rpc('estatisticas_estoque', { p_janela: Number(params.janela_consumo_dias || 90) }),
     ]);
-    base = { parametros, params, fornecedores, fichas, fichaItens, pedidos, pedidoItens, perfis, recebimentos, stats, unidades, locais, linhas, maceiras, operadores };
+    base = { parametros, params, fornecedores, fichas, fichaItens, pedidos, pedidoItens, perfis, recebimentos, stats, unidades, locais, linhas, maceiras, operadores,
+      statsEm: statsVelhas ? anterior.statsEm : Date.now(), completoEm: Date.now() };
   }
-  const [produtos, estoqueLocal, transferencias, requisicoes, programacoes] = await operacao();
+  const [produtos, estoqueLocal, transferencias, requisicoes, programacoes] = await opP;
   const [transfItens, reqItens] = await Promise.all([
     transferencias.length ? porIds('transferencia_itens', 'transferencia_id', transferencias.map((t) => t.id), seguro) : [],
     requisicoes.length ? porIds('requisicao_itens', 'requisicao_id', requisicoes.map((t) => t.id), seguro) : [],
   ]);
   const { parametros, params, fornecedores, fichas, fichaItens, pedidos, pedidoItens, perfis, recebimentos, stats, unidades, locais, linhas, maceiras, operadores } = base;
   const ind = indicadores(produtos, stats || [], params, fornecedores);
+  // índices (DESEMPENHO): as telas acham os itens/recebimentos de um pedido e o saldo de um produto num local
+  // sem varrer a lista inteira para cada linha
+  const itensPedido = leve && anterior.mapa.itensPedido ? anterior.mapa.itensPedido : agrupar(pedidoItens, 'pedido_id');
+  const recPedido = leve && anterior.mapa.recPedido ? anterior.mapa.recPedido : agrupar(recebimentos, 'pedido_id');
+  const saldoLocal = new Map(estoqueLocal.map((e) => [`${e.produto_id}|${e.local_id}`, e]));
   return {
+    statsEm: base.statsEm, completoEm: base.completoEm,
     produtos, fornecedores, fichas, fichaItens, pedidos, pedidoItens, perfis, recebimentos, programacoes, parametros, params, stats, ind,
     unidades, locais: [...locais].sort((a, b) => a.ordem - b.ordem || a.id - b.id), estoqueLocal, linhas, maceiras: [...maceiras].sort((a, b) => a.ordem - b.ordem || a.id - b.id), operadores,
     transferencias, transfItens, requisicoes, reqItens, historicoDesde: desde,
     mapa: { produto: porId(produtos), fornecedor: porId(fornecedores), ficha: porId(fichas), perfil: porId(perfis), ind: porId(ind),
-      local: porId(locais), unidade: porId(unidades), maceira: porId(maceiras), operador: porId(operadores), linha: porId(linhas) },
+      local: porId(locais), unidade: porId(unidades), maceira: porId(maceiras), operador: porId(operadores), linha: porId(linhas),
+      itensPedido, recPedido, saldoLocal },
     carregadoEm: new Date(),
   };
 }
@@ -379,6 +401,7 @@ function App() {
   const [recolhido, setRecolhido] = useState(() => { try { return localStorage.getItem('pss-menu-recolhido') === '1'; } catch { return false; } });
   const pilha = useRef([]);         // telas visitadas (para o botão "voltar")
   const voltando = useRef(false);
+  const liberado = useRef(false);   // a pessoa já confirmou sair sem salvar
   const rotaAtual = useRef(rota);
   const [gruposFechados, setGruposFechados] = useState(() => { try { return JSON.parse(localStorage.getItem('pss-menu-grupos') || '[]'); } catch { return []; } });
   function alternarGrupo(g) {
@@ -394,6 +417,18 @@ function App() {
   useEffect(() => {
     const f = () => {
       const nova = (location.hash || '#inicio').slice(1);
+      if (nova === rotaAtual.current) { voltando.current = false; return; }
+      // há algo digitado e não salvo: pergunta antes de trocar de tela (a tela atual continua aberta)
+      if (!liberado.current && haEdicao()) {
+        const eraVoltar = voltando.current; voltando.current = false;
+        try { history.replaceState(null, '', '#' + rotaAtual.current); } catch { /* ignora */ }
+        confirmarDescarte().then((ok) => {
+          if (!ok) { if (eraVoltar) pilha.current.push(nova); return; }
+          liberado.current = true; voltando.current = eraVoltar; location.hash = '#' + nova;
+        });
+        return;
+      }
+      liberado.current = false;
       if (!voltando.current && nova !== rotaAtual.current) pilha.current.push(rotaAtual.current);
       voltando.current = false; rotaAtual.current = nova;
       setRota(nova); setMenuAberto(false);
@@ -401,7 +436,7 @@ function App() {
     window.addEventListener('hashchange', f);
     return () => window.removeEventListener('hashchange', f);
   }, []);
-  useEffect(() => { if (usuario) recarregar(); }, [usuario?.user_id]);
+  useEffect(() => { if (usuario) carregar(3, { avisarErro: true }); }, [usuario?.user_id]);
   // administrador: depois de entrar, escolhe o próprio acesso ou o de outra pessoa (uma vez por sessão)
   useEffect(() => {
     if (!usuario || !(usuario.papeis || []).includes('admin')) return;
@@ -429,34 +464,87 @@ function App() {
 
   const dadosRef = useRef(null);
   dadosRef.current = dados;
-  async function recarregar(silencioso) {
-    try { setDados(await carregarDados(silencioso === true ? dadosRef.current : null)); }
-    catch (e) { if (silencioso !== true) avisar(mensagemErro(e), 'erro'); }
+  // FILA ÚNICA DE ATUALIZAÇÃO (desempenho e consistência): nunca roda duas cargas ao mesmo tempo
+  // (em rede lenta, uma resposta velha podia sobrescrever uma nova). Pedidos que chegam durante uma
+  // carga são juntados numa só carga seguinte, do nível mais alto pedido.
+  // nível 1 = leve (operação) · 2 = completa reaproveitando o consumo médio · 3 = completa com consumo médio novo
+  const carga = useRef({ ativa: false, nivel: 0, esperando: [], desde: null, avisarErro: false });
+  function carregar(nivel, { avisarErro = false, desde = null } = {}) {
+    const c = carga.current;
+    c.nivel = Math.max(c.nivel, nivel); c.avisarErro = c.avisarErro || avisarErro;
+    if (desde && (!c.desde || desde < c.desde)) c.desde = desde;
+    const p = new Promise((resolve) => c.esperando.push(resolve));
+    if (!c.ativa) rodarCarga();
+    return p;
   }
-  // atualização automática: só o que muda na operação (saldos, transferências, requisições, programação)
-  async function recarregarLeve() {
-    if (!dadosRef.current) return recarregar(true);
-    try { setDados(await carregarDados(dadosRef.current, { leve: true })); } catch { /* tenta de novo na próxima */ }
+  async function rodarCarga() {
+    const c = carga.current;
+    c.ativa = true;
+    while (c.nivel > 0) {
+      const ant = dadosRef.current;
+      let nivel = c.nivel; const quem = c.esperando; const desde = c.desde; const avisarErro = c.avisarErro;
+      c.nivel = 0; c.esperando = []; c.desde = null; c.avisarErro = false;
+      if (!ant) nivel = 3;
+      else if (nivel === 2 && Date.now() - (ant.statsEm || 0) > CICLO_STATS_MS) nivel = 3;
+      try {
+        const novo = await carregarDados(ant, { leve: nivel === 1, renovarStats: nivel === 3, desde });
+        dadosRef.current = novo; setDados(novo);
+      } catch (e) {
+        if (avisarErro || !ant) avisar(mensagemErro(e), 'erro');
+        if (desde && desde === buscandoHist.current) buscandoHist.current = null;
+      }
+      quem.forEach((r) => r());
+    }
+    c.ativa = false;
   }
+  // depois de salvar algo: carga completa (o consumo médio só é recalculado se estiver velho)
+  const recarregar = (silencioso) => carregar(2, { avisarErro: silencioso !== true });
+  const recarregarLeve = () => carregar(1);
   // pesquisa de período antigo: busca o histórico que falta (uma vez) e mantém
   const buscandoHist = useRef(null);
-  async function garantirHistorico(de) {
+  function garantirHistorico(de) {
     const atual = dadosRef.current; if (!atual || !de || de >= atual.historicoDesde || buscandoHist.current === de) return;
     buscandoHist.current = de;
-    try { setDados(await carregarDados(atual, { desde: de })); } catch (e) { avisar(mensagemErro(e), 'erro'); } finally { buscandoHist.current = null; }
+    carregar(2, { desde: de, avisarErro: true }).finally(() => { if (buscandoHist.current === de) buscandoHist.current = null; });
   }
-  // TEMPO REAL: quando alguém muda algo, a tela aberta se atualiza sozinha
-  // (aviso instantâneo do banco + conferência a cada 30 s só nas telas "ao vivo" e só com a aba visível)
+  // TEMPO REAL: quando alguém muda algo, a tela aberta se atualiza sozinha.
+  // 1) aviso instantâneo do banco (operação → carga leve; pedidos/recebimentos/cadastros → completa;
+  //    entrada de mercadoria também muda o pedido → completa)
+  // 2) conferência periódica com a aba visível, em TODAS as telas (as "ao vivo" com mais frequência)
+  // 3) ao voltar para a aba/app depois de um tempo, atualiza na hora
+  // O que a pessoa está digitando não se perde: as telas guardam o que foi digitado no próprio estado,
+  // e só voltam para "carregando…" quando a própria pessoa troca um filtro.
   const rotaViva = useRef(false);
+  const pendenteAoVoltar = useRef(0);   // aviso que chegou com a aba escondida: aplica ao voltar
   useEffect(() => {
-    if (!usuario || !api.aoMudar) return;
-    let t = null;
-    const desligar = api.aoMudar(TABELAS_AO_VIVO, () => { clearTimeout(t); t = setTimeout(() => { if (!document.hidden) recarregarLeve(); }, 1200); });
-    const ciclo = setInterval(() => { if (!document.hidden && rotaViva.current) recarregarLeve(); }, 30000);
-    const visivel = () => { if (!document.hidden && rotaViva.current) recarregarLeve(); };
+    if (!usuario || !api.aoMudar) return undefined;
+    let t = null; let nivelAviso = 0;
+    const desligar = api.aoMudar(TABELAS_AO_VIVO, (tabelas, carga) => {
+      const lista = Array.isArray(tabelas) ? tabelas : [tabelas];
+      const base = lista.some((x) => x === '*' || TABELAS_BASE.includes(x)) || (lista.includes('movimentos') && carga?.new?.tipo === 'entrada');
+      nivelAviso = Math.max(nivelAviso, base ? 2 : 1);
+      clearTimeout(t);
+      t = setTimeout(() => { const nv = nivelAviso; nivelAviso = 0; if (!document.hidden) carregar(nv); else pendenteAoVoltar.current = Math.max(pendenteAoVoltar.current, nv); }, 1200);
+    });
+    let ultimaLeve = Date.now();
+    const ciclo = setInterval(() => {
+      if (document.hidden) return;
+      const d = dadosRef.current; const agora = Date.now();
+      if (d && agora - (d.completoEm || 0) >= CICLO_COMPLETO_MS) { ultimaLeve = agora; carregar(2); return; }
+      if (agora - ultimaLeve >= (rotaViva.current ? CICLO_VIVO_MS : CICLO_OUTRAS_MS) - 1000) { ultimaLeve = agora; carregar(1); }
+    }, 10000);
+    const voltou = () => {
+      if (document.hidden) return;
+      const d = dadosRef.current; const parado = d ? Date.now() - (d.carregadoEm?.getTime?.() || 0) : Infinity;
+      const pend = pendenteAoVoltar.current; pendenteAoVoltar.current = 0;
+      if (pend || parado > 15000) { ultimaLeve = Date.now(); carregar(Math.max(pend, d && Date.now() - (d.completoEm || 0) > 60000 ? 2 : 1)); }
+    };
     window.__pssAtualizar = recarregarLeve;   // usado nos testes automáticos (força a atualização automática)
-    document.addEventListener('visibilitychange', visivel);
-    return () => { clearTimeout(t); clearInterval(ciclo); desligar && desligar(); document.removeEventListener('visibilitychange', visivel); };
+    document.addEventListener('visibilitychange', voltou);
+    window.addEventListener('focus', voltou);
+    window.addEventListener('online', voltou);
+    return () => { clearTimeout(t); clearInterval(ciclo); desligar && desligar(); document.removeEventListener('visibilitychange', voltou);
+      window.removeEventListener('focus', voltou); window.removeEventListener('online', voltou); };
   }, [usuario?.user_id]);
   async function sair() {
     await api.rpc('registrar_acesso', { p_evento: 'saida', p_detalhe: null, p_agente: navigator.userAgent }).catch(() => {});
@@ -516,7 +604,7 @@ function App() {
         ${dados && html`<${Sininho} dados=${dados} papeis=${papeis} ir=${ir} />`}
         ${(real.papeis || []).includes('admin') && html`<button class="btn-icone so-tela" title="Entrar como / ver como outra pessoa" aria-label="Ver como outra pessoa" onClick=${() => setEscolher(true)}><${Icone} nome="usuarios" /></button>`}
         ${api.modo !== 'demo' && html`<button class="btn-icone so-tela" title="Trocar senha" aria-label="Trocar senha" onClick=${() => setSenha(true)}><${Icone} nome="chave" /></button>`}
-        <button class="btn-icone so-tela" title="Sair" aria-label="Sair" onClick=${sair}><${Icone} nome="sair" /></button>
+        <button class="btn-icone so-tela" title="Sair" aria-label="Sair" onClick=${protegido(sair)}><${Icone} nome="sair" /></button>
       </div>
     </header>
     ${visao && html`<div class="faixa-vendo"><${Icone} nome="usuarios" tam=${16} /> Vendo como <b>${visao.nome}</b> (${visao.funcao || papeisTexto(visao.papeis)}). O que você fizer fica registrado em seu nome (${real.nome}).
@@ -529,7 +617,7 @@ function App() {
           <div class="mu-acoes">
             ${(real.papeis || []).includes('admin') && html`<button class="btn btn-sec btn-peq" onClick=${() => { setMenuAberto(false); setEscolher(true); }}><${Icone} nome="usuarios" tam=${16} /> Ver como</button>`}
             ${api.modo !== 'demo' && html`<button class="btn btn-sec btn-peq" onClick=${() => { setMenuAberto(false); setSenha(true); }}><${Icone} nome="chave" tam=${16} /> Senha</button>`}
-            <button class="btn btn-sec btn-peq" onClick=${sair}><${Icone} nome="sair" tam=${16} /> Sair</button>
+            <button class="btn btn-sec btn-peq" onClick=${protegido(sair)}><${Icone} nome="sair" tam=${16} /> Sair</button>
           </div></div>
         ${(() => { let g = null; return visiveis.map((m) => {
           if (m.grupo) { g = m.grupo; const fechado = gruposFechados.includes(m.grupo) && grupoDe(m.grupo) !== grupoAtual;
@@ -554,7 +642,7 @@ function App() {
     <${BarraInferior} papeis=${papeis} visiveis=${visiveis} atual=${itemAtual.id} dados=${dados} menuAberto=${menuAberto} abrirMenu=${() => setMenuAberto(!menuAberto)} />
     ${senha && html`<${TrocarSenha} usuario=${real} aoFechar=${() => setSenha(false)} />`}
     ${escolher && html`<${EscolherVisao} admin=${real} aoEscolher=${escolherVisao} aoFechar=${() => escolherVisao(visao)} />`}
-    ${novaVersao && html`<div class="faixa-versao">Há uma versão nova do sistema. <button class="btn btn-pri btn-peq" onClick=${() => location.reload()}>Atualizar agora</button></div>`}
+    ${novaVersao && html`<div class="faixa-versao">Há uma versão nova do sistema. <button class="btn btn-pri btn-peq" onClick=${protegido(() => location.reload())}>Atualizar agora</button></div>`}
     <${HostConfirmacao} />
     <${Avisos} />
   </${Ctx.Provider}>`;

@@ -46,21 +46,102 @@ export function HostConfirmacao() {
   useEffect(() => { abrirConfirmacao = setC; return () => { abrirConfirmacao = null; }; }, []);
   if (!c) return null;
   const fechar = (v) => { c.resolve(v); setC(null); };
-  return html`<${Modal} titulo=${c.titulo || 'Confirmar'} aoFechar=${() => fechar(false)}
+  return html`<${Modal} semProtecao titulo=${c.titulo || 'Confirmar'} aoFechar=${() => fechar(false)}
     rodape=${html`<button class="btn btn-sec" onClick=${() => fechar(false)}>${c.cancelar || 'Voltar'}</button>
       <button class=${'btn ' + (c.perigo ? 'btn-perigo' : 'btn-pri')} onClick=${() => fechar(true)}>${c.ok || 'Confirmar'}</button>`}>
     ${typeof c.mensagem === 'string' ? html`<p>${c.mensagem}</p>` : c.mensagem}
   </${Modal}>`;
 }
 
+// ------------------------------ Edição em andamento ------------------
+// PROTEÇÃO DOS DADOS DIGITADOS: formulários com algo digitado e ainda não salvo se registram aqui.
+// Enquanto houver algum, o sistema pergunta antes de: trocar de tela, fechar/recarregar a página,
+// fechar a janela (modal) pelo ✕/Esc/fundo e aplicar uma versão nova.
+const edicoes = new Map();
+let seqEdicao = 0;
+export const haEdicao = () => edicoes.size > 0;
+export function useEdicao(sujo, rotulo = 'formulário') {
+  const id = useRef(null);
+  if (id.current === null) id.current = ++seqEdicao;
+  useEffect(() => { if (sujo) edicoes.set(id.current, rotulo); else edicoes.delete(id.current); }, [sujo, rotulo]);
+  useEffect(() => () => edicoes.delete(id.current), []);
+}
+// pergunta antes de descartar o que foi digitado (ok = pode descartar)
+export function confirmarDescarte(texto) {
+  if (!haEdicao()) return Promise.resolve(true);
+  return confirmar({ titulo: 'Sair sem salvar?', mensagem: texto || 'Há informações digitadas que ainda não foram salvas. Se sair agora, elas serão perdidas.',
+    ok: 'Sair sem salvar', cancelar: 'Continuar editando', perigo: true });
+}
+// executa fn só depois de confirmar o descarte (quando há algo digitado)
+export const protegido = (fn) => (...a) => confirmarDescarte().then((ok) => { if (ok) { edicoes.clear(); fn(...a); } });
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeunload', (e) => { if (haEdicao()) { e.preventDefault(); e.returnValue = ''; } });
+}
+
+// RASCUNHO AUTOMÁTICO: guarda neste aparelho o que está sendo digitado num formulário longo
+// (inventário, contagem, pedido novo). Se a página fechar, a bateria acabar ou a pessoa trocar de tela,
+// ao voltar o formulário continua de onde parou. Some ao salvar (limpar) ou depois de 7 dias.
+const RASCUNHO_DIAS = 7;
+export function useRascunho(chave, inicial, { aoRecuperar } = {}) {
+  const app = useApp();
+  const k = chave ? `pss-rascunho:${app?.real?.user_id || app?.usuario?.user_id || ''}:${chave}` : null;
+  const inicialDe = () => (typeof inicial === 'function' ? inicial() : inicial);
+  const ler = (kk) => {
+    if (!kk) return undefined;
+    try { const o = JSON.parse(localStorage.getItem(kk) || 'null'); if (o && Date.now() - o.t < RASCUNHO_DIAS * 864e5) return o; } catch { /* sem armazenamento */ }
+    return undefined;
+  };
+  const [estado, setEstado] = useState(() => { const o = ler(k); return { k, v: o ? o.v : inicialDe(), rec: o ? o.t : null }; });
+  const base = useRef(null);
+  if (base.current === null) base.current = JSON.stringify(inicialDe());
+  // chave mudou (ex.: outro local no inventário): carrega o rascunho daquela chave
+  if (estado.k !== k) { const o = ler(k); estado.k = k; estado.v = o ? o.v : inicialDe(); estado.rec = o ? o.t : null; }
+  useEffect(() => { if (estado.rec && aoRecuperar) aoRecuperar(estado.rec); }, [k]);
+  useEffect(() => {
+    if (!k) return undefined;
+    const t = setTimeout(() => {
+      try {
+        const txt = JSON.stringify(estado.v);
+        if (txt === base.current || txt === '{}' || txt === '[]' || txt === '""') localStorage.removeItem(k);
+        else localStorage.setItem(k, JSON.stringify({ t: Date.now(), v: estado.v }));
+      } catch { /* aparelho sem espaço ou modo privado: segue sem rascunho */ }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [k, estado.v]);
+  const set = (x) => setEstado((e) => ({ ...e, v: typeof x === 'function' ? x(e.v) : x }));
+  const limpar = () => { try { if (k) localStorage.removeItem(k); } catch { /* ignora */ } };
+  return [estado.v, set, limpar, estado.rec];
+}
+
+// campo de formulário (busca e filtro de pesquisa não contam como "dado digitado")
+const ehCampo = (el) => !!el && /^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName) && el.type !== 'search' && !el.classList?.contains('busca');
+// Formulário que fica na própria página (não numa janela): avisa antes de sair com algo digitado.
+// Volta a "limpo" quando qualquer gravação dá certo (evento pss-salvo do useAcao).
+export function AreaProtegida({ rotulo = 'formulário', classe = '', children }) {
+  const [sujo, setSujo] = useState(false);
+  useEdicao(sujo, rotulo);
+  useEffect(() => { const f = () => setSujo(false); window.addEventListener('pss-salvo', f); return () => window.removeEventListener('pss-salvo', f); }, []);
+  const marcar = (e) => { if (!sujo && ehCampo(e.target)) setSujo(true); };
+  return html`<section class=${classe} onInput=${marcar} onChange=${marcar}>${children}</section>`;
+}
+
 // ------------------------------ Modal --------------------------------
 let seqModal = 0;
+const pilhaModais = [];   // só a janela de cima responde ao Esc e prende o Tab
 const FOCAVEIS = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
-export function Modal({ titulo, aoFechar, children, rodape, largo, cheio }) {
+export function Modal({ titulo, aoFechar, children, rodape, largo, cheio, semProtecao }) {
   const caixa = useRef(null);
-  const fecharRef = useRef(aoFechar); fecharRef.current = aoFechar;
   const [idTitulo] = useState(() => `modal-titulo-${++seqModal}`);
+  const [sujo, setSujo] = useState(false);
+  useEdicao(sujo && !semProtecao, titulo);
+  // ✕, Esc, seta e clique no fundo: se algo foi digitado, pergunta antes de fechar
+  const pedirFechar = () => { if (!aoFechar) return; if (sujo && !semProtecao) confirmarDescarte().then((ok) => ok && aoFechar()); else aoFechar(); };
+  const fecharRef = useRef(pedirFechar); fecharRef.current = pedirFechar;
+  const marcar = (e) => { if (!sujo && ehCampo(e.target)) setSujo(true); };
+  useEffect(() => { const f = () => setSujo(false); window.addEventListener('pss-salvo', f); return () => window.removeEventListener('pss-salvo', f); }, []);
   useEffect(() => {
+    pilhaModais.push(idTitulo);
+    const noTopo = () => pilhaModais[pilhaModais.length - 1] === idTitulo;
     const antes = document.activeElement;   // devolve o foco para onde estava ao fechar
     const el = caixa.current;
     if (el && !el.contains(document.activeElement)) {
@@ -68,6 +149,7 @@ export function Modal({ titulo, aoFechar, children, rodape, largo, cheio }) {
       try { primeiro.focus({ preventScroll: true }); } catch { /* ignora */ }
     }
     const f = (e) => {
+      if (!noTopo()) return;
       if (e.key === 'Escape') { fecharRef.current?.(); return; }
       if (e.key !== 'Tab' || !caixa.current) return;   // Tab não sai da janela
       const itens = [...caixa.current.querySelectorAll(FOCAVEIS)].filter((x) => x.offsetParent !== null);
@@ -79,16 +161,18 @@ export function Modal({ titulo, aoFechar, children, rodape, largo, cheio }) {
     document.addEventListener('keydown', f);
     document.body.classList.add('sem-rolagem');
     return () => {
-      document.removeEventListener('keydown', f); document.body.classList.remove('sem-rolagem');
+      const i = pilhaModais.lastIndexOf(idTitulo); if (i >= 0) pilhaModais.splice(i, 1);
+      document.removeEventListener('keydown', f); if (!pilhaModais.length) document.body.classList.remove('sem-rolagem');
       if (antes && antes.focus && document.contains(antes)) { try { antes.focus({ preventScroll: true }); } catch { /* ignora */ } }
     };
   }, []);
-  return html`<div class="modal-fundo" onClick=${(e) => e.target === e.currentTarget && aoFechar?.()}>
-    <div class=${'modal' + (largo ? ' modal-largo' : '') + (cheio ? ' modal-cheio' : '')} role="dialog" aria-modal="true" aria-labelledby=${idTitulo} tabindex="-1" ref=${caixa}>
+  return html`<div class="modal-fundo" onClick=${(e) => e.target === e.currentTarget && pedirFechar()}>
+    <div class=${'modal' + (largo ? ' modal-largo' : '') + (cheio ? ' modal-cheio' : '')} role="dialog" aria-modal="true" aria-labelledby=${idTitulo} tabindex="-1" ref=${caixa}
+      onInput=${marcar} onChange=${marcar}>
       <div class="modal-topo">
-        ${aoFechar && html`<button class="btn-voltar" title="Voltar" aria-label="Voltar" onClick=${aoFechar}><${Seta} /></button>`}
+        ${aoFechar && html`<button class="btn-voltar" title="Voltar" aria-label="Voltar" onClick=${pedirFechar}><${Seta} /></button>`}
         <h2 id=${idTitulo}>${titulo}</h2>
-        ${aoFechar && html`<button class="btn-icone btn-fechar" title="Fechar" aria-label="Fechar" onClick=${aoFechar}>✕</button>`}
+        ${aoFechar && html`<button class="btn-icone btn-fechar" title="Fechar" aria-label="Fechar" onClick=${pedirFechar}>✕</button>`}
       </div>
       <div class="modal-corpo">${children}</div>
       ${rodape && html`<div class="modal-rodape">${rodape}</div>`}
@@ -292,6 +376,7 @@ export function useAcao() {
     try {
       const r = await fn();
       if (msgOk) avisar(msgOk, 'ok');
+      try { window.dispatchEvent(new Event('pss-salvo')); } catch { /* ignora */ }
       return r ?? true;
     } catch (e) {
       const { mensagemErro } = await import('./util.js');

@@ -1,5 +1,5 @@
 // Recebimento de mercadoria (pensado para o celular), com divergência
-import { html, useState, useMemo, useEffect, useApp, Campo, Numero, Escolher, QtdUnidade, Busca, Cabecalho, Vazio, useAcao, confirmar, avisar, n } from '../ui.js';
+import { html, AreaProtegida, protegido, useRef, useState, useMemo, useEffect, useApp, Campo, Numero, Escolher, QtdUnidade, Busca, Cabecalho, Vazio, useAcao, confirmar, avisar, n } from '../ui.js';
 import { numeroPedido, data, qtd, moeda, contem, fator, qu, pl, plural } from '../util.js';
 import { resumoPedido, PrazoEtiqueta } from './pedidos.js';
 
@@ -24,6 +24,7 @@ export function TelaReceber() {
   const [busca, setBusca] = useState('');
   const [pedidoId, setPedidoId] = useState(estadoRota?.pedido || null);
   const [semPedido, setSemPedido] = useState(false);
+  const ultimoPedido = useRef(null);
   useEffect(() => { if (estadoRota) setEstadoRota(null); }, []);
   useEffect(() => { window.scrollTo(0, 0); }, [pedidoId, semPedido]);
 
@@ -32,7 +33,11 @@ export function TelaReceber() {
     .filter((p) => contem(`${numeroPedido(p.id)} ${p.id} ${p.r.fornecedor?.nome} ${p.r.itens.map((i) => dados.mapa.produto.get(i.produto_id)?.descricao).join(' ')}`, busca))
     .sort((a, b) => String(a.previsao_entrega).localeCompare(String(b.previsao_entrega))), [dados, busca]);
 
-  if (pedidoId) return html`<${ConferirPedido} pedido=${dados.pedidos.find((p) => p.id === pedidoId)} aoVoltar=${() => setPedidoId(null)} />`;
+  // a atualização automática não pode tirar a conferência da tela: se o pedido sumir da lista carregada,
+  // continua com o último dado conhecido (o servidor confere tudo de novo ao gravar)
+  const atual = pedidoId ? dados.pedidos.find((p) => p.id === pedidoId) : null;
+  if (atual) ultimoPedido.current = atual;
+  if (pedidoId && (atual || ultimoPedido.current?.id === pedidoId)) return html`<${ConferirPedido} pedido=${atual || ultimoPedido.current} aoVoltar=${() => setPedidoId(null)} />`;
   if (semPedido) return html`<${ReceberSemPedido} aoVoltar=${() => setSemPedido(false)} />`;
 
   return html`
@@ -105,8 +110,8 @@ function ConferirPedido({ pedido, aoVoltar }) {
     if (res) { await recarregar(); aoVoltar(); }
   }
 
-  return html`
-    <${Cabecalho} aoVoltar=${aoVoltar} titulo=${`Conferir ${numeroPedido(pedido.id)}`} sub=${`${r.fornecedor?.nome} · pedido em ${data(pedido.data_pedido)} · previsão ${data(pedido.previsao_entrega)}`} />
+  return html`<${AreaProtegida} rotulo="conferência do recebimento">
+    <${Cabecalho} aoVoltar=${protegido(aoVoltar)} titulo=${`Conferir ${numeroPedido(pedido.id)}`} sub=${`${r.fornecedor?.nome} · pedido em ${data(pedido.data_pedido)} · previsão ${data(pedido.previsao_entrega)}`} />
     <${Campo} rotulo="Nº da nota fiscal"><input class="entrada" inputmode="numeric" value=${nf} onInput=${(e) => setNf(e.target.value)} /></${Campo}>
     <p class="nota">Confira cada item e informe a quantidade que <b>chegou agora</b>. Já vem preenchido com o que falta receber.</p>
     <div class="lista-conferencia">
@@ -155,7 +160,7 @@ function ConferirPedido({ pedido, aoVoltar }) {
       ajuda="Ex.: veio 510 sacos, comprador autorizou por WhatsApp; 2 sacos rasgados; motorista volta amanhã…">
       <textarea class="entrada" rows="3" value=${obs} onInput=${(e) => setObs(e.target.value)}></textarea></${Campo}>
     <div class="barra-acao"><button class=${'btn btn-grande ' + (temDiv ? 'btn-alerta' : 'btn-pri')} disabled=${ocupado} onClick=${registrar}>
-      ${ocupado ? 'Registrando…' : temDiv ? 'Receber com divergência' : 'Confirmar recebimento'}</button></div>`;
+      ${ocupado ? 'Registrando…' : temDiv ? 'Receber com divergência' : 'Confirmar recebimento'}</button></div></${AreaProtegida}>`;
 }
 
 function ReceberSemPedido({ aoVoltar }) {
@@ -180,8 +185,8 @@ function ReceberSemPedido({ aoVoltar }) {
       itens: its.map((l) => ({ produto_id: l.produto_id, quantidade: n(l.quantidade), unidade: l.unidade, custo_unitario: n(l.custo), ...extraDestino(dados, l, dados.mapa.produto.get(l.produto_id)) })) } }), 'Recebido sem pedido. O comprador vai ver o aviso no sistema.');
     if (res) { await recarregar(); aoVoltar(); }
   }
-  return html`
-    <${Cabecalho} aoVoltar=${aoVoltar} titulo="Recebimento sem pedido" sub="Mercadoria que chegou sem pedido de compra no sistema" />
+  return html`<${AreaProtegida} rotulo="recebimento sem pedido">
+    <${Cabecalho} aoVoltar=${protegido(aoVoltar)} titulo="Recebimento sem pedido" sub="Mercadoria que chegou sem pedido de compra no sistema" />
     <div class="grade">
       <${Campo} rotulo="Fornecedor"><${Escolher} itens=${dados.fornecedores.filter((x) => x.ativo)} valor=${forn} aoMudar=${setForn} rotuloDe=${(x) => x.nome} placeholder="(opcional)" /></${Campo}>
       <${Campo} rotulo="Nº da nota fiscal"><input class="entrada" value=${nf} onInput=${(e) => setNf(e.target.value)} /></${Campo}>
@@ -205,5 +210,5 @@ function ReceberSemPedido({ aoVoltar }) {
     </div>
     <${Campo} rotulo="Ressalva (obrigatória)" obrigatorio ajuda="Por que chegou sem pedido? Com quem foi combinado?"><textarea class="entrada" rows="3" value=${obs} onInput=${(e) => setObs(e.target.value)}></textarea></${Campo}>
     <p class="nota">Sem preço informado, a entrada usa o custo médio atual do produto.</p>
-    <div class="barra-acao"><button class="btn btn-alerta btn-grande" disabled=${ocupado} onClick=${registrar}>${ocupado ? 'Registrando…' : 'Receber sem pedido'}</button></div>`;
+    <div class="barra-acao"><button class="btn btn-alerta btn-grande" disabled=${ocupado} onClick=${registrar}>${ocupado ? 'Registrando…' : 'Receber sem pedido'}</button></div></${AreaProtegida}>`;
 }

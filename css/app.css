@@ -743,7 +743,11 @@ label.btn { cursor: pointer; }
 .mac-cont { background: var(--cartao); border: 1px solid var(--borda); border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; box-shadow: var(--sombra); font: inherit; color: inherit; text-align: left; }
 .mac-cont b { font-size: 1.8rem; line-height: 1.1; }
 .mac-cont.botao { cursor: pointer; }
-.mac-cont.botao.chegando { border: 2px solid var(--azul); background: var(--azul-f); animation: pulso 2s infinite; }
+.mac-cont.botao.chegando { border: 2px solid var(--azul); background: var(--azul-f); position: relative; }
+/* pulso só com opacidade (a placa de vídeo anima sozinha; antes a sombra animada redesenhava a tela o dia todo no tablet) */
+.mac-cont.botao.chegando::after { content: ''; position: absolute; inset: -2px; border-radius: 14px; box-shadow: 0 0 0 6px rgba(31,95,168,.18); opacity: 0;
+  animation: pulso-op 2s ease-in-out infinite; pointer-events: none; will-change: opacity; }
+@keyframes pulso-op { 50% { opacity: 1; } }
 @keyframes pulso { 50% { box-shadow: 0 0 0 6px rgba(31,95,168,.15); } }
 .mac-acao { color: var(--cor); font-weight: 800; }
 .mac-txt { font-size: .95rem; font-weight: 700; }
@@ -1144,3 +1148,13 @@ html[data-tema="escuro"] {
 .entrada-auto { width: auto; }
 .horarios small { display: block; }
 @media (max-width: 640px) { .periodo-barra { position: static; } }
+
+/* =====================================================================
+   VERSÃO 2.5 — desempenho em celular e tablet
+   ===================================================================== */
+/* desfoque atrás da barra fixa custa caro para rolar em celular/tablet simples: fundo sólido */
+@media (max-width: 860px), (pointer: coarse) {
+  .barra-acao.fixa { backdrop-filter: none; background: var(--fundo); }
+}
+/* listas longas: o navegador pula o desenho do que está fora da tela */
+.lista-conferencia > .conf-item, .lista-transf > .transf-cartao { content-visibility: auto; contain-intrinsic-size: auto 160px; }
