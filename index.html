@@ -6,8 +6,10 @@
   <meta name="theme-color" content="#026e57" />
   <meta name="robots" content="noindex, nofollow" />
   <meta name="referrer" content="no-referrer" />
-  <!-- Segurança: só roda código deste site e só conversa com o Supabase -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'" />
+  <!-- Segurança: só roda código deste site e só conversa com o Supabase DESTE projeto
+       (se trocar de projeto no config.js, troque o endereço aqui também) -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://kuttfnmjvzgzebjpjvvy.supabase.co wss://kuttfnmjvzgzebjpjvvy.supabase.co; worker-src 'self' blob:; frame-src 'none'; manifest-src 'self'; media-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests" />
+  <meta name="format-detection" content="telephone=no" />
   <title>Compras & Estoque · Pães São Sebastião</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" href="icons/icon-192.png" />

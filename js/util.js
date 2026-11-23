@@ -329,3 +329,17 @@ export function problemaDoc(v, tipo) {
   if (d.length < total) return '';
   return (tipo === 'PF' ? cpfValido(d) : cnpjValido(d)) ? '' : `${rotuloDoc(tipo)} inválido: confira os números digitados.`;
 }
+
+// ---------------------------------------------------------------------
+// SEGURANÇA DE ANEXOS: só PDF e fotos, conferidos pelos bytes do início do arquivo
+// (a extensão e o "tipo" informados podem ser falsificados; um SVG/HTML abriria com acesso ao sistema)
+export const ANEXO_TIPOS = { 'application/pdf': 'PDF', 'image/jpeg': 'JPG', 'image/png': 'PNG', 'image/webp': 'WEBP', 'image/heic': 'HEIC' };
+export function tipoRealAnexo(bytes) {
+  const b = bytes; const s = (i, t) => [...t].every((c, k) => b[i + k] === c.charCodeAt(0));
+  if (s(0, '%PDF')) return 'application/pdf';
+  if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'image/jpeg';
+  if (b[0] === 0x89 && s(1, 'PNG')) return 'image/png';
+  if (s(0, 'RIFF') && s(8, 'WEBP')) return 'image/webp';
+  if (s(4, 'ftyp') && (s(8, 'heic') || s(8, 'heix') || s(8, 'mif1') || s(8, 'msf1'))) return 'image/heic';
+  return null;
+}

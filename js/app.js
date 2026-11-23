@@ -454,11 +454,18 @@ function App() {
   // Sai sozinho depois de muito tempo sem uso (computador compartilhado)
   useEffect(() => {
     if (!usuario) return;
-    const limite = (CFG.SAIR_APOS_MINUTOS_SEM_USO || 480) * 60000;
+    // SEGURANÇA: perfis com mais poder (administrador, diretoria, financeiro) saem antes (2 h parado);
+    // os demais em 8 h. Com algo digitado e não salvo, espera o prazo maior (não perder o que foi digitado).
+    const gestao = (usuario.papeis || []).some((p) => ['admin', 'diretoria', 'financeiro'].includes(p));
+    const longo = (CFG.SAIR_APOS_MINUTOS_SEM_USO || 480) * 60000;
+    const curto = Math.min(longo, (CFG.SAIR_APOS_MINUTOS_SEM_USO_GESTAO || 120) * 60000);
     let ultimo = Date.now();
     const marcar = () => { ultimo = Date.now(); };
     ['click', 'keydown', 'touchstart'].forEach((ev) => document.addEventListener(ev, marcar, { passive: true }));
-    const t = setInterval(() => { if (Date.now() - ultimo > limite) { sair(); avisar('Sessão encerrada por falta de uso.', 'aviso'); } }, 60000);
+    const t = setInterval(() => {
+      const limite = gestao && !haEdicao() ? curto : longo;
+      if (Date.now() - ultimo > limite) { sair(); avisar('Sessão encerrada por falta de uso (segurança). Entre de novo para continuar.', 'aviso'); }
+    }, 60000);
     return () => { clearInterval(t); ['click', 'keydown', 'touchstart'].forEach((ev) => document.removeEventListener(ev, marcar)); };
   }, [usuario?.user_id]);
 
@@ -648,7 +655,16 @@ function App() {
   </${Ctx.Provider}>`;
 }
 
-render(html`<${App} />`, document.getElementById('app'));
+// SEGURANÇA (anti-clickjacking): com dados reais, o sistema não abre dentro de outro site
+// (golpe em que um site falso mostra o sistema "por baixo" para a pessoa clicar sem saber)
+let dentroDeOutroSite = false; try { dentroDeOutroSite = window.self !== window.top; } catch { dentroDeOutroSite = true; }
+if (CFG.MODO === 'supabase' && dentroDeOutroSite) {
+  render(html`<div class="login"><div class="login-caixa"><div class="login-marca"><img src="icons/logo-pss.png" alt="Pães São Sebastião" /><strong>Compras & Estoque</strong></div>
+    <p>Por segurança, o sistema só funciona no endereço oficial, fora de outros sites.</p>
+    <a class="btn btn-pri btn-bloco" href=${location.href} target="_top" rel="noopener noreferrer">Abrir o sistema com segurança</a></div></div>`, document.getElementById('app'));
+} else {
+  render(html`<${App} />`, document.getElementById('app'));
+}
 
 // App instalável (PWA): registra o service worker quando possível
 // funciona offline e pode ser instalado como aplicativo (fora da prévia, que roda dentro de um quadro)

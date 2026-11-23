@@ -4,7 +4,7 @@
 // Cancelar envio → volta para separado · cancelar separação → volta ao disponível
 // =====================================================================
 import { html, useState, useEffect, useApp, Cabecalho, Abas, Tabela, Etiqueta, Modal, Campo, Numero, Escolher, Vazio, Carregando, useAcao, confirmar, avisar, n, useFiltroMudou } from '../ui.js';
-import { num, qu, dataHora, hojeISO, somarDias, operaLocal, ehGestao, SITUACAO_TRANSF, pl, mensagemErro, contem } from '../util.js';
+import { num, qu, dataHora, hojeISO, somarDias, operaLocal, ehGestao, SITUACAO_TRANSF, pl, mensagemErro, contem, tipoRealAnexo } from '../util.js';
 import { Icone } from '../icones.js';
 import { nomeLocal, saldoLocal, minutos, tempoTexto, horaDia } from '../producao-util.js';
 import { Exportar } from '../exportar.js';
@@ -127,8 +127,11 @@ function NovaTransferencia({ aoFechar }) {
   async function lerArquivo(f) {
     if (!f) return setAnexo(null);
     if (f.size > 3 * 1024 * 1024) return avisar('Arquivo maior que 3 MB. Tire uma foto menor ou envie o PDF reduzido.', 'erro');
+    // SEGURANÇA: confere o conteúdo real (não confia na extensão nem no tipo informado)
+    const tipo = tipoRealAnexo(new Uint8Array(await f.slice(0, 16).arrayBuffer()));
+    if (!tipo) return avisar('Envie a nota em PDF ou uma foto (JPG, PNG, WEBP ou HEIC).', 'erro');
     const b64 = await new Promise((ok, erro) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1]); r.onerror = erro; r.readAsDataURL(f); });
-    setAnexo({ nome: f.name, tipo: f.type, conteudo: b64 });
+    setAnexo({ nome: String(f.name).replace(/[^\w.\- ()À-ú]/g, '_').slice(0, 120), tipo, conteudo: b64 });
   }
   async function salvar() {
     const itens = linhas.filter((l) => l.produto_id && n(l.q) > 0).map((l) => ({ produto_id: l.produto_id, quantidade: n(l.q), unidade: dados.mapa.produto.get(l.produto_id).unidade_estoque, qtd2: l.q2 === '' ? null : n(l.q2) }));
@@ -158,7 +161,7 @@ function NovaTransferencia({ aoFechar }) {
     <label class="check destaque"><input type="checkbox" checked=${enviar} onChange=${(e) => setEnviar(e.target.checked)} /> Já sair agora (separar e enviar juntos). Desmarque para só separar e enviar depois.</label>
     <${Campo} rotulo="Observação"><input class="entrada" value=${obs} onInput=${(e) => setObs(e.target.value)} placeholder="ex.: entregar para o Juliano" /></${Campo}>
     ${outraUnidade && html`<${Campo} rotulo="Nota fiscal de transferência (opcional)" ajuda="PDF ou foto, até 3 MB. A nota continua sendo emitida no ERP.">
-      <input class="entrada" type="file" accept="application/pdf,image/*" onChange=${(e) => lerArquivo(e.target.files[0])} /></${Campo}>`}
+      <input class="entrada" type="file" accept="application/pdf,image/jpeg,image/png,image/webp,image/heic,.heic" onChange=${(e) => lerArquivo(e.target.files[0])} /></${Campo}>`}
   </${Modal}>`;
 }
 
@@ -173,7 +176,12 @@ function DetalheTransf({ id, aoFechar }) {
     try {
       const [a] = await api.rpc('ler_anexo', { p_id: r.t.anexo_id });
       const bin = Uint8Array.from(atob(a.conteudo), (c) => c.charCodeAt(0));
-      window.open(URL.createObjectURL(new Blob([bin], { type: a.tipo || 'application/octet-stream' })), '_blank');
+      // SEGURANÇA: o tipo vem dos bytes do arquivo, nunca do que foi gravado; o que não for PDF/foto só é baixado
+      const tipo = tipoRealAnexo(bin);
+      const url = URL.createObjectURL(new Blob([bin], { type: tipo || 'application/octet-stream' }));
+      if (tipo) window.open(url, '_blank', 'noopener');
+      else { const l = document.createElement('a'); l.href = url; l.download = String(a.nome || 'anexo').replace(/[^\w.\- ()À-ú]/g, '_'); l.click(); }
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
     } catch (e) { avisar(mensagemErro(e), 'erro'); }
   }
   if (!r) return html`<${Modal} titulo=${`Transferência nº ${id}`} aoFechar=${aoFechar}><${Carregando} /></${Modal}>`;

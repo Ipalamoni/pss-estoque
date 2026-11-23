@@ -24,6 +24,30 @@ export async function carregarPDF() {
 }
 export async function carregarExcel() { if (!window.XLSX) await carregarScript('js/vendor/xlsx.mini.min.js'); return window.XLSX; }
 
+// SEGURANÇA: planilha enviada pelo usuário é aberta num processo isolado (js/planilha-worker.js),
+// com limite de tamanho e de tempo. Devolve um "leitor" com a mesma forma que a importação usa.
+const LIMITE_PLANILHA_MB = 15, TEMPO_PLANILHA_MS = 20000;
+export function lerPlanilhaIsolada(buffer) {
+  if (!buffer || buffer.byteLength > LIMITE_PLANILHA_MB * 1024 * 1024) return Promise.reject(new Error(`Planilha maior que ${LIMITE_PLANILHA_MB} MB.`));
+  const assinatura = new Uint8Array(buffer.slice(0, 4));
+  const zip = assinatura[0] === 0x50 && assinatura[1] === 0x4b;               // .xlsx (PK..)
+  const ole = assinatura[0] === 0xd0 && assinatura[1] === 0xcf;               // .xls antigo
+  if (!zip && !ole) return Promise.reject(new Error('O arquivo não é uma planilha do Excel (.xlsx ou .xls).'));
+  return new Promise((ok, erro) => {
+    const w = new Worker('js/planilha-worker.js');
+    const fim = setTimeout(() => { w.terminate(); erro(new Error('A planilha demorou demais para abrir e foi recusada.')); }, TEMPO_PLANILHA_MS);
+    w.onmessage = (e) => {
+      clearTimeout(fim); w.terminate();
+      if (!e.data || !e.data.ok) return erro(new Error((e.data && e.data.erro) || 'Planilha inválida.'));
+      const { nomes, abas } = e.data;
+      const Sheets = Object.create(null); nomes.forEach((n) => { Sheets[n] = abas[n]; });
+      ok({ read: () => ({ SheetNames: nomes, Sheets }), utils: { sheet_to_json: (linhas) => linhas } });
+    };
+    w.onerror = (e) => { clearTimeout(fim); w.terminate(); erro(new Error(e.message || 'Não consegui abrir a planilha.')); };
+    w.postMessage(buffer, [buffer]);
+  });
+}
+
 async function logo(caminho) {
   if (caminho in cacheLogo) return cacheLogo[caminho];
   try {
