@@ -1219,3 +1219,10 @@ html[data-tema="escuro"] {
 }
 @media (max-width: 359px) { .marca-sep { display: none; } .marca-sistema { height: 20px; } }
 @media (max-width: 380px) { .login-marca .marca-login { height: 30px; } }
+
+/* v2.8.1 — fila da masseira: número da ordem em AMARELO, grande (premissa: produção simples e chamativa) */
+.fila-pos, [data-tema="escuro"] .fila-pos { width: 48px; height: 48px; background: #ffc61a; color: #1d2733; border: 2px solid #b88a00;
+  font-size: 1.35rem; font-weight: 900; flex: none; box-shadow: 0 2px 6px rgba(0,0,0,.18); }
+/* números da fila separados (antes ficavam grudados: "30Pronto p/ iniciar") */
+.fila-nums { display: flex; flex-wrap: wrap; gap: 2px 16px; }
+.fila-nums b { margin-left: 3px; }
