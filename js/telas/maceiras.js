@@ -281,12 +281,13 @@ function IniciarBatelada({ prog, maceira, operador, fluxo, agora, aoFechar }) {
             <button class="btn btn-sec btn-quadrado grande" onClick=${() => { const v = Math.max(Math.round((Number(i.quantidade) - passo(i.quantidade)) * 100) / 100, 0); mudar(k, { quantidade: v, txt: String(v).replace('.', ',') }); }}>−</button>
             <div class="ini-valor"><input class="entrada" inputmode="decimal" value=${i.txt} onInput=${(e) => mudar(k, { txt: e.target.value, quantidade: n(e.target.value) || 0 })} /><small>${p?.unidade_estoque} · média da ficha ${qtd(i.padrao)}</small></div>
             <button class="btn btn-sec btn-quadrado grande" onClick=${() => { const v = Math.round((Number(i.quantidade) + passo(i.quantidade)) * 100) / 100; mudar(k, { quantidade: v, txt: String(v).replace('.', ',') }); }}>+</button>
+            <button class="btn btn-sec btn-peq ini-trocar" onClick=${() => setTrocando(k)} title="Acabou este? Trocar por outro que tenha no estoque"><${Icone} nome="trocar" tam=${14} /> Trocar</button>
           </div>`
         : html`<div class="ini-conf">
             ${i.editar ? html`<div class="ini-valor"><input class="entrada" inputmode="decimal" value=${i.txt} onInput=${(e) => mudar(k, { txt: e.target.value, quantidade: n(e.target.value) || 0 })} /><small>${p?.unidade_estoque}</small></div>`
               : html`<b class="ini-qtd">${qu(i.quantidade, p?.unidade_estoque)}</b>`}
             <span class="ini-ok">✓</span>
-            <button class="btn btn-sec btn-peq" onClick=${() => setTrocando(k)} title="Acabou esta? Trocar por outra que tenha no estoque"><${Icone} nome="trocar" tam=${14} /> Trocar</button>
+            <button class="btn btn-sec btn-peq ini-trocar" onClick=${() => setTrocando(k)} title="Acabou esta? Trocar por outra que tenha no estoque"><${Icone} nome="trocar" tam=${14} /> Trocar</button>
             <button class="btn-icone discreto" title="Alterar a quantidade (só em caso atípico)" onClick=${() => mudar(k, { editar: !i.editar })}><${Icone} nome="lapis" tam=${15} /></button>
           </div>`}
       </div>`;
@@ -302,7 +303,7 @@ function TrocarFarinha({ atual, aoFechar, aoEscolher }) {
   const dep = localTipo(dados, 'deposito');
   const p0 = dados.mapa.produto.get(atual.produto_id);
   const opcoes = dados.produtos.filter((p) => p.ativo && p.categoria === 'materia_prima' && p.usado_na === 'maceira' && p.id !== atual.produto_id
-      && (ehFarinha(p0) ? ehFarinha(p) : (p.grupo || '') === (p0?.grupo || '')))
+      && (ehFarinha(p0) ? ehFarinha(p) : ehFermento(p0) ? ehFermento(p) : (p.grupo || '') === (p0?.grupo || '')))
     .map((p) => ({ p, s: dep ? saldoLocal(dados, p.id, dep.id).disponivel : 0 }))
     .sort((a, b) => b.s - a.s);
   return html`<${Modal} titulo=${`Trocar ${p0?.descricao}`} aoFechar=${aoFechar}>

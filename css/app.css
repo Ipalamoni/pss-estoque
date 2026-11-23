@@ -809,6 +809,12 @@ label.btn { cursor: pointer; }
 .ini-nome { display: flex; justify-content: space-between; gap: 8px; align-items: center; font-weight: 800; font-size: 1.05rem; flex-wrap: wrap; }
 .ini-stepper { display: flex; align-items: center; gap: 10px; }
 .ini-stepper .btn-quadrado.grande { width: 58px; height: 58px; font-size: 1.6rem; border-radius: 14px; }
+.ini-stepper { flex-wrap: wrap; }
+.ini-trocar { min-height: 56px; padding: 0 16px; font-size: 1rem; }
+@media (max-width: 600px) {
+  .ini-stepper .ini-valor { flex: 1 1 0; min-width: 0; flex-wrap: wrap; }
+  .ini-stepper .ini-trocar { flex: 1 0 100%; justify-content: center; }
+}
 .ini-valor { display: flex; align-items: baseline; gap: 6px; }
 .ini-valor .entrada { width: 120px; font-size: 1.5rem; font-weight: 800; text-align: center; }
 .ini-conf { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }

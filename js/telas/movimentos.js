@@ -1,6 +1,6 @@
 // Movimentações (extrato do estoque) e correção de lançamentos
 import { html, useState, useMemo, useEffect, useApp, Modal, Campo, Escolher, QtdUnidade, Etiqueta, Cabecalho, Tabela, Carregando, Cartao, useAcao, avisar, n, Filtros, useFiltroMudou } from '../ui.js';
-import { TIPOS_MOV, ETAPAS_TRANSF, MOTIVOS_INVENTARIO, qtd, moeda, data, dataHora, hojeISO, somarDias, fator, numeroPedido, mensagemErro, diaLocal, qu, plural, pl, nomeUsuario } from '../util.js';
+import { veValores, TIPOS_MOV, ETAPAS_TRANSF, MOTIVOS_INVENTARIO, qtd, moeda, data, dataHora, hojeISO, somarDias, fator, numeroPedido, mensagemErro, diaLocal, qu, plural, pl, nomeUsuario } from '../util.js';
 import { Exportar } from '../exportar.js';
 import { Icone } from '../icones.js';
 import { nomeLocal } from '../producao-util.js';
@@ -12,7 +12,8 @@ const qLocal = (m) => Number(m.qtd_local ?? m.quantidade);
 const inicioDia = (iso) => new Date(iso + 'T00:00:00').toISOString();
 
 export function TelaMovimentos() {
-  const { dados, usuario, podeFazer, api, estadoRota, setEstadoRota } = useApp();
+  const { dados, usuario, podeFazer, api, estadoRota, setEstadoRota, papeis } = useApp();
+  const vv = veValores(papeis);   // pesagem/padeiro: sem custo nem valor
   const [de, setDe] = useState(somarDias(hojeISO(), estadoRota?.produto ? -60 : -7));
   const [ate, setAte] = useState(hojeISO());
   const [prod, setProd] = useState(estadoRota?.produto || null);
@@ -49,7 +50,7 @@ export function TelaMovimentos() {
     { titulo: 'Local', valor: (m) => (m.local_id ? nomeLocal(dados, m.local_id) : '') }, { titulo: 'No local', valor: (m) => (m.local_id ? qLocal(m) : ''), num: true },
     { titulo: 'Saldo no local', valor: (m) => (m.saldo_local_apos != null ? Number(m.saldo_local_apos) : ''), num: true },
     { titulo: 'Padeiro', valor: (m) => dados.mapa.operador.get(m.operador_id)?.nome || '' },
-    { titulo: 'Custo unit.', valor: (m) => Number(m.custo_unitario), texto: (m) => moeda(m.custo_unitario), num: true }, { titulo: 'Valor', valor: (m) => Number(m.valor), texto: (m) => moeda(m.valor), num: true },
+    ...(vv ? [{ titulo: 'Custo unit.', valor: (m) => Number(m.custo_unitario), texto: (m) => moeda(m.custo_unitario), num: true }, { titulo: 'Valor', valor: (m) => Number(m.valor), texto: (m) => moeda(m.valor), num: true }] : []),
     { titulo: 'Saldo após', valor: (m) => Number(m.saldo_apos), num: true }, { titulo: 'Usuário', valor: (m) => dados.mapa.perfil.get(m.usuario_id)?.nome },
     { titulo: 'Referência', valor: ref }, { titulo: 'Destino', valor: (m) => m.destino }, { titulo: 'Motivo', valor: (m) => MOTIVOS_INVENTARIO[m.motivo] || m.motivo },
     { titulo: 'Observação', valor: (m) => m.observacao, largura: 45 }];
@@ -107,7 +108,7 @@ export function TelaMovimentos() {
       { chave: 'quantidade', titulo: 'Quantidade', num: true, valor: (m) => (loc ? qLocal(m) : Number(m.quantidade)), render: (m) => { const q = loc || ehTransf(m) ? qLocal(m) : Number(m.quantidade);
         return html`<b class=${ehTransf(m) ? 'texto-azul' : q < 0 ? 'texto-vermelho' : 'texto-verde'}>${q > 0 ? '+' : ''}${qtd(q)}</b> ${p(m)?.unidade_estoque}${ehTransf(m) && !loc ? html`<br /><small class="texto-cinza">no local</small>` : ''}`; } },
       { chave: 'local', titulo: 'Local', valor: (m) => nomeLocal(dados, m.local_id), render: (m) => (m.local_id ? html`${nomeLocal(dados, m.local_id)}${m.etapa ? html`<br /><small>${ETAPAS_TRANSF[m.etapa] || m.etapa}</small>` : ''}` : '–') },
-      { chave: 'valor', titulo: 'Valor', num: true, render: (m) => (ehTransf(m) ? html`<span class="texto-cinza">–</span>` : moeda(m.valor)) },
+      vv && { chave: 'valor', titulo: 'Valor', num: true, render: (m) => (ehTransf(m) ? html`<span class="texto-cinza">–</span>` : moeda(m.valor)) },
       { chave: 'saldo_apos', titulo: loc ? 'Saldo no local' : 'Saldo após', num: true, render: (m) => (loc ? (m.saldo_local_apos != null ? qtd(m.saldo_local_apos) : '–') : qtd(m.saldo_apos)) },
       { chave: 'u', titulo: 'Usuário', valor: (m) => dados.mapa.perfil.get(m.usuario_id)?.nome, render: (m) => html`${nomeUsuario(dados.mapa.perfil.get(m.usuario_id))}${m.operador_id ? html`<br /><small>padeiro ${dados.mapa.operador.get(m.operador_id)?.nome}</small>` : ''}` },
       { chave: 'obs', titulo: 'Referência / observação', valor: (m) => m.observacao, render: (m) => html`<small>${[ref(m), m.destino, MOTIVOS_INVENTARIO[m.motivo] || m.motivo, m.observacao].filter(Boolean).join(' · ')}</small>` },
@@ -116,7 +117,7 @@ export function TelaMovimentos() {
 }
 
 function DetalheMovimento({ mov, podeCorrigir, aoFechar }) {
-  const { dados, api } = useApp();
+  const { dados, api, papeis } = useApp();
   const [corr, setCorr] = useState(null);
   const [corrigir, setCorrigir] = useState(false);
   const [original, setOriginal] = useState(null);
@@ -134,7 +135,7 @@ function DetalheMovimento({ mov, podeCorrigir, aoFechar }) {
       ${linha('Produto', `${p?.codigo} · ${p?.descricao}`)}${linha('Tipo', TIPOS_MOV[mov.tipo])}${linha('Data/hora', dataHora(mov.data_hora))}
       ${linha('Quantidade', `${qu(mov.quantidade, p?.unidade_estoque)}`)}
       ${mov.qtd_informada !== null && mov.unidade_informada && mov.unidade_informada !== p?.unidade_estoque && linha('Digitado', `${qu(mov.qtd_informada, mov.unidade_informada)}`)}
-      ${linha('Custo unitário', moeda(mov.custo_unitario))}${linha('Valor', moeda(mov.valor))}${linha('Saldo depois', `${qu(mov.saldo_apos, p?.unidade_estoque)}`)}
+      ${veValores(papeis) && html`${linha('Custo unitário', moeda(mov.custo_unitario))}${linha('Valor', moeda(mov.valor))}`}${linha('Saldo depois', `${qu(mov.saldo_apos, p?.unidade_estoque)}`)}
       ${linha('Local', mov.local_id ? nomeLocal(dados, mov.local_id) : '')}${linha('Etapa', mov.etapa ? ETAPAS_TRANSF[mov.etapa] || mov.etapa : '')}
       ${linha('No local', mov.local_id && mov.qtd_local != null ? qu(mov.qtd_local, p?.unidade_estoque) : '')}${linha('Saldo no local depois', mov.saldo_local_apos != null ? qu(mov.saldo_local_apos, p?.unidade_estoque) : '')}
       ${linha('Padeiro', dados.mapa.operador.get(mov.operador_id)?.nome)}${linha('Transferência', mov.transferencia_id ? `nº ${mov.transferencia_id}` : '')}${linha('Batelada', mov.batelada_id ? `nº ${mov.batelada_id}` : '')}

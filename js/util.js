@@ -133,8 +133,14 @@ export function num(v, casas = 2, min = 0) {
   return Number(v).toLocaleString('pt-BR', { minimumFractionDigits: min, maximumFractionDigits: casas });
 }
 export const qtd = (v) => num(v, 3, 0);
+// Quem tem SÓ os papéis da produção (pesagem e/ou padeiro) não vê custo nem valor em R$ (decisão do dono).
+// veValores: usar nas telas para esconder colunas/cartões. A rede de segurança abaixo troca qualquer R$ por "—".
+export const veValores = (papeis) => (papeis || []).some((p) => !['pesagem', 'padeiro'].includes(p));
+let _ocultarValores = false;
+export const definirOcultarValores = (v) => { _ocultarValores = !!v; };
 export const moeda = (v) =>
-  v === null || v === undefined || Number.isNaN(Number(v)) ? '–'
+  _ocultarValores ? '—'
+    : v === null || v === undefined || Number.isNaN(Number(v)) ? '–'
     : Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 // "1.234,5" -> 1234.5 ; "2,5" -> 2.5 ; "2.5" -> 2.5

@@ -1,7 +1,7 @@
 // Tela inicial: atalhos por perfil, indicadores e alertas
 import { html, useState, useApp, Cartao, Tabela, Etiqueta, Cabecalho } from '../ui.js';
 import { STATUS_ESTOQUE } from '../calc.js';
-import { moeda, num, qtdDupla, numeroPedido, data, hojeISO, diasEntre, somarDias, pl, qu, acessoAmplo, pode, operaLocal, ehGestao } from '../util.js';
+import { veValores, moeda, num, qtdDupla, numeroPedido, data, hojeISO, diasEntre, somarDias, pl, qu, acessoAmplo, pode, operaLocal, ehGestao } from '../util.js';
 import { linhasFinanceiro } from './financeiro.js';
 import { ResumoPrevisao } from './previsao.js';
 import { resumoPedido } from './pedidos.js';
@@ -126,7 +126,8 @@ function InicioOperacao() {
     </section>`}
 
     <div class="cartoes">
-      <${Cartao} titulo="Valor em estoque" valor=${moeda(valorEstoque)} sub=${pl(ativos.length, 'item ativo', 'itens ativos')} aoClicar=${() => ir('estoque')} />
+      ${veValores(papeis) ? html`<${Cartao} titulo="Valor em estoque" valor=${moeda(valorEstoque)} sub=${pl(ativos.length, 'item ativo', 'itens ativos')} aoClicar=${() => ir('estoque')} />`
+        : html`<${Cartao} titulo="Itens em estoque" valor=${ativos.length} sub="ativos no cadastro" aoClicar=${() => ir('estoque')} />`}
       ${!naLista('alerta') && html`<${Cartao} titulo="Zerados ou críticos" valor=${conta('zerado') + conta('critico')} cor=${conta('zerado') + conta('critico') ? 'c-vermelho' : ''}
         sub=${conta('zerado') + conta('critico') ? `${conta('zerado')} zerados · ${conta('critico')} abaixo da segurança` : 'nenhum item em falta'} aoClicar=${() => ir('estoque', { status: 'alerta' })} />`}
       <${Cartao} titulo="Para comprar" valor=${conta('comprar')} cor=${conta('comprar') ? 'c-laranja' : ''} sub="no ponto de pedido" aoClicar=${() => ir('estoque', { status: 'comprar' })} />

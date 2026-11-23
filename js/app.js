@@ -3,7 +3,7 @@
 // =====================================================================
 import { html, render, useState, useEffect, useRef, Ctx, Avisos, HostConfirmacao, avisar, Carregando, Modal, Campo, haEdicao, confirmarDescarte, protegido } from './ui.js';
 import { api } from './api.js';
-import { PAPEIS, pode, porId, mensagemErro, papeisTexto, operaLocal, pl } from './util.js';
+import { PAPEIS, pode, porId, mensagemErro, papeisTexto, operaLocal, pl, veValores, definirOcultarValores } from './util.js';
 import { indicadores } from './calc.js';
 import { Icone } from './icones.js';
 import { MarcaArtas } from './marca.js';
@@ -82,8 +82,8 @@ const MENU = [
   { id: 'historico-producao', titulo: 'Histórico da produção', papeis: ['admin', 'engenharia', 'gestor_producao', 'diretoria'], tela: TelaHistoricoProducao, aoVivo: true },
   { id: 'saidas-producao', titulo: 'Saídas da produção', papeis: ['admin', 'engenharia', 'pesagem', 'almoxarifado', 'diretoria', 'gestor_producao'], tela: TelaSaidasProducao },
   { grupo: 'Estoque' },
-  { id: 'estoque-local', titulo: 'Estoque por local', papeis: [...TODOS, 'padeiro'], tela: TelaEstoqueLocal, aoVivo: true },
-  { id: 'transferencias', titulo: 'Transferências', papeis: ['admin', 'almoxarifado', 'recebimento', 'pesagem', 'engenharia', 'diretoria', 'padeiro', 'gestor_producao'], tela: TelaTransferencias, aoVivo: true },
+  { id: 'estoque-local', titulo: 'Estoque por local', papeis: TODOS, tela: TelaEstoqueLocal, aoVivo: true },
+  { id: 'transferencias', titulo: 'Transferências', papeis: ['admin', 'almoxarifado', 'recebimento', 'pesagem', 'engenharia', 'diretoria', 'gestor_producao'], tela: TelaTransferencias, aoVivo: true },
   { id: 'requisicoes', titulo: 'Requisições e consumo', papeis: ['admin', 'engenharia', 'almoxarifado', 'recebimento', 'diretoria', 'gestor_producao'], tela: TelaRequisicoes, aoVivo: true },
   { id: 'receber', titulo: 'Receber mercadoria', papeis: ['admin', 'almoxarifado', 'recebimento'], tela: TelaReceber },
   { id: 'saidas', titulo: 'Saídas', papeis: ['admin', 'pesagem', 'almoxarifado', 'recebimento'], tela: TelaSaidas },
@@ -588,6 +588,7 @@ function App() {
   const real = usuario;                       // quem está logado (é quem fica registrado)
   const atual = visao || usuario;             // de quem são as telas mostradas
   const papeis = atual.papeis || [];
+  definirOcultarValores(!veValores(papeis));   // pesagem/padeiro: nenhum R$ na tela
   const visiveis = MENU.filter((m) => !m.papeis || m.papeis.some((x) => papeis.includes(x)))
     .filter((m, i, l) => !m.grupo || (l[i + 1] && !l[i + 1].grupo));   // esconde grupo vazio
   const padrao = papeis.length === 1 && papeis[0] === 'padeiro' ? visiveis.find((m) => m.id === 'maceiras') : null;

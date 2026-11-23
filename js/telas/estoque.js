@@ -1,7 +1,7 @@
 // Posição de estoque: saldo, valor, consumo médio, cobertura, mínimos, sugestão de compra
 import { html, useState, useMemo, useEffect, useApp, Modal, Busca, Etiqueta, Cabecalho, Tabela, avisar, Filtros } from '../ui.js';
 import { STATUS_ESTOQUE } from '../calc.js';
-import { CATEGORIAS, qtd, num, moeda, contem, qtdDupla, dataHora, hojeISO, mensagemErro, qu, plural, pl } from '../util.js';
+import { veValores, CATEGORIAS, qtd, num, moeda, contem, qtdDupla, dataHora, hojeISO, mensagemErro, qu, plural, pl } from '../util.js';
 import { pdfTabela } from '../export.js';
 import { Exportar } from '../exportar.js';
 import { Icone } from '../icones.js';
@@ -9,7 +9,8 @@ import { Icone } from '../icones.js';
 const v = (x, c = 2) => (x === null || x === undefined ? '–' : num(x, c));
 
 export function TelaEstoque() {
-  const { dados, estadoRota, setEstadoRota, ir } = useApp();
+  const { dados, estadoRota, setEstadoRota, ir, papeis } = useApp();
+  const vv = veValores(papeis);   // pesagem/padeiro: sem custo nem valor
   const [cats, setCats] = useState(() => new Set(estadoRota?.categoria ? [estadoRota.categoria] : Object.keys(CATEGORIAS)));
   const [status, setStatus] = useState(estadoRota?.status || '');
   const [busca, setBusca] = useState('');
@@ -52,8 +53,8 @@ export function TelaEstoque() {
     { chave: 'saldo_compra', titulo: 'Saldo (embalagem do fornecedor)', num: true, render: (p) => (p.unidade_compra ? html`${num(p.saldo_compra, 2)} <small>${plural(p.unidade_compra, p.saldo_compra)}</small>
         <br /><small class="mudo">1 ${p.unidade_compra} = ${qu(Number(p.fator_compra), p.unidade_estoque)}</small>` : '–'),
       exp: (p) => (p.unidade_compra ? Math.round(p.saldo_compra * 100) / 100 : ''), txt: (p) => (p.unidade_compra ? `${qu(p.saldo_compra, p.unidade_compra, 2)} (1 = ${qu(Number(p.fator_compra), p.unidade_estoque)})` : '') },
-    completo && { chave: 'custo_medio', titulo: 'Custo médio', num: true, render: (p) => moeda(p.custo_medio), exp: (p) => p.custo_medio, txt: (p) => moeda(p.custo_medio) },
-    { chave: 'valor', titulo: 'Valor total', num: true, render: (p) => moeda(p.valor), exp: (p) => Math.round(p.valor * 100) / 100, txt: (p) => moeda(p.valor) },
+    vv && completo && { chave: 'custo_medio', titulo: 'Custo médio', num: true, render: (p) => moeda(p.custo_medio), exp: (p) => p.custo_medio, txt: (p) => moeda(p.custo_medio) },
+    vv && { chave: 'valor', titulo: 'Valor total', num: true, render: (p) => moeda(p.valor), exp: (p) => Math.round(p.valor * 100) / 100, txt: (p) => moeda(p.valor) },
     completo && { chave: 'media_dia', titulo: 'Consumo/dia', num: true, render: (p) => v(p.media_dia), exp: (p) => p.media_dia, txt: (p) => v(p.media_dia) },
     completo && { chave: 'media_semana', titulo: 'Consumo/semana', num: true, render: (p) => v(p.media_semana, 1), exp: (p) => p.media_semana, txt: (p) => v(p.media_semana, 1) },
     completo && { chave: 'media_mes', titulo: 'Consumo/mês', num: true, render: (p) => v(p.media_mes, 1), exp: (p) => p.media_mes, txt: (p) => v(p.media_mes, 1) },
@@ -72,8 +73,8 @@ export function TelaEstoque() {
     ['Código', (p) => p.codigo], ['Código ERP', (p) => p.codigo_erp], ['Descrição', (p) => p.descricao], ['Categoria', (p) => CATEGORIAS[p.categoria]], ['Grupo', (p) => p.grupo], ['Classificação', (p) => p.classificacao],
     ['Marca', (p) => p.marca], ['Unid. estoque', (p) => p.unidade_estoque],
     ['Saldo (unid. padrão)', (p) => p.saldo], ['Embalagem do fornecedor', (p) => p.unidade_compra], ['Conteúdo da embalagem', (p) => (p.unidade_compra ? Number(p.fator_compra) : '')],
-    ['Saldo (embalagens)', (p) => (p.unidade_compra ? p.saldo_compra : '')], ['Custo médio', (p) => p.custo_medio],
-    ['Valor total', (p) => Math.round(p.valor * 100) / 100], ['Consumo/dia', (p) => p.media_dia], ['Consumo/semana', (p) => p.media_semana], ['Consumo/mês', (p) => p.media_mes],
+    ['Saldo (embalagens)', (p) => (p.unidade_compra ? p.saldo_compra : '')], ...(vv ? [['Custo médio', (p) => p.custo_medio],
+    ['Valor total', (p) => Math.round(p.valor * 100) / 100]] : []), ['Consumo/dia', (p) => p.media_dia], ['Consumo/semana', (p) => p.media_semana], ['Consumo/mês', (p) => p.media_mes],
     ['Desvio padrão/dia', (p) => p.desvio_dia], ['Dias de histórico', (p) => p.dias_historico], ['Cobertura (dias)', (p) => p.cobertura], ['Prazo de entrega (dias)', (p) => p.prazo],
     ['Origem do prazo', (p) => p.fonte_prazo], ['Estoque de segurança', (p) => p.estoque_seguranca], ['Mín. definido', (p) => p.min_definido], ['Mín. calculado', (p) => p.min_calculado],
     ['A receber', (p) => p.a_receber], ['Sugestão (un. compra)', (p) => p.sugestao_compra], ['Situação', (p) => STATUS_ESTOQUE[p.status].rotulo],
@@ -81,7 +82,7 @@ export function TelaEstoque() {
   const r3 = (x) => Math.round(x * 1000) / 1000;
   const colsGrupo = [{ titulo: 'Grupo', valor: (g) => g.grupo }, { titulo: 'Classificação', valor: (g) => g.classificacao }, { titulo: 'Produtos / marcas', valor: (g) => g.itens.map((p) => p.marca || p.codigo).join(', '), largura: 34 },
     { titulo: 'Saldo total', valor: (g) => r3(g.saldo), texto: (g) => qu(g.saldo, g.unidade), num: true }, { titulo: 'Unid.', valor: (g) => g.unidade },
-    { titulo: 'Valor', valor: (g) => Math.round(g.valor * 100) / 100, texto: (g) => moeda(g.valor), num: true }, { titulo: 'Consumo/dia', valor: (g) => r3(g.media), num: true },
+    ...(vv ? [{ titulo: 'Valor', valor: (g) => Math.round(g.valor * 100) / 100, texto: (g) => moeda(g.valor), num: true }] : []), { titulo: 'Consumo/dia', valor: (g) => r3(g.media), num: true },
     { titulo: 'Cobertura (dias)', valor: (g) => (g.cobertura === null ? '' : Math.round(g.cobertura * 10) / 10), num: true }, { titulo: 'A receber', valor: (g) => r3(g.receber), num: true },
     { titulo: 'Pior situação', valor: (g) => STATUS_ESTOQUE[g.statusPior].rotulo }];
   const pdfEstoque = (prm) => { const iValor = colsExp.findIndex((c) => c.titulo === 'Valor total');
@@ -119,7 +120,7 @@ export function TelaEstoque() {
           { chave: 'classificacao', titulo: 'Classificação', render: (g) => (g.classificacao ? html`<${Etiqueta} cor="azul">${g.classificacao}</${Etiqueta}>` : '–') },
           { chave: 'n', titulo: 'Produtos / marcas', valor: (g) => g.itens.length, render: (g) => html`${pl(g.itens.length, 'produto', 'produtos')}<br /><small>${g.itens.map((p) => p.marca || p.codigo).join(', ')}</small>` },
           { chave: 'saldo', titulo: 'Saldo total', num: true, render: (g) => html`<b>${qu(g.saldo, g.unidade)}</b>` },
-          { chave: 'valor', titulo: 'Valor', num: true, render: (g) => moeda(g.valor) },
+          vv && { chave: 'valor', titulo: 'Valor', num: true, render: (g) => moeda(g.valor) },
           { chave: 'media', titulo: 'Consumo/dia', num: true, render: (g) => v(g.media) },
           { chave: 'cobertura', titulo: 'Cobertura (dias)', num: true, valor: (g) => g.cobertura ?? 99999, render: (g) => (g.cobertura === null ? '–' : num(g.cobertura, 1)) },
           { chave: 'receber', titulo: 'A receber', num: true, render: (g) => (g.receber ? qu(g.receber, g.unidade, 1) : '–') },

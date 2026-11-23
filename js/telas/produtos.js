@@ -1,6 +1,6 @@
 // Cadastro de produtos (matérias-primas, embalagens e outros)
 import { html, useState, useMemo, useApp, Tabela, Modal, Campo, Numero, Escolher, Busca, Etiqueta, Cabecalho, useAcao, confirmar, n, Filtros } from '../ui.js';
-import { CATEGORIAS, CATEGORIAS_CADASTRO, UNIDADES_ESTOQUE, UNIDADES_COMPRA, contem, qtdDupla, num, moeda, qu, pl, hojeISO } from '../util.js';
+import { veValores, CATEGORIAS, CATEGORIAS_CADASTRO, UNIDADES_ESTOQUE, UNIDADES_COMPRA, contem, qtdDupla, num, moeda, qu, pl, hojeISO } from '../util.js';
 import { Icone } from '../icones.js';
 import { UltimaAlteracao, HistoricoAuditoria } from '../historico.js';
 import { Exportar } from '../exportar.js';
@@ -62,7 +62,7 @@ export function TelaProdutos() {
 }
 
 function FormProduto({ produto, aoFechar, somenteLeitura }) {
-  const { dados, recarregar, api } = useApp();
+  const { dados, recarregar, api, papeis } = useApp();
   const [f, setF] = useState(() => ({
     codigo: produto.codigo || '', codigo_erp: produto.codigo_erp || '', descricao: produto.descricao || '',
     categoria: produto.categoria || 'materia_prima', grupo: produto.grupo || '', classificacao: produto.classificacao || '', marca: produto.marca || '',
@@ -175,7 +175,7 @@ function FormProduto({ produto, aoFechar, somenteLeitura }) {
       </div>
       <${Campo} rotulo="Observação" classe="larga"><textarea class="entrada" rows="2" value=${f.observacao} onInput=${set('observacao')}></textarea></${Campo}>
     </fieldset>
-    ${produto.id && html`<p class="nota">Saldo atual: <b>${qtdDupla(produto, produto.saldo)}</b> · Custo médio: <b>${moeda(produto.custo_medio)}/${produto.unidade_estoque}</b>.
+    ${produto.id && html`<p class="nota">Saldo atual: <b>${qtdDupla(produto, produto.saldo)}</b> ${veValores(papeis) && html`· Custo médio: <b>${moeda(produto.custo_medio)}/${produto.unidade_estoque}</b>`}.
       Saldo e custo só mudam por movimentações (entrada, saída, inventário, correção).</p>`}
     ${produto.id && html`<${UltimaAlteracao} reg=${produto} /><${HistoricoAuditoria} tabela="produtos" id=${produto.id} />`}
   </${Modal}>`;

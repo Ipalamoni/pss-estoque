@@ -330,7 +330,8 @@ const Seta = () => html`<svg width="18" height="18" viewBox="0 0 24 24" fill="no
 
 // ------------------------------ Tabela -------------------------------
 // colunas: [{ chave, titulo, valor:(l)=>valor p/ ordenar, render:(l)=>conteúdo, num:true, classe }]
-export function Tabela({ colunas, linhas, aoClicar, vazio, rodape, ordemInicial, chave = 'id', classeLinha, max, aoVerTodos }) {
+export function Tabela({ colunas: colunasBrutas, linhas, aoClicar, vazio, rodape, ordemInicial, chave = 'id', classeLinha, max, aoVerTodos }) {
+  const colunas = colunasBrutas.filter(Boolean);   // coluna escondida (ex.: valores para pesagem) chega como false
   const [ord, setOrd] = useState(ordemInicial || null);
   const lista = useMemo(() => {
     if (!ord) return linhas;
