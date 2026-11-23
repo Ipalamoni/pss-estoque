@@ -2,7 +2,7 @@
 // FINALIZAR BATELADAS (engenharia, normalmente à tarde, todas juntas)
 // Lista na ordem de produção, rendimento editável na última coluna, finaliza 1, algumas ou todas.
 // =====================================================================
-import { html, AreaProtegida, useState, useEffect, useApp, Cabecalho, Abas, Tabela, Etiqueta, Campo, Numero, Vazio, Carregando, useAcao, confirmar, avisar, n, useFiltroMudou } from '../ui.js';
+import { html, AreaProtegida, useState, useEffect, useApp, Cabecalho, Abas, Tabela, Etiqueta, Campo, Numero, Vazio, Modal, Carregando, useAcao, confirmar, avisar, n, useFiltroMudou } from '../ui.js';
 import { num, dataHora, hojeISO, somarDias, pode, mensagemErro } from '../util.js';
 import { Icone } from '../icones.js';
 import { minutos, tempoTexto, diaDe } from '../producao-util.js';
@@ -54,13 +54,7 @@ function Abertas() {
       bs.length > 1 ? `${bs.length} bateladas finalizadas.` : 'Batelada finalizada.');
     if (r !== null) { setSel(new Set()); await recarregar(true); }
   }
-  async function cancelar(b) {
-    let motivo = '';
-    const ok = await confirmar({ titulo: `Cancelar a batelada nº ${b.id}`, ok: 'Cancelar batelada', perigo: true, cancelar: 'Voltar',
-      mensagem: html`<p>Use só se foi iniciada por engano. A farinha, o fermento e a mistura voltam para o estoque.</p>
-        <${Campo} rotulo="Motivo" obrigatorio><input class="entrada" onInput=${(e) => { motivo = e.target.value; }} /></${Campo}>` });
-    if (ok && (await executar(() => api.rpc('cancelar_batelada', { p_id: b.id, p_motivo: motivo }), 'Batelada cancelada.')) !== null) await recarregar(true);
-  }
+  const [corrigir, setCorrigir] = useState(null);   // batelada aberta para correção
   const macs = [...new Set(lista.map((b) => b.maceira_id))].map((id) => dados.mapa.maceira.get(id)).filter(Boolean);
   return html`<${AreaProtegida} rotulo="rendimento das bateladas">
     ${atrasadas > 0 && html`<div class="alerta-faixa laranja"><${Icone} nome="relogio" tam=${18} /> ${atrasadas} batelada(s) iniciada(s) há mais de ${tempoTexto(prazo)} ainda sem finalizar.</div>`}
@@ -83,17 +77,65 @@ function Abertas() {
           <td><b>${hora(b.iniciada_em)}</b>${diaDe(b.iniciada_em) !== hojeISO() ? html` <small>${dataHora(b.iniciada_em).slice(0, 5)}</small>` : ''}<br /><small class="texto-cinza">há ${tempoTexto(m)}</small></td>
           <td>${dados.mapa.maceira.get(b.maceira_id)?.nome || '–'}</td>
           <td>${dados.mapa.operador.get(b.operador_id)?.nome || '–'}</td>
-          <td><b>${f?.codigo}</b> ${f?.nome}${(b.itens || []).some((i) => i.trocou_de) ? html` <${Etiqueta} cor="roxo" titulo="O padeiro trocou a marca da farinha">trocou farinha</${Etiqueta}>` : ''}</td>
+          <td><b>${f?.codigo}</b> ${f?.nome}${(b.itens || []).some((i) => i.trocou_de) ? html` <${Etiqueta} cor="roxo" titulo="O padeiro trocou a marca da farinha">trocou farinha</${Etiqueta}>` : ''}${b.fora_da_ordem ? html` <${Etiqueta} cor="laranja" titulo="Iniciada antes da 1ª da fila (o padeiro confirmou que já tinha carregado a masseira)">fora da ordem</${Etiqueta}>` : ''}</td>
           <td class="n">${b.rendimento_padrao != null ? `${num(b.rendimento_padrao, 0)} ${f?.rendimento_unidade || ''}` : '–'}</td>
           <td class="n col-rend">${podeFin ? html`<div class=${'rend-campo' + (alt ? ' alterado' : '')}><${Numero} valor=${rend[b.id] ?? ''} aoMudar=${(v) => setRend({ ...rend, [b.id]: v })} />
               ${alt && html`<small>${(n(rend[b.id]) || 0) > Number(b.rendimento_padrao) ? '+' : ''}${num((n(rend[b.id]) || 0) - Number(b.rendimento_padrao), 0)}</small>`}</div>` : num(b.rendimento_padrao, 0)}</td>
           ${podeFin && html`<td class="acoes-linha"><button class="btn btn-pri btn-peq" disabled=${ocupado} onClick=${() => finalizar([b.id])}>Finalizar</button>
-            <button class="btn-icone" title="Cancelar batelada (iniciada por engano)" disabled=${ocupado} onClick=${() => cancelar(b)}>✕</button></td>`}
+            <button class="btn btn-sec btn-peq" disabled=${ocupado} onClick=${() => setCorrigir(b)}><${Icone} nome="corrigir" tam=${14} /> Corrigir</button></td>`}
         </tr>`; })}</tbody>
       <tfoot><tr>${podeFin && html`<td></td>`}<td colspan="5"><b>${vis.length} batelada(s)</b></td>
         <td class="n">${num(vis.reduce((s, b) => s + Number(b.rendimento_padrao || 0), 0), 0)}</td>
         <td class="n col-rend"><b>${num(vis.reduce((s, b) => s + (n(rend[b.id]) || 0), 0), 0)}</b></td>${podeFin && html`<td></td>`}</tr></tfoot>
-    </table></div>`}</${AreaProtegida}>`;
+    </table></div>`}
+    ${corrigir && html`<${CorrigirBatelada} b=${corrigir} aoFechar=${() => setCorrigir(null)} />`}</${AreaProtegida}>`;
+}
+
+// ------------------------- CORRIGIR BATELADA (engenharia / gestor da produção / admin) -------------------------
+// Nada é apagado: a correção fica registrada (quem, quando, antes → depois e o motivo) e aparece no Histórico.
+const MOTIVOS_CORRECAO = ['Padeiro iniciou por engano', 'Iniciou na masseira errada', 'Iniciou com o nome de outro padeiro', 'Receita errada', 'Outro'];
+export function CorrigirBatelada({ b, aoFechar }) {
+  const { dados, api, recarregar } = useApp();
+  const [tipo, setTipo] = useState(null);         // masseira | padeiro | cancelar
+  const [mac, setMac] = useState(b.maceira_id);
+  const [oper, setOper] = useState(b.operador_id);
+  const [motivo, setMotivo] = useState('');
+  const [outro, setOutro] = useState('');
+  const [ocupado, executar] = useAcao();
+  const f = dados.mapa.ficha.get(b.ficha_id);
+  const textoMotivo = motivo === 'Outro' ? outro.trim() : motivo;
+  async function salvar() {
+    if (!textoMotivo || textoMotivo.length < 3) return avisar('Escolha ou escreva o motivo.', 'erro');
+    let r;
+    if (tipo === 'cancelar') r = await executar(() => api.rpc('cancelar_batelada', { p_id: b.id, p_motivo: textoMotivo }), 'Batelada cancelada. Os ingredientes voltaram para o estoque.');
+    else if (tipo === 'masseira') {
+      if (mac === b.maceira_id) return avisar('Escolha a masseira certa.', 'erro');
+      r = await executar(() => api.rpc('corrigir_batelada', { p: { id: b.id, maceira_id: mac, motivo: textoMotivo } }), 'Masseira corrigida.');
+    } else {
+      if (oper === b.operador_id) return avisar('Escolha o padeiro certo.', 'erro');
+      r = await executar(() => api.rpc('corrigir_batelada', { p: { id: b.id, operador_id: oper, motivo: textoMotivo } }), 'Padeiro corrigido.');
+    }
+    if (r !== null) { await recarregar(true); aoFechar(); }
+  }
+  const OPCOES = [['masseira', 'Trocar a masseira', 'Foi feita em outra masseira'], ['padeiro', 'Trocar o padeiro', 'Foi feita por outro padeiro'],
+    ['cancelar', 'Cancelar a batelada', 'Iniciada por engano: os ingredientes voltam ao estoque']];
+  return html`<${Modal} titulo=${`Corrigir a batelada nº ${b.id}`} aoFechar=${aoFechar}
+    rodape=${tipo && html`<button class="btn btn-sec" onClick=${() => setTipo(null)}>Voltar</button>
+      <button class=${'btn ' + (tipo === 'cancelar' ? 'btn-perigo' : 'btn-pri')} disabled=${ocupado} onClick=${salvar}>${tipo === 'cancelar' ? 'Cancelar batelada' : 'Salvar correção'}</button>`}>
+    <p class="nota"><b>${f?.nome}</b> · ${dados.mapa.maceira.get(b.maceira_id)?.nome || 'sem masseira'} · ${dados.mapa.operador.get(b.operador_id)?.nome || 'sem padeiro'} · iniciada às ${hora(b.iniciada_em)}</p>
+    ${!tipo ? html`<div class="opcoes">${OPCOES.map(([id, t, d]) => html`<button type="button" class="opcao" onClick=${() => { setTipo(id); setMotivo(''); }}>
+        <${Icone} nome=${id === 'cancelar' ? 'aviso' : 'corrigir'} tam=${22} /><span><b>${t}</b><small>${d}</small></span></button>`)}</div>`
+    : html`
+      ${tipo === 'masseira' && html`<${Campo} rotulo="Masseira certa"><select class="entrada" value=${mac} onChange=${(e) => setMac(Number(e.target.value))}>
+        ${dados.maceiras.filter((m) => m.ativa || m.id === b.maceira_id).map((m) => html`<option value=${m.id}>${m.nome}</option>`)}</select></${Campo}>`}
+      ${tipo === 'padeiro' && html`<${Campo} rotulo="Padeiro certo"><select class="entrada" value=${oper} onChange=${(e) => setOper(Number(e.target.value))}>
+        ${dados.operadores.filter((o) => o.ativo || o.id === b.operador_id).map((o) => html`<option value=${o.id}>${o.nome}</option>`)}</select></${Campo}>`}
+      ${tipo === 'cancelar' && html`<div class="alerta">A farinha, o fermento e a mistura voltam para o estoque. A batelada continua no histórico como <b>cancelada</b>.</div>`}
+      <div class="campo"><span class="campo-rotulo">Motivo <b class="obrig">*</b></span>
+        <div class="chips">${MOTIVOS_CORRECAO.map((m) => html`<button type="button" class=${'chip' + (motivo === m ? ' ativo' : '')} aria-pressed=${motivo === m} onClick=${() => setMotivo(m)}>${m}</button>`)}</div></div>
+      ${motivo === 'Outro' && html`<${Campo} rotulo="Escreva o motivo"><input class="entrada" maxlength="300" value=${outro} onInput=${(e) => setOutro(e.target.value)} /></${Campo}>`}
+      <p class="nota">Fica registrado quem corrigiu, quando, o que era antes e o motivo.</p>`}
+  </${Modal}>`;
 }
 
 function Finalizadas() {

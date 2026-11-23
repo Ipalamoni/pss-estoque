@@ -13,6 +13,7 @@ export const PAPEIS = {
   financeiro: 'Financeiro (pedidos e pagamentos)',
   faturamento: 'Faturamento (previsão de produção)',
   padeiro: 'Padeiro (tablet da Produção Masseiras)',
+  gestor_producao: 'Gestor da produção (ordem, masseiras e correções)',
 };
 
 export const CATEGORIAS = {
@@ -90,7 +91,7 @@ export const PERMISSOES = {
   pedido: ['admin', 'comprador'],
   recebimento: ['admin', 'almoxarifado', 'recebimento'],
   saida_receita: ['admin', 'pesagem', 'almoxarifado'],
-  saida_avulsa: ['admin', 'pesagem', 'almoxarifado', 'padeiro', 'engenharia'],
+  saida_avulsa: ['admin', 'pesagem', 'almoxarifado', 'padeiro', 'engenharia', 'gestor_producao'],
   saida_almox: ['admin', 'almoxarifado', 'recebimento'],
   inventario: ['admin', 'almoxarifado', 'recebimento'],
   corrigir: ['admin', 'almoxarifado'],
@@ -100,22 +101,22 @@ export const PERMISSOES = {
   parametros: ['admin'],
   auditoria: ['admin', 'diretoria'],
   importacao: ['admin'],
-  programacao: ['admin', 'engenharia'],
+  programacao: ['admin', 'engenharia', 'gestor_producao'],
   financeiro: ['admin', 'financeiro'],
   data_pagamento: ['admin', 'comprador', 'financeiro'],
-  previsao_producao: ['admin', 'engenharia', 'diretoria', 'financeiro', 'faturamento'],
+  previsao_producao: ['admin', 'engenharia', 'diretoria', 'financeiro', 'faturamento', 'gestor_producao'],
   custos: ['admin', 'diretoria'],
-  requisicao: ['admin', 'engenharia'],
-  producao_config: ['admin', 'engenharia'],
-  batelada: ['admin', 'padeiro', 'engenharia'],
-  finalizar_batelada: ['admin', 'engenharia'],
-  consumo: ['admin', 'engenharia', 'almoxarifado', 'padeiro', 'pesagem'],
+  requisicao: ['admin', 'engenharia', 'gestor_producao'],
+  producao_config: ['admin', 'engenharia', 'gestor_producao'],
+  batelada: ['admin', 'padeiro', 'engenharia', 'gestor_producao'],
+  finalizar_batelada: ['admin', 'engenharia', 'gestor_producao'],
+  consumo: ['admin', 'engenharia', 'almoxarifado', 'padeiro', 'pesagem', 'gestor_producao'],
   locais: ['admin'],
 };
 // o usuário opera este local? (administrador opera todos)
 export const operaLocal = (papeis, local) => (papeis || []).includes('admin') || (local?.papeis || []).some((x) => (papeis || []).includes(x));
 // gestão = vê tudo (estoque de todos os locais, produção, painel)
-export const ehGestao = (papeis) => (papeis || []).some((x) => ['admin', 'diretoria', 'engenharia', 'comprador'].includes(x));
+export const ehGestao = (papeis) => (papeis || []).some((x) => ['admin', 'diretoria', 'engenharia', 'comprador', 'gestor_producao'].includes(x));
 // Papéis que NÃO enxergam estoque/produção (o banco também bloqueia a leitura)
 export const PAPEIS_RESTRITOS = ['financeiro', 'faturamento'];
 export const acessoAmplo = (papeis) => (papeis || []).some((x) => !PAPEIS_RESTRITOS.includes(x));

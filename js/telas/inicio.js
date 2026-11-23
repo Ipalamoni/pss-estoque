@@ -65,22 +65,22 @@ function InicioOperacao() {
   const divPend = (dados.recebimentos || []).filter((r) => r.divergencia && !r.ciente_por);
   const valorPedido = (id) => (mapa.itensPedido.get(id) || []).reduce((s, i) => s + Number(i.valor_total), 0);
 
-  const verProg = papeis.some((x) => ['admin', 'engenharia', 'pesagem', 'diretoria'].includes(x));
+  const verProg = papeis.some((x) => ['admin', 'engenharia', 'pesagem', 'diretoria', 'gestor_producao'].includes(x));
   const meus = new Set(dados.locais.filter((l) => operaLocal(papeis, l)).map((l) => l.id));
   const admin = papeis.includes('admin');
   const nReq = dados.requisicoes.filter((r) => admin || meus.has(r.origem_id)).length;
   const nChegando = dados.transferencias.filter((t) => t.situacao === 'enviada' && (admin || meus.has(t.destino_id))).length;
   const nSeparadas = dados.transferencias.filter((t) => t.situacao === 'separada' && (admin || meus.has(t.origem_id))).length;
-  const gestao = papeis.some((x) => ['admin', 'diretoria', 'engenharia'].includes(x));
+  const gestao = papeis.some((x) => ['admin', 'diretoria', 'engenharia', 'gestor_producao'].includes(x));
   const atalhos = [
     gestao && { t: 'Painel de Produção', i: 'painel-producao', f: () => ir('painel-producao'), destaque: true },
-    papeis.some((x) => ['admin', 'padeiro', 'engenharia'].includes(x)) && { t: 'Produção Masseiras', i: 'maceiras', f: () => ir('maceiras') },
+    papeis.some((x) => ['admin', 'padeiro', 'engenharia', 'gestor_producao'].includes(x)) && { t: 'Produção Masseiras', i: 'maceiras', f: () => ir('maceiras') },
     podeFazer('finalizar_batelada') && { t: 'Finalizar bateladas', i: 'finalizar', f: () => ir('finalizar') },
     nReq > 0 && { t: 'Requisições para atender', i: 'requisicoes', f: () => ir('requisicoes'), n: nReq },
     nChegando > 0 && { t: 'Receber transferências', i: 'transferencias', f: () => ir('transferencias'), n: nChegando },
     nSeparadas > 0 && { t: 'Separadas para enviar', i: 'caminhao', f: () => ir('transferencias'), n: nSeparadas },
     podeFazer('requisicao') && { t: 'Pedir material (requisição)', i: 'requisicoes', f: () => ir('requisicoes') },
-    papeis.some((x) => ['admin', 'diretoria', 'comprador', 'almoxarifado', 'engenharia'].includes(x)) && { t: 'Painel de Estoque e Compras', i: 'painel', f: () => ir('painel') },
+    papeis.some((x) => ['admin', 'diretoria', 'comprador', 'almoxarifado', 'engenharia', 'gestor_producao'].includes(x)) && { t: 'Painel de Estoque e Compras', i: 'painel', f: () => ir('painel') },
     podeFazer('custos') && { t: 'Central de Custos', i: 'custos', f: () => ir('custos') },
     podeFazer('contagem_inicial') && !dados.produtos.some((p) => Number(p.saldo) !== 0) && { t: 'Contagem inicial (saldo)', i: 'contagem', f: () => ir('contagem') },
     podeFazer('previsao_producao') && !gestao && { t: 'Programado × produzido', i: 'previsao', f: () => ir('previsao') },
@@ -91,7 +91,7 @@ function InicioOperacao() {
     podeFazer('saida_almox') && { t: 'Saída almoxarifado', i: 'saidas', f: () => ir('saidas', { aba: 'almox' }) },
     podeFazer('inventario') && { t: 'Inventário', i: 'inventario', f: () => ir('inventario') },
     podeFazer('pedido') && { t: 'Novo pedido de compra', i: 'pedidos', f: () => ir('pedidos', { novo: true }) },
-    papeis.some((x) => ['engenharia', 'pesagem'].includes(x)) && { t: 'Saídas da produção', i: 'saidas-producao', f: () => ir('saidas-producao') },
+    papeis.some((x) => ['engenharia', 'pesagem', 'gestor_producao'].includes(x)) && { t: 'Saídas da produção', i: 'saidas-producao', f: () => ir('saidas-producao') },
     { t: 'Estoque por local', i: 'estoque-local', f: () => ir('estoque-local') },
     { t: 'Posição de estoque', i: 'estoque', f: () => ir('estoque') },
   ].filter(Boolean);

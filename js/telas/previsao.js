@@ -88,7 +88,7 @@ function Progresso({ l }) {
 export function TelaPrevisao() {
   const hoje = hojeISO();
   const { papeis } = useApp();
-  const reduzido = !(papeis || []).some((p) => ['admin', 'engenharia', 'diretoria'].includes(p));   // faturamento/financeiro: só hoje e amanhã
+  const reduzido = !(papeis || []).some((p) => ['admin', 'engenharia', 'diretoria', 'gestor_producao'].includes(p));   // faturamento/financeiro: só hoje e amanhã
   const [per, setPer] = useState('hoje');
   const [de, setDe] = useState(hoje);
   const [ate, setAte] = useState(hoje);

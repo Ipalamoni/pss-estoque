@@ -3,6 +3,7 @@
 // mudar de maceira ou de ordem. Setas para quem usa o dedo. Dá para dividir.
 // =====================================================================
 import { html, useState, useApp, Modal, Campo, Numero, Etiqueta, Carregando, useAcao, avisar, n } from '../ui.js';
+import { hora } from '../producao-util.js';
 import { num, hojeISO } from '../util.js';
 import { Icone } from '../icones.js';
 import { useFluxo, ETAPAS, useEventos, LinhaTempo } from '../producao-util.js';
@@ -13,6 +14,7 @@ export function QuadroMaceiras({ dia, setDia, SeletorDia }) {
   const [arrastando, setArrastando] = useState(null);
   const [sobre, setSobre] = useState(null);
   const [dividir, setDividir] = useState(null);
+  const [recado, setRecado] = useState(null);   // masseira que vai receber o recado
   const [ocupado, executar] = useAcao();
   const fx = new Map((fluxo?.fluxo || []).map((x) => [x.programacao_id, x]));
   const progs = dados.programacoes.filter((p) => p.data === dia && p.situacao === 'ativa' && !p.finalizada_em);
@@ -47,7 +49,11 @@ export function QuadroMaceiras({ dia, setDia, SeletorDia }) {
     ${!fluxo ? html`<${Carregando} />` : html`
     <div class="quadro">${cols.map((m) => { const itens = daCol(m.id); const tot = itens.reduce((s, p) => s + Number(p.quantidade), 0);
       return html`<section class=${'quadro-col' + (m.id ? '' : ' sem')} key=${m.id ?? 'sem'} ...${alvo(m.id, itens.length)}>
-        <header><b>${m.nome}</b><small>${num(tot, 1)} receita(s)${m.capacidade_kg ? ` · ${num(m.capacidade_kg, 0)} kg` : ''}</small></header>
+        <header><b>${m.nome}</b><small>${num(tot, 1)} receita(s)${m.capacidade_kg ? ` · ${num(m.capacidade_kg, 0)} kg` : ''}</small>
+          ${m.id && (() => { const pend = (dados.avisos || []).filter((a) => a.maceira_id === m.id && !a.ciente_em);
+            return html`${pend.length > 0 && html`<span class="qc-aviso" title="O tablet ainda não confirmou que viu"><${Icone} nome="aviso" tam=${14} /> ${pend.length} aviso(s) não visto(s) desde ${hora(pend[0].criado_em)}</span>`}
+              <button type="button" class="btn btn-sec btn-peq qc-recado" onClick=${() => setRecado(m)}><${Icone} nome="aviso" tam=${14} /> Recado para o padeiro</button>`; })()}
+        </header>
         ${itens.map((p, i) => { const f = dados.mapa.ficha.get(p.ficha_id); const fl = fx.get(p.id); const trav = travada(p);
           return html`<div class=${'quadro-cartao' + (sobre === `${m.id}-${i}` ? ' alvo' : '') + (arrastando === p.id ? ' arrastando' : '') + (trav ? ' travado' : '')} key=${p.id}
             draggable=${!trav} onDragStart=${(e) => { e.dataTransfer.setData('text/plain', String(p.id)); setArrastando(p.id); }} onDragEnd=${() => { setArrastando(null); setSobre(null); }}
@@ -68,6 +74,7 @@ export function QuadroMaceiras({ dia, setDia, SeletorDia }) {
         ${!itens.length && html`<div class="quadro-vazio">Solte aqui</div>`}
       </section>`; })}</div>
     <div class="legenda">${ETAPAS.map((e) => html`<span><i style=${`background:${e.cor}`}></i>${e.titulo}</span>`)}</div>`}
+    ${recado && html`<${EnviarRecado} m=${recado} aoFechar=${() => setRecado(null)} />`}
     ${dividir && html`<${Dividir} p=${dividir} fl=${fx.get(dividir.id)} aoFechar=${() => setDividir(null)} />`}`;
 }
 
@@ -90,5 +97,22 @@ function Dividir({ p, fl, aoFechar }) {
       <${Campo} rotulo="Para a masseira"><select class="entrada" value=${mac} onChange=${(e) => setMac(e.target.value ? Number(e.target.value) : '')}>
         <option value="">Sem masseira</option>${dados.maceiras.filter((m) => m.ativa).map((m) => html`<option value=${m.id}>${m.nome}</option>`)}</select></${Campo}>
     </div>
+  </${Modal}>`;
+}
+
+// recado do engenheiro/gestor: aparece no tablet como aviso de mudança (o padeiro confirma com nome + senha)
+function EnviarRecado({ m, aoFechar }) {
+  const { api, recarregar } = useApp();
+  const [txt, setTxt] = useState('');
+  const [ocupado, executar] = useAcao();
+  async function enviar() {
+    if (!txt.trim()) return avisar('Escreva o recado.', 'erro');
+    const r = await executar(() => api.rpc('enviar_recado_producao', { p_maceira: m.id, p_texto: txt.trim() }), 'Recado enviado para o tablet.');
+    if (r !== null) { await recarregar(true); aoFechar(); }
+  }
+  return html`<${Modal} titulo=${`Recado para ${m.nome}`} aoFechar=${aoFechar}
+    rodape=${html`<button class="btn btn-sec" onClick=${aoFechar}>Cancelar</button><button class="btn btn-pri" disabled=${ocupado} onClick=${enviar}>Enviar recado</button>`}>
+    <${Campo} rotulo="Recado" ajuda="Aparece em destaque no tablet. Escreva curto e direto (máx. 300 letras).">
+      <textarea class="entrada" rows="3" maxlength="300" value=${txt} onInput=${(e) => setTxt(e.target.value)} placeholder="Ex.: Limpar a masseira antes do hot dog."></textarea></${Campo}>
   </${Modal}>`;
 }

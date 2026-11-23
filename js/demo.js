@@ -8,7 +8,7 @@
 //    (gerado por ferramentas-dev/montar_demo.py a partir da pasta sql/).
 // =====================================================================
 
-const NOME_BANCO = 'idb://pss-estoque-demo-v2';
+const NOME_BANCO = 'idb://pss-estoque-demo-v3';   // v3: inclui as atualizações do banco v2.6/v2.7
 const CHAVE_SESSAO = 'pss-estoque-demo-v2-sessao';
 let db = null;            // PGlite
 let preparando = null;    // promessa da carga inicial

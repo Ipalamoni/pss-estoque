@@ -59,10 +59,11 @@ const TelaMaceiras = preguicosa(() => import('./telas/maceiras.js'), 'TelaMaceir
 const TelaFinalizar = preguicosa(() => import('./telas/finalizar.js'), 'TelaFinalizar');
 const TelaPainelProducao = preguicosa(() => import('./telas/painel-producao.js'), 'TelaPainelProducao');
 const TelaCadastrosProducao = preguicosa(() => import('./telas/cadastros-producao.js'), 'TelaCadastrosProducao');
+const TelaHistoricoProducao = preguicosa(() => import('./telas/historico-producao.js'), 'TelaHistoricoProducao');
 
 const CFG = window.CONFIG || {};
 const TODOS = Object.keys(PAPEIS).filter((p) => !['financeiro', 'faturamento', 'padeiro'].includes(p));   // financeiro: só pedidos/pagamentos e previsão; faturamento: só previsão; padeiro: só a produção
-const GESTAO = ['admin', 'diretoria', 'engenharia'];
+const GESTAO = ['admin', 'diretoria', 'engenharia', 'gestor_producao'];
 
 // Menu: quem vê cada tela (as gravações são conferidas de novo no banco)
 const MENU = [
@@ -71,17 +72,18 @@ const MENU = [
   { id: 'painel-producao', titulo: 'Painel de Produção', papeis: GESTAO, tela: TelaPainelProducao, aoVivo: true },
   { id: 'custos', titulo: 'Central de Custos', papeis: ['admin', 'diretoria'], tela: TelaCustos },
   { id: 'financeiro', titulo: 'Pedidos a pagar', papeis: ['admin', 'financeiro', 'diretoria'], tela: TelaFinanceiro },
-  { id: 'previsao', titulo: 'Programado × produzido', papeis: ['admin', 'engenharia', 'diretoria', 'financeiro', 'faturamento'], tela: TelaPrevisao, aoVivo: true },
-  { id: 'painel', titulo: 'Painel de Estoque e Compras', papeis: ['admin', 'diretoria', 'comprador', 'almoxarifado', 'engenharia'], tela: TelaPainel },
+  { id: 'previsao', titulo: 'Programado × produzido', papeis: ['admin', 'engenharia', 'diretoria', 'financeiro', 'faturamento', 'gestor_producao'], tela: TelaPrevisao, aoVivo: true },
+  { id: 'painel', titulo: 'Painel de Estoque e Compras', papeis: ['admin', 'diretoria', 'comprador', 'almoxarifado', 'engenharia', 'gestor_producao'], tela: TelaPainel },
   { grupo: 'Produção' },
-  { id: 'maceiras', titulo: 'Produção Masseiras', papeis: ['admin', 'padeiro', 'engenharia', 'diretoria'], tela: TelaMaceiras, aoVivo: true },
-  { id: 'programacao', titulo: 'Programação e pesagem', papeis: ['admin', 'engenharia', 'pesagem', 'diretoria'], tela: TelaProgramacao, aoVivo: true },
-  { id: 'finalizar', titulo: 'Finalizar bateladas', papeis: ['admin', 'engenharia', 'diretoria'], tela: TelaFinalizar, aoVivo: true },
-  { id: 'saidas-producao', titulo: 'Saídas da produção', papeis: ['admin', 'engenharia', 'pesagem', 'almoxarifado', 'diretoria'], tela: TelaSaidasProducao },
+  { id: 'maceiras', titulo: 'Produção Masseiras', papeis: ['admin', 'padeiro', 'engenharia', 'diretoria', 'gestor_producao'], tela: TelaMaceiras, aoVivo: true },
+  { id: 'programacao', titulo: 'Programação e pesagem', papeis: ['admin', 'engenharia', 'pesagem', 'diretoria', 'gestor_producao'], tela: TelaProgramacao, aoVivo: true },
+  { id: 'finalizar', titulo: 'Finalizar bateladas', papeis: ['admin', 'engenharia', 'diretoria', 'gestor_producao'], tela: TelaFinalizar, aoVivo: true },
+  { id: 'historico-producao', titulo: 'Histórico da produção', papeis: ['admin', 'engenharia', 'gestor_producao', 'diretoria'], tela: TelaHistoricoProducao, aoVivo: true },
+  { id: 'saidas-producao', titulo: 'Saídas da produção', papeis: ['admin', 'engenharia', 'pesagem', 'almoxarifado', 'diretoria', 'gestor_producao'], tela: TelaSaidasProducao },
   { grupo: 'Estoque' },
   { id: 'estoque-local', titulo: 'Estoque por local', papeis: [...TODOS, 'padeiro'], tela: TelaEstoqueLocal, aoVivo: true },
-  { id: 'transferencias', titulo: 'Transferências', papeis: ['admin', 'almoxarifado', 'recebimento', 'pesagem', 'engenharia', 'diretoria', 'padeiro'], tela: TelaTransferencias, aoVivo: true },
-  { id: 'requisicoes', titulo: 'Requisições e consumo', papeis: ['admin', 'engenharia', 'almoxarifado', 'recebimento', 'diretoria'], tela: TelaRequisicoes, aoVivo: true },
+  { id: 'transferencias', titulo: 'Transferências', papeis: ['admin', 'almoxarifado', 'recebimento', 'pesagem', 'engenharia', 'diretoria', 'padeiro', 'gestor_producao'], tela: TelaTransferencias, aoVivo: true },
+  { id: 'requisicoes', titulo: 'Requisições e consumo', papeis: ['admin', 'engenharia', 'almoxarifado', 'recebimento', 'diretoria', 'gestor_producao'], tela: TelaRequisicoes, aoVivo: true },
   { id: 'receber', titulo: 'Receber mercadoria', papeis: ['admin', 'almoxarifado', 'recebimento'], tela: TelaReceber },
   { id: 'saidas', titulo: 'Saídas', papeis: ['admin', 'pesagem', 'almoxarifado', 'recebimento'], tela: TelaSaidas },
   { id: 'inventario', titulo: 'Inventário', papeis: ['admin', 'almoxarifado', 'recebimento'], tela: TelaInventario },
@@ -95,7 +97,7 @@ const MENU = [
   { id: 'produtos', titulo: 'Produtos', papeis: TODOS, tela: TelaProdutos },
   { id: 'fornecedores', titulo: 'Fornecedores', papeis: ['admin', 'comprador', 'almoxarifado', 'recebimento', 'diretoria'], tela: TelaFornecedores },
   { id: 'fichas', titulo: 'Fichas técnicas', papeis: ['admin', 'engenharia', 'pesagem', 'almoxarifado', 'diretoria'], tela: TelaFichas },
-  { id: 'cadastros-producao', titulo: 'Masseiras e padeiros', papeis: ['admin', 'engenharia', 'diretoria'], tela: TelaCadastrosProducao },
+  { id: 'cadastros-producao', titulo: 'Masseiras e padeiros', papeis: ['admin', 'engenharia', 'diretoria', 'gestor_producao'], tela: TelaCadastrosProducao },
   { grupo: 'Administração', papeis: ['admin', 'diretoria'] },
   { id: 'usuarios', titulo: 'Usuários e acessos', papeis: ['admin'], tela: TelaUsuarios },
   { id: 'configuracoes', titulo: 'Configurações e locais', papeis: ['admin'], tela: TelaConfiguracoes },
@@ -105,7 +107,7 @@ const MENU = [
 // OPERACAO: atualização leve (saldos, transferências, requisições, programação)
 // BASE: atualização completa (pedidos, recebimentos, cadastros) — só chegam aqui se a tabela estiver na
 // publicação de tempo real do Supabase; sem isso, a conferência periódica (abaixo) cobre.
-const TABELAS_OPERACAO = ['movimentos', 'estoque_local', 'transferencias', 'requisicoes', 'bateladas', 'programacoes', 'producoes'];
+const TABELAS_OPERACAO = ['movimentos', 'estoque_local', 'transferencias', 'requisicoes', 'bateladas', 'programacoes', 'producoes', 'avisos_producao', 'correcoes_producao'];
 const TABELAS_BASE = ['pedidos', 'pedido_itens', 'recebimentos', 'produtos', 'fornecedores', 'fichas_tecnicas', 'ficha_itens', 'parametros',
   'perfis', 'locais', 'unidades', 'maceiras', 'operadores', 'linhas_producao'];
 const TABELAS_AO_VIVO = [...TABELAS_OPERACAO, ...TABELAS_BASE];
@@ -136,6 +138,8 @@ async function carregarDados(anterior, opcoes = {}) {
     seguro(api.listar('transferencias', { em: { situacao: ['separada', 'enviada'] } })),
     seguro(api.listar('requisicoes', { em: { situacao: ['pendente', 'parcial'] } })),
     Promise.all([api.listar('programacoes', { campoData: 'data', desde }), api.listar('programacoes', { eq: { situacao: 'ativa' }, nulo: ['finalizada_em'] })]).then((x) => unir(...x)),
+    // avisos de mudança na programação ainda não vistos no tablet (últimos 2 dias)
+    seguro(api.listar('avisos_producao', { nulo: ['ciente_em'], campoData: 'criado_em', desde: new Date(Date.now() - 2 * 864e5).toISOString() })),
   ]);
   // DESEMPENHO: a parte da operação começa junto com o resto (antes esperava tudo terminar);
   // a carga completa vai em 2 rodadas paralelas (antes eram 4 em sequência)
@@ -164,7 +168,7 @@ async function carregarDados(anterior, opcoes = {}) {
     base = { parametros, params, fornecedores, fichas, fichaItens, pedidos, pedidoItens, perfis, recebimentos, stats, unidades, locais, linhas, maceiras, operadores,
       statsEm: statsVelhas ? anterior.statsEm : Date.now(), completoEm: Date.now() };
   }
-  const [produtos, estoqueLocal, transferencias, requisicoes, programacoes] = await opP;
+  const [produtos, estoqueLocal, transferencias, requisicoes, programacoes, avisos] = await opP;
   const [transfItens, reqItens] = await Promise.all([
     transferencias.length ? porIds('transferencia_itens', 'transferencia_id', transferencias.map((t) => t.id), seguro) : [],
     requisicoes.length ? porIds('requisicao_itens', 'requisicao_id', requisicoes.map((t) => t.id), seguro) : [],
@@ -180,7 +184,7 @@ async function carregarDados(anterior, opcoes = {}) {
     statsEm: base.statsEm, completoEm: base.completoEm,
     produtos, fornecedores, fichas, fichaItens, pedidos, pedidoItens, perfis, recebimentos, programacoes, parametros, params, stats, ind,
     unidades, locais: [...locais].sort((a, b) => a.ordem - b.ordem || a.id - b.id), estoqueLocal, linhas, maceiras: [...maceiras].sort((a, b) => a.ordem - b.ordem || a.id - b.id), operadores,
-    transferencias, transfItens, requisicoes, reqItens, historicoDesde: desde,
+    transferencias, transfItens, requisicoes, reqItens, avisos: avisos || [], historicoDesde: desde,
     mapa: { produto: porId(produtos), fornecedor: porId(fornecedores), ficha: porId(fichas), perfil: porId(perfis), ind: porId(ind),
       local: porId(locais), unidade: porId(unidades), maceira: porId(maceiras), operador: porId(operadores), linha: porId(linhas),
       itensPedido, recPedido, saldoLocal },
