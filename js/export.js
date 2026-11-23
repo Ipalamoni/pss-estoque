@@ -70,7 +70,7 @@ function rodapes(doc) {
   for (let i = 1; i <= total; i++) {
     doc.setPage(i);
     doc.setFontSize(7.5); doc.setTextColor(120);
-    doc.text(`Gerado em ${dataHora(new Date())} · Compras & Estoque · software de propriedade da Palamoni Consultoria Empresarial`, 10, h - 6);
+    doc.text(`Gerado em ${dataHora(new Date())} · Artas Indústria · software de propriedade da Palamoni Consultoria Empresarial`, 10, h - 6);
     doc.text(`Página ${i} de ${total}`, w - 10, h - 6, { align: 'right' });
   }
 }

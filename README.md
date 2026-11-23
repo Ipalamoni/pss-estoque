@@ -1,4 +1,6 @@
-# Compras & Estoque · Pães São Sebastião
+# Artas Indústria · Pães São Sebastião
+
+**Artas Indústria** é o sistema de compras, estoque e produção (marca em `icons/artas-*.svg` e `js/marca.js`).
 
 Aplicativo de compras e estoque (PWA). Esta publicação está em **modo demonstração**: dados fictícios guardados no próprio aparelho, entrada escolhendo o perfil, sem senha.
 

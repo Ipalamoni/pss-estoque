@@ -6,6 +6,7 @@ import { api } from './api.js';
 import { PAPEIS, pode, porId, mensagemErro, papeisTexto, operaLocal, pl } from './util.js';
 import { indicadores } from './calc.js';
 import { Icone } from './icones.js';
+import { MarcaArtas } from './marca.js';
 
 import { TelaInicio } from './telas/inicio.js';
 
@@ -212,7 +213,7 @@ function Sininho({ dados, papeis, ir }) {
   useEffect(() => {   // aviso do aparelho quando chega algo novo (se a pessoa ativou)
     const n = itens.length;
     if (ant.current !== null && n > ant.current && 'Notification' in window && Notification.permission === 'granted') {
-      try { new Notification('Compras & Estoque PSS', { body: itens[0]?.texto || 'Nova pendência', icon: 'icons/icon-192.png', tag: 'pss-pendencias' }); } catch { /* ignora */ }
+      try { new Notification('Artas Indústria', { body: itens[0]?.texto || 'Nova pendência', icon: 'icons/icon-192.png', tag: 'pss-pendencias' }); } catch { /* ignora */ }
     }
     ant.current = n;
   }, [itens.length]);
@@ -263,7 +264,7 @@ function Login({ aoEntrar }) {
     <div class="login-caixa">
       <div class="login-marca">
         <img src="icons/logo-pss.png" alt="Pães São Sebastião" />
-        <strong>Compras & Estoque</strong>
+        <${MarcaArtas} classe="marca-login" />
       </div>
       ${api.modo === 'demo' ? html`
         <p class="login-demo">Modo demonstração: escolha um perfil para testar. Os dados são fictícios e ficam só neste navegador.</p>
@@ -289,7 +290,7 @@ const ANO = new Date().getFullYear();
 function Assinatura() {
   return html`<div class="assinatura">
     <img src="icons/logo-palamoni.png" alt="Palamoni Consultoria Empresarial" />
-    <p>Compras & Estoque ${window.VERSAO_APP || ''} · licenciado para Pães São Sebastião · © ${ANO} Palamoni Consultoria Empresarial</p>
+    <p>Artas Indústria ${window.VERSAO_APP || ''} · licenciado para Pães São Sebastião · © ${ANO} Palamoni Consultoria Empresarial</p>
   </div>`;
 }
 
@@ -607,7 +608,7 @@ function App() {
       <button class="btn-icone so-celular" aria-label="Abrir menu" onClick=${() => setMenuAberto(!menuAberto)}><${Icone} nome="menu" /></button>
       <a class="marca" href="#inicio" title="Ir para o Início" aria-label="Ir para o Início">
         <img src="icons/logo-pss.png" alt="Pães São Sebastião" />
-        <span class="marca-titulo">Compras & Estoque</span>
+        <span class="marca-sep" aria-hidden="true"></span><${MarcaArtas} classe="marca-sistema" />
       </a>
       <div class="topo-usuario">
         <span class="so-tela"><strong>${atual.nome}</strong><small>${atual.funcao || papeisTexto(papeis)}</small></span>
@@ -663,7 +664,7 @@ function App() {
 // (golpe em que um site falso mostra o sistema "por baixo" para a pessoa clicar sem saber)
 let dentroDeOutroSite = false; try { dentroDeOutroSite = window.self !== window.top; } catch { dentroDeOutroSite = true; }
 if (CFG.MODO === 'supabase' && dentroDeOutroSite) {
-  render(html`<div class="login"><div class="login-caixa"><div class="login-marca"><img src="icons/logo-pss.png" alt="Pães São Sebastião" /><strong>Compras & Estoque</strong></div>
+  render(html`<div class="login"><div class="login-caixa"><div class="login-marca"><img src="icons/logo-pss.png" alt="Pães São Sebastião" /><${MarcaArtas} classe="marca-login" /></div>
     <p>Por segurança, o sistema só funciona no endereço oficial, fora de outros sites.</p>
     <a class="btn btn-pri btn-bloco" href=${location.href} target="_top" rel="noopener noreferrer">Abrir o sistema com segurança</a></div></div>`, document.getElementById('app'));
 } else {

@@ -1,5 +1,5 @@
 /* =====================================================================
-   Compras & Estoque PSS — visual
+   Artas Indústria (licenciado para Pães São Sebastião) — visual
    Cores da marca Pães São Sebastião (tiradas do logo): verde #026E57 e
    laranja #FD9B02. Para mudar o visual, troque as variáveis abaixo.
    ===================================================================== */
@@ -23,6 +23,7 @@
   --laranja: #a85700; --laranja-f: #fff0dc;   /* #a85700: 4,6:1 sobre o fundo laranja-claro */
   --serie-1: #0b5e46; --serie-2: #d17800;      /* gráficos: claro × escuro bem diferentes */
   --foco: #01503f;
+  --marca: #3d3d3a;        /* Artas Indústria: grafite no tema claro */
   --azul: #1f5fa8; --azul-f: #e3eefb;
   --roxo: #6b43a8; --roxo-f: #efe8fa;
   --cinza: #5b6878; --cinza-f: #eceff3;
@@ -368,7 +369,7 @@ fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
   .marca-titulo { font-size: .95rem; padding-left: 8px; }
   .selo-palamoni { height: 32px; }
 }
-@media (max-width: 400px) { .marca-titulo { display: none; } }
+
 @media (max-width: 640px) {
   :root { font-size: 15.5px; }
   h1 { font-size: 1.25rem; }
@@ -992,6 +993,7 @@ html[data-tema="escuro"] {
   --sombra: 0 1px 2px rgba(0,0,0,.35), 0 1px 3px rgba(0,0,0,.25);
   --serie-1: #a7ecd0; --serie-2: #c26d0a;
   --foco: #fda524;
+  --marca: #ffffff;        /* Artas Indústria: branca no tema escuro */
 }
 [data-tema="escuro"] ::placeholder { color: #7c858e; }
 [data-tema="escuro"] .topo { box-shadow: 0 2px 10px rgba(0,0,0,.35); }
@@ -1191,3 +1193,29 @@ html[data-tema="escuro"] {
 .quadro-col header .qc-recado { margin-top: 6px; align-self: flex-start; }
 .qc-aviso { display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; font-size: .78rem; font-weight: 700; color: #7a4100; background: #fff0dc; border-radius: 999px; padding: 2px 8px; }
 [data-tema="escuro"] .qc-aviso { color: #f7b155; background: #3a2d18; }
+
+/* =====================================================================
+   VERSÃO 2.8 — identidade visual ARTAS INDÚSTRIA (símbolo "Silos")
+   Marca vetorial em currentColor: grafite #3D3D3A (claro) / branca (escuro).
+   Completa ("Artas Indústria") em telas ≥ 520 px; compacta ("Artas") abaixo disso.
+   ===================================================================== */
+.artas-marca { display: inline-flex; align-items: center; color: var(--marca); line-height: 0; flex: none; }
+.artas-marca svg { display: block; height: 100%; width: auto; }
+.artas-marca .artas-ind { opacity: .78; }
+.artas-compacta { display: none !important; }
+.marca-sistema { height: 26px; }
+.marca-sep { width: 2px; height: 28px; background: var(--borda); border-radius: 2px; flex: none; }
+.marca-login { height: 40px; margin-top: 2px; }
+.login-marca .marca-login { height: 38px; }
+@media (max-width: 860px) {
+  .marca-sistema { height: 23px; }
+  .marca { gap: 9px; }
+  .marca-sep { height: 24px; }
+}
+@media (max-width: 519px) {
+  .marca-sistema .artas-completa { display: none !important; }
+  .marca-sistema .artas-compacta { display: block !important; }
+  .marca-sistema { height: 22px; }
+}
+@media (max-width: 359px) { .marca-sep { display: none; } .marca-sistema { height: 20px; } }
+@media (max-width: 380px) { .login-marca .marca-login { height: 30px; } }

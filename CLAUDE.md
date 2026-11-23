@@ -1,4 +1,8 @@
-# Compras & Estoque PSS: premissas permanentes de trabalho
+# Artas Indústria (licenciado para Pães São Sebastião): premissas permanentes de trabalho
+
+Identidade visual: marca **Artas Indústria**, símbolo "Silos" (A formado por 3 colunas). Componente `js/marca.js`
+(`MarcaArtas`, `SimboloArtas`), arquivos em `icons/artas-*.svg`, ícones do app em `icons/`. Cor: grafite #3D3D3A no
+tema claro e branco no escuro (`--marca`). O logo do cliente (Pães São Sebastião) continua ao lado da marca.
 
 Valem para TODA alteração neste projeto, sem precisar o dono pedir de novo.
 
