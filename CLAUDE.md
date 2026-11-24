@@ -10,6 +10,10 @@ Valem para TODA alteração neste projeto, sem precisar o dono pedir de novo.
 - A cada mensagem do dono, responder logo no início, em português simples: **se entendeu** e **o que vai fazer agora**.
 - Durante trabalhos longos, mandar avisos curtos de andamento ("terminei X, agora estou em Y").
 - No fim, dizer claramente o que foi feito, o que foi testado, o que ficou pendente e o que depende dele.
+- Sempre que precisar de um TOKEN (ex.: Supabase para aplicar o banco): ANTES de abrir o formulário seguro, mandar o
+  passo a passo completo — caminho nas telas (endereço direto + menus), cada campo, e cada valor a digitar em
+  LINHA/BLOCO SEPARADO para copiar e colar (nome, validade, projeto, permissões). Nunca em bloco único.
+  O token só é colado no formulário seguro, nunca no chat.
 
 ## BACKUP · quando o dono disser "executar backup da versão atual"
 1. Conferir que tudo está commitado e publicado (git status limpo, push feito).
