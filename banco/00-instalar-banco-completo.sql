@@ -3,7 +3,7 @@
 -- Para um projeto NOVO do Supabase (vazio). Rode UMA vez, inteiro:
 --   Supabase › SQL Editor › New query › colar este arquivo › Run
 -- Conteúdo, nesta ordem: estrutura, segurança (RLS), funções, dados iniciais (unidade Matriz,
--- locais, parâmetros), atualizações 001–005, v2.6, v2.7.
+-- locais, parâmetros), atualizações 001–005, v2.6, v2.7, v2.9, v2.10, v2.11, v2.13.
 -- NÃO contém dados do dia a dia (pedidos, estoque…) nem senhas: só a estrutura e as regras.
 -- Gerado automaticamente a partir do código do sistema por ferramentas/gerar_backup.py.
 -- =====================================================================
@@ -4421,3 +4421,1037 @@ select 'Tabelas que o app consegue gravar direto',
  where n.nspname = 'public' and c.relkind = 'r'
    and (has_table_privilege('authenticated', c.oid, 'insert') or has_table_privilege('authenticated', c.oid, 'update')
         or has_table_privilege('authenticated', c.oid, 'delete'));
+
+
+-- =====================================================================
+-- Compras & Estoque PSS · ATUALIZAÇÃO DO BANCO v2.9 · ORDEM DA PESAGEM + AVISOS + "BASE"
+-- (aplicar DEPOIS da v2.7; pode rodar de novo sem problema; não apaga dados)
+--
+--  1. Ordem da PESAGEM (prioridade_pesagem): uma ordem única do dia para a pesagem,
+--     separada da ordem de cada masseira. Só admin, engenharia e gestor da produção mudam.
+--  2. Botão URGENTE: põe a produção em 1º lugar na pesagem E na masseira dela, de uma vez.
+--  3. Avisos melhores: um aviso por mudança (não um por linha), com o que mudou em
+--     destaque e a nova ordem. A pesagem também recebe avisos e confirma com o próprio login.
+--  4. "Mistura" passa a se chamar "Base" (Base – Pão de forma).
+-- =====================================================================
+
+-- ---------------------------------------------------------------------
+-- 1. ORDEM DA PESAGEM
+-- ---------------------------------------------------------------------
+alter table public.programacoes add column if not exists prioridade_pesagem integer;
+alter table public.programacoes drop constraint if exists programacoes_prioridade_pesagem_check;
+alter table public.programacoes add constraint programacoes_prioridade_pesagem_check
+  check (prioridade_pesagem is null or prioridade_pesagem between 1 and 9999);
+create index if not exists programacoes_dia_pesagem on public.programacoes (data, prioridade_pesagem);
+
+-- as que ainda não têm ordem da pesagem: rodadas intercaladas entre as masseiras
+-- (1ª de cada masseira, depois a 2ª de cada uma…)
+with o as (
+  select g.id, row_number() over (partition by g.data order by g.prioridade nulls last, m.ordem nulls last, g.maceira_id nulls last, g.id) n,
+         coalesce((select max(x.prioridade_pesagem) from public.programacoes x where x.data = g.data), 0) base
+    from public.programacoes g left join public.maceiras m on m.id = g.maceira_id
+   where g.prioridade_pesagem is null)
+update public.programacoes p set prioridade_pesagem = least(o.base + o.n, 9999) from o where o.id = p.id;
+
+-- produção nova entra no FIM da fila da pesagem
+create or replace function public._prioridade_pesagem_padrao()
+returns trigger language plpgsql security definer set search_path = public, pg_temp as $$
+begin
+  if new.prioridade_pesagem is null then
+    select least(coalesce(max(prioridade_pesagem), 0) + 1, 9999) into new.prioridade_pesagem
+      from public.programacoes where data = new.data;
+  end if;
+  return new;
+end $$;
+revoke execute on function public._prioridade_pesagem_padrao() from public, anon, authenticated;
+drop trigger if exists prioridade_pesagem on public.programacoes;
+create trigger prioridade_pesagem before insert on public.programacoes for each row execute function public._prioridade_pesagem_padrao();
+
+-- ---------------------------------------------------------------------
+-- 2. AVISOS: setor (masseira ou pesagem), tipo "urgente" e detalhe (nova ordem)
+-- ---------------------------------------------------------------------
+alter table public.avisos_producao add column if not exists setor text not null default 'masseira';
+alter table public.avisos_producao drop constraint if exists avisos_producao_setor_check;
+alter table public.avisos_producao add constraint avisos_producao_setor_check check (setor in ('masseira','pesagem'));
+alter table public.avisos_producao add column if not exists detalhe text;
+alter table public.avisos_producao drop constraint if exists avisos_producao_detalhe_check;
+alter table public.avisos_producao add constraint avisos_producao_detalhe_check check (detalhe is null or length(detalhe) <= 600);
+alter table public.avisos_producao drop constraint if exists avisos_producao_tipo_check;
+alter table public.avisos_producao add constraint avisos_producao_tipo_check
+  check (tipo in ('ordem','masseira','nova','retirada','quantidade','recado','urgente'));
+create index if not exists avisos_producao_pend_setor on public.avisos_producao (setor) where ciente_em is null;
+
+-- "Nova ordem: 1º Pão de forma · 2º Bisnaguinha · …" (fila de uma masseira no dia)
+create or replace function public._texto_ordem_masseira(p_mac bigint, p_data date)
+returns text language sql stable security definer set search_path = public, pg_temp as $$
+  select left('Nova ordem: ' || coalesce(string_agg(s.n || 'º ' || s.nome, ' · ' order by s.n), '–'), 600)
+    from (select row_number() over (order by g.prioridade nulls last, g.id) n, f.nome
+            from public.programacoes g join public.fichas_tecnicas f on f.id = g.ficha_id
+           where g.maceira_id = p_mac and g.data = p_data and g.situacao = 'ativa' and g.finalizada_em is null
+           order by g.prioridade nulls last, g.id limit 8) s
+$$;
+-- fila da PESAGEM no dia (só o que ainda falta pesar)
+create or replace function public._texto_ordem_pesagem(p_data date)
+returns text language sql stable security definer set search_path = public, pg_temp as $$
+  select left('Ordem da pesagem: ' || coalesce(string_agg(s.n || 'º ' || s.nome, ' · ' order by s.n), '–'), 600)
+    from (select row_number() over (order by g.prioridade_pesagem nulls last, g.id) n, f.nome
+            from public.programacoes g join public.fichas_tecnicas f on f.id = g.ficha_id
+           where g.data = p_data and g.situacao = 'ativa' and g.finalizada_em is null
+             and coalesce((select sum(pr.multiplicador) from public.producoes pr where pr.programacao_id = g.id), 0) < g.quantidade - 0.0001
+           order by g.prioridade_pesagem nulls last, g.id limit 8) s
+$$;
+revoke execute on function public._texto_ordem_masseira(bigint, date) from public, anon, authenticated;
+revoke execute on function public._texto_ordem_pesagem(date) from public, anon, authenticated;
+
+-- aviso automático da programação (mesmo de antes, com 3 mudanças):
+--  · mudança de ORDEM feita pelo quadro vira UM aviso por masseira (feito em reordenar_programacao)
+--  · a pesagem também fica sabendo de produção nova ou cancelada no dia
+--  · nomes das receitas em MAIÚSCULAS (leitura rápida no tablet)
+create or replace function public._aviso_programacao()
+returns trigger language plpgsql security definer set search_path = public, pg_temp as $$
+declare v_ficha text; v_mac_old text; v_mac_new text; v_q text; v_lote boolean := coalesce(current_setting('pss.reordenando', true), '') = '1';
+begin
+  if new.data is distinct from public._hoje() then return new; end if;              -- só a produção do dia
+  select upper(nome) into v_ficha from public.fichas_tecnicas where id = new.ficha_id;
+  v_q := trim(to_char(new.quantidade, 'FM999990.##')); v_q := rtrim(v_q, '.');
+  if tg_op = 'INSERT' then
+    if new.situacao = 'ativa' then
+      if new.maceira_id is not null then
+        insert into public.avisos_producao (maceira_id, programacao_id, tipo, texto, detalhe) values (new.maceira_id, new.id, 'nova',
+          format('NOVA produção: %s (%s bateladas), em %sº lugar.', v_ficha, v_q, coalesce(new.prioridade::text, '?')),
+          public._texto_ordem_masseira(new.maceira_id, new.data));
+      end if;
+      insert into public.avisos_producao (setor, programacao_id, tipo, texto, detalhe) values ('pesagem', new.id, 'nova',
+        format('NOVA produção para pesar: %s (%s receitas).', v_ficha, v_q), public._texto_ordem_pesagem(new.data));
+    end if;
+    return new;
+  end if;
+  if new.finalizada_em is not null and old.finalizada_em is null then return new; end if;   -- finalização não é mudança
+  if new.situacao = 'cancelada' and old.situacao is distinct from 'cancelada' then
+    if old.maceira_id is not null then
+      insert into public.avisos_producao (maceira_id, programacao_id, tipo, texto) values (old.maceira_id, new.id, 'retirada',
+        format('CANCELADA: %s não é mais para fazer.', v_ficha));
+    end if;
+    insert into public.avisos_producao (setor, programacao_id, tipo, texto) values ('pesagem', new.id, 'retirada',
+      format('CANCELADA: %s não é mais para pesar.', v_ficha));
+    return new;
+  end if;
+  if new.situacao <> 'ativa' then return new; end if;
+  if new.maceira_id is distinct from old.maceira_id then
+    select nome into v_mac_old from public.maceiras where id = old.maceira_id;
+    select nome into v_mac_new from public.maceiras where id = new.maceira_id;
+    if old.maceira_id is not null then
+      insert into public.avisos_producao (maceira_id, programacao_id, tipo, texto) values (old.maceira_id, new.id, 'masseira',
+        format('SAIU daqui: %s foi para %s.', v_ficha, coalesce(v_mac_new, 'outra masseira')));
+    end if;
+    if new.maceira_id is not null then
+      insert into public.avisos_producao (maceira_id, programacao_id, tipo, texto) values (new.maceira_id, new.id, 'masseira',
+        format('VEIO para cá: %s (%s bateladas), em %sº lugar%s.', v_ficha, v_q, coalesce(new.prioridade::text, '?'),
+               case when v_mac_old is not null then ', vindo da ' || v_mac_old else '' end));
+    end if;
+    return new;
+  end if;
+  if not v_lote and new.maceira_id is not null and new.prioridade is distinct from old.prioridade then
+    insert into public.avisos_producao (maceira_id, programacao_id, tipo, texto, detalhe) values (new.maceira_id, new.id, 'ordem',
+      case when new.prioridade = 1 then format('%s passou para o 1º lugar: PRIORIDADE MÁXIMA.', v_ficha)
+           else format('%s passou de %sº para %sº lugar.', v_ficha, coalesce(old.prioridade::text, '?'), coalesce(new.prioridade::text, '?')) end,
+      public._texto_ordem_masseira(new.maceira_id, new.data));
+  end if;
+  if new.maceira_id is not null and new.quantidade is distinct from old.quantidade then
+    insert into public.avisos_producao (maceira_id, programacao_id, tipo, texto) values (new.maceira_id, new.id, 'quantidade',
+      format('QUANTIDADE mudou: %s agora são %s bateladas (antes %s).', v_ficha, v_q, rtrim(trim(to_char(old.quantidade, 'FM999990.##')), '.')));
+  end if;
+  return new;
+end $$;
+revoke execute on function public._aviso_programacao() from public, anon, authenticated;
+
+-- Um aviso por fila que mudou. Quem "mudou de verdade" = a única que subiu (ou a única que desceu);
+-- as outras só andaram uma casa por consequência.
+-- p_antes: {"<id>": {"m": masseira antes, "p": posição antes}}; p_setor: 'masseira' ou 'pesagem'
+create or replace function public._avisar_nova_ordem(p_antes jsonb, p_setor text)
+returns integer language plpgsql security definer set search_path = public, pg_temp as $$
+declare v_hoje date := public._hoje(); r record; v_n int := 0; v_txt text; v_prim bigint;
+begin
+  for r in
+    select g.maceira_id mac from public.programacoes g
+     where p_setor = 'masseira' and g.id in (select k::bigint from jsonb_object_keys(p_antes) k)
+       and g.data = v_hoje and g.maceira_id is not null and g.situacao = 'ativa'
+    union
+    select null::bigint where p_setor = 'pesagem'
+  loop
+    with mud as (
+      select g.id, upper(f.nome) nome,
+             case when p_setor = 'pesagem' then g.prioridade_pesagem else g.prioridade end nova,
+             (p_antes -> g.id::text ->> 'p')::int velha
+        from public.programacoes g join public.fichas_tecnicas f on f.id = g.ficha_id
+       where g.id in (select k::bigint from jsonb_object_keys(p_antes) k) and g.data = v_hoje and g.situacao = 'ativa'
+         and (p_setor = 'pesagem' or (g.maceira_id = r.mac and (p_antes -> g.id::text ->> 'm')::bigint is not distinct from r.mac))),
+    m2 as (select * from mud where nova is distinct from velha and velha is not null),
+    esc as (
+      select * from m2 where nova < velha and (select count(*) from m2 where nova < velha) = 1
+      union all
+      select * from m2 where nova > velha and (select count(*) from m2 where nova < velha) <> 1 and (select count(*) from m2 where nova > velha) = 1
+      union all
+      select * from m2 where nova < velha and (select count(*) from m2 where nova < velha) > 1 and (select count(*) from m2 where nova > velha) <> 1)
+    select left(string_agg(case when nova = 1 then nome || ' passou para o 1º lugar: PRIORIDADE MÁXIMA.'
+                                else nome || ' passou de ' || velha || 'º para ' || nova || 'º lugar.' end, ' ' order by nova), 500),
+           min(id)
+      into v_txt, v_prim from esc;
+    if v_txt is not null then
+      if p_setor = 'pesagem' then
+        insert into public.avisos_producao (setor, programacao_id, tipo, texto, detalhe)
+        values ('pesagem', v_prim, 'ordem', v_txt, public._texto_ordem_pesagem(v_hoje));
+      else
+        insert into public.avisos_producao (maceira_id, programacao_id, tipo, texto, detalhe)
+        values (r.mac, v_prim, 'ordem', v_txt, public._texto_ordem_masseira(r.mac, v_hoje));
+      end if;
+      v_n := v_n + 1;
+    end if;
+  end loop;
+  return v_n;
+end $$;
+revoke execute on function public._avisar_nova_ordem(jsonb, text) from public, anon, authenticated;
+
+-- quadro das masseiras: mesma função de antes + UM aviso por masseira
+create or replace function public.reordenar_programacao(p jsonb)
+returns integer language plpgsql security definer set search_path = public, pg_temp as $$
+declare itj jsonb; v_n int := 0; v_antes jsonb;
+begin
+  perform public._exigir('programacao');
+  if jsonb_typeof(coalesce(p, 'null'::jsonb)) <> 'array' then raise exception 'Lista inválida.'; end if;
+  if jsonb_array_length(p) > 500 then raise exception 'Lista grande demais.'; end if;
+  select coalesce(jsonb_object_agg(g.id::text, jsonb_build_object('m', g.maceira_id, 'p', g.prioridade)), '{}'::jsonb) into v_antes
+    from public.programacoes g where g.id in (select (x->>'id')::bigint from jsonb_array_elements(p) x);
+  perform set_config('pss.reordenando', '1', true);
+  for itj in select * from jsonb_array_elements(p) loop
+    if (itj->>'prioridade') is not null and (itj->>'prioridade')::int not between 1 and 9999 then raise exception 'Posição inválida.'; end if;
+    update public.programacoes set maceira_id = (itj->>'maceira_id')::bigint, prioridade = coalesce((itj->>'prioridade')::int, prioridade),
+           operador_id = case when itj ? 'operador_id' then (itj->>'operador_id')::bigint else operador_id end,
+           atualizado_em = now(), atualizado_por = auth.uid()
+     where id = (itj->>'id')::bigint and situacao = 'ativa' and finalizada_em is null;
+    v_n := v_n + found::int;
+  end loop;
+  perform set_config('pss.reordenando', '', true);
+  perform public._avisar_nova_ordem(v_antes, 'masseira');
+  return v_n;
+end $$;
+revoke execute on function public.reordenar_programacao(jsonb) from public, anon;
+grant execute on function public.reordenar_programacao(jsonb) to authenticated;
+
+-- ordem da pesagem: recebe os ids na ordem desejada ([id1, id2, …] → 1º, 2º, …)
+create or replace function public.reordenar_pesagem(p jsonb)
+returns integer language plpgsql security definer set search_path = public, pg_temp as $$
+declare v_n int := 0; v_antes jsonb; r record;
+begin
+  perform public._exigir('programacao');
+  if jsonb_typeof(coalesce(p, 'null'::jsonb)) <> 'array' then raise exception 'Lista inválida.'; end if;
+  if jsonb_array_length(p) > 500 then raise exception 'Lista grande demais.'; end if;
+  if exists (select 1 from jsonb_array_elements(p) x where jsonb_typeof(x) <> 'number') then raise exception 'Lista inválida.'; end if;
+  select coalesce(jsonb_object_agg(g.id::text, jsonb_build_object('p', g.prioridade_pesagem)), '{}'::jsonb) into v_antes
+    from public.programacoes g where g.id in (select (x #>> '{}')::bigint from jsonb_array_elements(p) x);
+  for r in select (x #>> '{}')::bigint id, min(o) pos from jsonb_array_elements(p) with ordinality t(x, o) group by 1 order by 2 loop
+    v_n := v_n + 1;
+    update public.programacoes set prioridade_pesagem = v_n, atualizado_em = now(), atualizado_por = auth.uid()
+     where id = r.id and situacao = 'ativa' and finalizada_em is null and prioridade_pesagem is distinct from v_n;
+  end loop;
+  perform public._avisar_nova_ordem(v_antes, 'pesagem');
+  return v_n;
+end $$;
+revoke execute on function public.reordenar_pesagem(jsonb) from public, anon;
+grant execute on function public.reordenar_pesagem(jsonb) to authenticated;
+
+-- URGENTE: 1º lugar na pesagem E na masseira dela, com aviso para os dois setores
+create or replace function public.programacao_urgente(p_id bigint)
+returns boolean language plpgsql security definer set search_path = public, pg_temp as $$
+declare v public.programacoes; v_nome text;
+begin
+  perform public._exigir('programacao');
+  select * into v from public.programacoes where id = p_id for update;
+  if not found or v.situacao <> 'ativa' or v.finalizada_em is not null then raise exception 'Esta produção não está aberta.'; end if;
+  select upper(nome) into v_nome from public.fichas_tecnicas where id = v.ficha_id;
+  perform set_config('pss.reordenando', '1', true);
+  with o as (select g.id, row_number() over (order by case when g.id = p_id then 0 else 1 end, g.prioridade_pesagem nulls last, g.id) n
+               from public.programacoes g where g.data = v.data and g.situacao = 'ativa' and g.finalizada_em is null)
+  update public.programacoes g set prioridade_pesagem = least(o.n, 9999), atualizado_em = now(), atualizado_por = auth.uid()
+    from o where o.id = g.id and g.prioridade_pesagem is distinct from least(o.n, 9999);
+  if v.maceira_id is not null then
+    with o as (select g.id, row_number() over (order by case when g.id = p_id then 0 else 1 end, g.prioridade nulls last, g.id) n
+                 from public.programacoes g where g.data = v.data and g.maceira_id = v.maceira_id and g.situacao = 'ativa' and g.finalizada_em is null)
+    update public.programacoes g set prioridade = least(o.n, 9999), atualizado_em = now(), atualizado_por = auth.uid()
+      from o where o.id = g.id and g.prioridade is distinct from least(o.n, 9999);
+  end if;
+  perform set_config('pss.reordenando', '', true);
+  if v.data = public._hoje() then
+    if v.maceira_id is not null then
+      insert into public.avisos_producao (maceira_id, programacao_id, tipo, texto, detalhe) values (v.maceira_id, p_id, 'urgente',
+        format('URGENTE: %s passou para o 1º lugar. PRIORIDADE MÁXIMA.', v_nome), public._texto_ordem_masseira(v.maceira_id, v.data));
+    end if;
+    insert into public.avisos_producao (setor, programacao_id, tipo, texto, detalhe) values ('pesagem', p_id, 'urgente',
+      format('URGENTE: pese %s primeiro. PRIORIDADE MÁXIMA.', v_nome), public._texto_ordem_pesagem(v.data));
+  end if;
+  return true;
+end $$;
+revoke execute on function public.programacao_urgente(bigint) from public, anon;
+grant execute on function public.programacao_urgente(bigint) to authenticated;
+
+-- o padeiro confirma só os avisos da MASSEIRA (nome + senha)
+create or replace function public.confirmar_avisos_producao(p jsonb)
+returns integer language plpgsql security definer set search_path = public, pg_temp as $$
+declare v_oper bigint := (p->>'operador_id')::bigint; v_n int;
+begin
+  perform public._exigir('batelada');
+  if v_oper is null then raise exception 'Escolha o seu nome.'; end if;
+  if not public._operador_ok(v_oper, p->>'pin') then raise exception 'Senha do padeiro incorreta.'; end if;
+  update public.avisos_producao set ciente_em = now(), ciente_operador_id = v_oper, ciente_por = auth.uid()
+   where ciente_em is null and setor = 'masseira'
+     and id in (select (x)::bigint from jsonb_array_elements_text(coalesce(p->'ids', '[]'::jsonb)) x);
+  get diagnostics v_n = row_count;
+  return v_n;
+end $$;
+revoke execute on function public.confirmar_avisos_producao(jsonb) from public, anon;
+grant execute on function public.confirmar_avisos_producao(jsonb) to authenticated;
+
+-- a pesagem confirma os avisos dela com o próprio login (fica registrado quem e quando)
+create or replace function public.confirmar_avisos_pesagem(p jsonb)
+returns integer language plpgsql security definer set search_path = public, pg_temp as $$
+declare v_n int;
+begin
+  perform public._exigir('saida_receita');
+  if jsonb_typeof(coalesce(p->'ids', 'null'::jsonb)) <> 'array' or jsonb_array_length(p->'ids') > 500 then raise exception 'Lista inválida.'; end if;
+  update public.avisos_producao set ciente_em = now(), ciente_por = auth.uid()
+   where ciente_em is null and setor = 'pesagem'
+     and id in (select (x)::bigint from jsonb_array_elements_text(p->'ids') x);
+  get diagnostics v_n = row_count;
+  return v_n;
+end $$;
+revoke execute on function public.confirmar_avisos_pesagem(jsonb) from public, anon;
+grant execute on function public.confirmar_avisos_pesagem(jsonb) to authenticated;
+
+-- ---------------------------------------------------------------------
+-- 3. "MISTURA" PASSA A SE CHAMAR "BASE"
+-- ---------------------------------------------------------------------
+create or replace function public._mistura_da_ficha(p_ficha bigint)
+returns bigint language plpgsql security definer set search_path = public, pg_temp as $$
+declare v_id bigint; f public.fichas_tecnicas;
+begin
+  select id into v_id from public.produtos where ficha_id = p_ficha and categoria = 'intermediario';
+  select * into f from public.fichas_tecnicas where id = p_ficha;
+  if v_id is not null then
+    update public.produtos set descricao = 'Base – ' || f.nome, grupo = 'Base', ativo = f.ativo
+     where id = v_id and (descricao <> 'Base – ' || f.nome or grupo is distinct from 'Base' or ativo <> f.ativo);
+    return v_id;
+  end if;
+  insert into public.produtos (codigo, descricao, categoria, grupo, unidade_estoque, controla_estoque, baixa_producao, baixa_requisicao,
+                               local_padrao_id, ficha_id, ativo, observacao)
+  values ('MIS-' || f.codigo, 'Base – ' || f.nome, 'intermediario', 'Base', 'un', true, true, false,
+          public._local_tipo('pesagem'), p_ficha, f.ativo, 'Produto intermediário: 1 un = 1 base pesada (balde). Criado pelo sistema.')
+  on conflict (codigo) do nothing
+  returning id into v_id;
+  if v_id is null then select id into v_id from public.produtos where codigo = 'MIS-' || f.codigo; end if;
+  return v_id;
+end $$;
+revoke execute on function public._mistura_da_ficha(bigint) from public, anon, authenticated;
+
+update public.produtos p set descricao = 'Base – ' || f.nome, grupo = 'Base',
+       observacao = replace(coalesce(p.observacao, ''), '1 receita pesada', '1 base pesada')
+  from public.fichas_tecnicas f
+ where p.ficha_id = f.id and p.categoria = 'intermediario' and (p.descricao <> 'Base – ' || f.nome or p.grupo is distinct from 'Base');
+
+update public.parametros set descricao = replace(replace(descricao, 'mistura', 'base'), 'Mistura', 'Base')
+ where descricao ilike '%mistura%';
+
+-- iniciar batelada: igual à anterior; só a mensagem fala em "base"
+create or replace function public.iniciar_batelada(p jsonb)
+returns bigint language plpgsql security definer set search_path = public, pg_temp as $$
+declare v_b bigint; v_prog public.programacoes; v_ficha bigint := (p->>'ficha_id')::bigint; f public.fichas_tecnicas;
+        v_mac bigint := public._local_tipo('maceiras'); v_mis bigint; e numeric; itj jsonb; v_pr public.produtos;
+        v_q numeric; v_mov bigint; v_cm numeric := 0; v_cmac numeric := 0; v_oper bigint := (p->>'operador_id')::bigint;
+        v_itens jsonb := '[]'::jsonb; v_padrao jsonb; t record; v_det jsonb := '[]'::jsonb; v_local bigint;
+begin
+  perform public._exigir('batelada');
+  if v_oper is null then raise exception 'Escolha quem está batendo.'; end if;
+  if not public._operador_ok(v_oper, p->>'pin') then raise exception 'Senha do padeiro incorreta.'; end if;
+  if (p->>'programacao_id') is not null then
+    select * into v_prog from public.programacoes where id = (p->>'programacao_id')::bigint;
+    if not found or v_prog.situacao <> 'ativa' then raise exception 'Programação não encontrada ou cancelada.'; end if;
+    if v_prog.finalizada_em is not null then raise exception 'Esta programação já foi finalizada.'; end if;
+    v_ficha := v_prog.ficha_id;
+  end if;
+  select * into f from public.fichas_tecnicas where id = v_ficha;
+  if not found then raise exception 'Receita não encontrada.'; end if;
+  if (p->>'maceira_id') is null or not exists (select 1 from public.maceiras where id = (p->>'maceira_id')::bigint) then
+    raise exception 'Escolha a maceira.'; end if;
+  v_mis := public._mistura_da_ficha(v_ficha);
+
+  -- "Receber e iniciar": recebe as bases desta receita que estão a caminho
+  if coalesce((p->>'receber')::boolean, false) then
+    for t in select distinct tr.id from public.transferencias tr join public.transferencia_itens ti on ti.transferencia_id = tr.id
+              where tr.situacao = 'enviada' and tr.destino_id = v_mac and ti.produto_id = v_mis loop
+      perform public.receber_transferencia(jsonb_build_object('id', t.id, 'operador_id', v_oper, 'pin', p->>'pin'));
+    end loop;
+  end if;
+
+  select coalesce(disponivel, 0) into e from public.estoque_local where produto_id = v_mis and local_id = v_mac;
+  if coalesce(e, 0) < 0.9999 then
+    raise exception 'A base de % ainda não chegou na masseira. Receba da pesagem antes de iniciar.', f.nome;
+  end if;
+
+  insert into public.bateladas (programacao_id, ficha_id, maceira_id, operador_id, rendimento_padrao, observacao)
+  values ((p->>'programacao_id')::bigint, v_ficha, (p->>'maceira_id')::bigint, v_oper, f.rendimento_qtd, public._texto(p,'observacao'))
+  returning id into v_b;
+
+  -- 1 base sai da Produção Maceiras
+  v_mov := public._movimentar(v_mis, 'saida_receita', -1, null,
+    jsonb_build_object('batelada_id', v_b, 'local_id', v_mac, 'programacao_id', (p->>'programacao_id')::bigint, 'operador_id', v_oper));
+  v_cm := coalesce((select -valor from public.movimentos where id = v_mov), 0);
+
+  -- itens da maceira: os informados (farinha confirmada/trocada, fermento ajustado)
+  for itj in select * from jsonb_array_elements(coalesce(p->'itens','[]'::jsonb)) loop
+    select * into v_pr from public.produtos where id = (itj->>'produto_id')::bigint;
+    if not found then raise exception 'Produto não encontrado.'; end if;
+    if v_pr.categoria <> 'materia_prima' then raise exception 'Na maceira só entra matéria-prima.'; end if;
+    v_q := coalesce((itj->>'quantidade')::numeric, 0) * public._fator(v_pr.id, coalesce(itj->>'unidade', v_pr.unidade_estoque));
+    if v_q < 0 then raise exception 'Quantidade não pode ser negativa.'; end if;
+    v_itens := v_itens || jsonb_build_array(jsonb_build_object('produto_id', v_pr.id, 'quantidade', v_q,
+                 'padrao', (itj->>'padrao')::numeric, 'trocou_de', (itj->>'trocou_de')::bigint));
+    if v_q = 0 or not v_pr.controla_estoque or not v_pr.baixa_producao then continue; end if;
+    v_local := coalesce(v_pr.local_padrao_id, public._local_tipo('deposito'));
+    v_mov := public._movimentar(v_pr.id, 'saida_receita', -v_q, null,
+      jsonb_build_object('batelada_id', v_b, 'local_id', v_local, 'programacao_id', (p->>'programacao_id')::bigint, 'operador_id', v_oper));
+    v_cmac := v_cmac + coalesce((select -valor from public.movimentos where id = v_mov), 0);
+    v_det := v_det || jsonb_build_array(jsonb_build_object('produto_id', v_pr.id, 'quantidade', v_q,
+               'valor', (select -valor from public.movimentos where id = v_mov)));
+  end loop;
+  update public.bateladas set itens = v_itens where id = v_b;
+  insert into public.batelada_custos (batelada_id, custo_mistura, custo_maceira, custo_total, detalhe)
+  values (v_b, v_cm, v_cmac, v_cm + v_cmac, jsonb_build_object('maceira', v_det));
+  return v_b;
+end $$;
+revoke execute on function public.iniciar_batelada(jsonb) from public, anon;
+grant execute on function public.iniciar_batelada(jsonb) to authenticated;
+
+insert into public.versao_banco (versao, descricao)
+select '2.9.0', 'Ordem da pesagem, botão urgente, avisos melhores (pesagem também), mistura passa a se chamar base'
+where not exists (select 1 from public.versao_banco where versao = '2.9.0');
+
+-- ---------------------------------------------------------------------
+-- CONFERÊNCIA (todas as linhas devem dizer OK)
+-- ---------------------------------------------------------------------
+select 'Ordem da pesagem preenchida' as verificacao,
+       case when count(*) filter (where prioridade_pesagem is null) = 0 then 'OK' else 'ATENÇÃO: ' || count(*) filter (where prioridade_pesagem is null) || ' sem ordem' end as resultado
+  from public.programacoes
+union all
+select 'Produção nova entra no fim da pesagem', case when exists (select 1 from pg_trigger where tgname = 'prioridade_pesagem') then 'OK' else 'ATENÇÃO' end
+union all
+select 'Avisos com setor (masseira/pesagem)', case when exists (select 1 from information_schema.columns where table_name = 'avisos_producao' and column_name = 'setor') then 'OK' else 'ATENÇÃO' end
+union all
+select 'Funções novas só para quem tem login',
+       case when count(*) = 3 then 'OK' else 'ATENÇÃO' end
+  from pg_proc p where p.proname in ('reordenar_pesagem','programacao_urgente','confirmar_avisos_pesagem')
+   and not has_function_privilege('anon', p.oid, 'execute') and has_function_privilege('authenticated', p.oid, 'execute')
+union all
+select '"Mistura" virou "Base" nos produtos',
+       case when count(*) = 0 then 'OK' else 'ATENÇÃO: ' || count(*) end
+  from public.produtos where categoria = 'intermediario' and descricao like 'Mistura –%'
+union all
+select 'Funções que alguém SEM LOGIN pode executar',
+       case when count(*) = 0 then 'OK (nenhuma)' else 'ATENÇÃO: ' || string_agg(p.proname, ', ') end
+  from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+ where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')
+   and not exists (select 1 from pg_depend d where d.objid = p.oid and d.deptype = 'e')
+union all
+select 'Tabelas SEM proteção por linha (RLS)',
+       case when count(*) = 0 then 'OK (nenhuma)' else 'ATENÇÃO: ' || string_agg(c.relname, ', ') end
+  from pg_class c join pg_namespace n on n.oid = c.relnamespace
+ where n.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity
+union all
+select 'Tabelas que o app consegue gravar direto',
+       case when count(*) = 0 then 'OK (nenhuma)' else 'ATENÇÃO: ' || string_agg(c.relname, ', ') end
+  from pg_class c join pg_namespace n on n.oid = c.relnamespace
+ where n.nspname = 'public' and c.relkind = 'r'
+   and (has_table_privilege('authenticated', c.oid, 'insert') or has_table_privilege('authenticated', c.oid, 'update')
+        or has_table_privilege('authenticated', c.oid, 'delete'))
+union all
+select 'Versão do banco', case when exists (select 1 from public.versao_banco where versao = '2.9.0') then 'OK (2.9.0)' else 'ATENÇÃO' end;
+
+
+-- =====================================================================
+-- Compras & Estoque PSS · ATUALIZAÇÃO DO BANCO v2.10 · PADEIRO FINALIZA + TEMPO E TOLERÂNCIA
+-- (aplicar DEPOIS da v2.9; pode rodar de novo sem problema; não apaga dados)
+--
+--  1. Tempo e TOLERÂNCIA por receita (ex.: 30 min + 10 de tolerância). Receita sem tolerância
+--     usa o padrão de Parâmetros da produção (producao_tolerancia_batelada_min = 10).
+--     Até o tempo: no prazo · até tempo + tolerância: atenção · depois: atrasada.
+--  2. O PADEIRO finaliza a batelada (nome + senha, um toque). Não digita quantidade:
+--     fica registrado o rendimento médio da receita (o definido pelo engenheiro).
+--     Fica registrado qual padeiro finalizou (finalizada_operador_id), além de data e hora.
+--  3. A engenharia continua podendo finalizar (bateladas esquecidas), como antes.
+-- =====================================================================
+
+-- ---------------------------------------------------------------------
+-- 1. TEMPO E TOLERÂNCIA POR RECEITA
+-- ---------------------------------------------------------------------
+alter table public.fichas_tecnicas add column if not exists tolerancia_batelada_min integer;
+alter table public.fichas_tecnicas drop constraint if exists fichas_tecnicas_tolerancia_batelada_min_check;
+alter table public.fichas_tecnicas add constraint fichas_tecnicas_tolerancia_batelada_min_check
+  check (tolerancia_batelada_min is null or tolerancia_batelada_min between 0 and 600);
+
+insert into public.parametros (chave, valor, descricao) values
+  ('producao_tolerancia_batelada_min', '10', 'Produção: tolerância padrão da batelada (minutos além do tempo da receita antes de ficar atrasada)')
+on conflict (chave) do nothing;
+
+create or replace function public.salvar_parametros_producao(p jsonb)
+returns void language plpgsql security definer set search_path = public, pg_temp as $$
+declare k text; v text;
+begin
+  perform public._exigir('producao_config');
+  for k, v in select * from jsonb_each_text(p) loop
+    if k = 'producao_inicio_turno' then
+      if v !~ '^([01][0-9]|2[0-3]):[0-5][0-9]$' then raise exception 'Início do turno inválido: use hora no formato 04:00.'; end if;
+    elsif k in ('producao_tolerancia_min','producao_tempo_padrao_min','producao_prazo_finalizar_h','mistura_parada_h') then
+      if v !~ '^[0-9]+$' or v::int <= 0 or v::int > 1440 then raise exception 'Valor inválido para %: use um número inteiro maior que zero.', k; end if;
+    elsif k = 'producao_tolerancia_batelada_min' then
+      if v !~ '^[0-9]+$' or v::int > 600 then raise exception 'Tolerância inválida: use um número de 0 a 600 minutos.'; end if;
+    else
+      raise exception 'Configuração não permitida aqui: %', k;
+    end if;
+    update public.parametros set valor = v where chave = k;
+  end loop;
+end $$;
+revoke execute on function public.salvar_parametros_producao(jsonb) from public, anon;
+grant execute on function public.salvar_parametros_producao(jsonb) to authenticated;
+
+-- salvar ficha técnica: igual à anterior + tolerância (com histórico)
+create or replace function public.salvar_ficha(p jsonb)
+returns bigint language plpgsql security definer set search_path = public, pg_temp as $$
+declare v_id bigint := (p->>'id')::bigint; v_old public.fichas_tecnicas; it jsonb; r record;
+        v_novos jsonb := '{}'::jsonb; v_desc text[] := '{}'; v_pid bigint; v_q numeric;
+        k text; v text; v_pr public.produtos; v_n int := 0; v_cat text;
+begin
+  perform public._exigir('ficha_tecnica');
+  if public._texto(p,'nome') is null then raise exception 'Informe o nome da ficha técnica.'; end if;
+  if public._texto(p,'rendimento_qtd') is null and public._texto(p,'rendimento') ~ '^\s*[0-9][0-9.]*(,[0-9]+)?\s*\S' then
+    p := p || jsonb_build_object(
+      'rendimento_qtd', replace(replace(substring(p->>'rendimento' from '^\s*([0-9][0-9.]*(,[0-9]+)?)'), '.', ''), ',', '.'),
+      'rendimento_unidade', coalesce(public._texto(p,'rendimento_unidade'), btrim(regexp_replace(p->>'rendimento', '^\s*[0-9][0-9.]*(,[0-9]+)?\s*', ''))));
+  end if;
+  if public._texto(p,'rendimento_qtd') is not null and (p->>'rendimento_qtd')::numeric <= 0 then
+    raise exception 'O rendimento precisa ser maior que zero.';
+  end if;
+  if (p->>'tempo_batelada_min') is not null and (p->>'tempo_batelada_min')::int <= 0 then
+    raise exception 'O tempo da batelada precisa ser maior que zero.';
+  end if;
+  if (p->>'tolerancia_batelada_min') is not null and (p->>'tolerancia_batelada_min')::int not between 0 and 600 then
+    raise exception 'A tolerância precisa ser de 0 a 600 minutos.';
+  end if;
+  if (p->>'tempo_batelada_min') is not null and (p->>'tempo_batelada_min')::int > 1440 then
+    raise exception 'O tempo da batelada pode ser no máximo 1440 minutos.';
+  end if;
+  if jsonb_array_length(coalesce(p->'itens','[]'::jsonb)) = 0 then
+    raise exception 'A ficha técnica precisa de pelo menos 1 ingrediente.';
+  end if;
+  if public._texto(p,'codigo') is not null and exists (select 1 from public.fichas_tecnicas
+       where lower(codigo) = lower(btrim(p->>'codigo')) and id is distinct from v_id) then
+    raise exception 'Já existe uma ficha técnica com o código %.', p->>'codigo';
+  end if;
+  for it in select * from jsonb_array_elements(p->'itens') loop
+    v_pid := (it->>'produto_id')::bigint;
+    select categoria into v_cat from public.produtos where id = v_pid;
+    if v_cat is null or v_cat not in ('materia_prima','embalagem') then
+      raise exception 'Ficha técnica só aceita matéria-prima e embalagem (produto %).', v_pid;
+    end if;
+    if coalesce((it->>'quantidade')::numeric, 0) <= 0 then
+      raise exception 'Quantidade do ingrediente precisa ser maior que zero.';
+    end if;
+    v_q := case when v_cat = 'embalagem' then (it->>'quantidade')::numeric      -- por unidade produzida
+                else (it->>'quantidade')::numeric * public._fator(v_pid, it->>'unidade') end;
+    v_novos := jsonb_set(v_novos, array[v_pid::text], to_jsonb(coalesce((v_novos->>v_pid::text)::numeric, 0) + v_q));
+  end loop;
+  if not exists (select 1 from jsonb_object_keys(v_novos) k2 join public.produtos pr on pr.id = k2::bigint where pr.categoria = 'materia_prima') then
+    raise exception 'A ficha técnica precisa de pelo menos 1 matéria-prima.';
+  end if;
+
+  if v_id is null then
+    insert into public.fichas_tecnicas (codigo, nome, produto_final, rendimento, rendimento_qtd, rendimento_unidade, observacao, ativo,
+        linha_id, tempo_batelada_min, tolerancia_batelada_min, atualizado_em, atualizado_por)
+    values (coalesce(btrim(p->>'codigo'), 'R' || lpad((select coalesce(max(id),0)+1 from public.fichas_tecnicas)::text, 3, '0')),
+            btrim(p->>'nome'), public._texto(p,'produto_final'), public._texto(p,'rendimento'),
+            (public._texto(p,'rendimento_qtd'))::numeric, public._texto(p,'rendimento_unidade'),
+            public._texto(p,'observacao'), coalesce((p->>'ativo')::boolean, true),
+            (p->>'linha_id')::bigint, (p->>'tempo_batelada_min')::int, (p->>'tolerancia_batelada_min')::int, now(), auth.uid())
+    returning id into v_id;
+    select count(*) into v_n from jsonb_object_keys(v_novos);
+    v_desc := array[format('Criou a ficha com %s %s', v_n, case when v_n = 1 then 'item' else 'itens' end)];
+  else
+    select * into v_old from public.fichas_tecnicas where id = v_id for update;
+    if not found then raise exception 'Ficha técnica não encontrada.'; end if;
+    if public._texto(p,'codigo') is not null and v_old.codigo is distinct from btrim(p->>'codigo') then
+      v_desc := v_desc || format('código: "%s" → "%s"', v_old.codigo, btrim(p->>'codigo')); end if;
+    if v_old.nome is distinct from btrim(p->>'nome') then
+      v_desc := v_desc || format('nome: "%s" → "%s"', v_old.nome, btrim(p->>'nome')); end if;
+    if v_old.produto_final is distinct from public._texto(p,'produto_final') then
+      v_desc := v_desc || format('produto final: "%s" → "%s"', coalesce(v_old.produto_final,''), coalesce(public._texto(p,'produto_final'),'')); end if;
+    if v_old.rendimento_qtd is distinct from (public._texto(p,'rendimento_qtd'))::numeric
+       or v_old.rendimento_unidade is distinct from public._texto(p,'rendimento_unidade') then
+      v_desc := v_desc || format('rendimento por receita: %s %s → %s %s', coalesce(public._fmt(v_old.rendimento_qtd),'–'), coalesce(v_old.rendimento_unidade,''),
+                                 coalesce(public._fmt((public._texto(p,'rendimento_qtd'))::numeric),'–'), coalesce(public._texto(p,'rendimento_unidade'),'')); end if;
+    if v_old.tempo_batelada_min is distinct from (p->>'tempo_batelada_min')::int then
+      v_desc := v_desc || format('tempo da batelada: %s → %s min', coalesce(v_old.tempo_batelada_min::text,'–'), coalesce(p->>'tempo_batelada_min','–')); end if;
+    if v_old.tolerancia_batelada_min is distinct from (p->>'tolerancia_batelada_min')::int then
+      v_desc := v_desc || format('tolerância da batelada: %s → %s min', coalesce(v_old.tolerancia_batelada_min::text,'–'), coalesce(p->>'tolerancia_batelada_min','–')); end if;
+    if v_old.linha_id is distinct from (p->>'linha_id')::bigint then
+      v_desc := v_desc || 'mudou a linha de produção'::text; end if;
+    if v_old.observacao is distinct from public._texto(p,'observacao') then
+      v_desc := v_desc || 'alterou a observação'::text; end if;
+    if v_old.ativo is distinct from coalesce((p->>'ativo')::boolean, true) then
+      v_desc := v_desc || (case when coalesce((p->>'ativo')::boolean, true) then 'reativou a ficha' else 'desativou a ficha' end); end if;
+    update public.fichas_tecnicas set codigo = coalesce(btrim(p->>'codigo'), codigo), nome = btrim(p->>'nome'), produto_final = public._texto(p,'produto_final'),
+      rendimento = public._texto(p,'rendimento'), rendimento_qtd = (public._texto(p,'rendimento_qtd'))::numeric,
+      rendimento_unidade = public._texto(p,'rendimento_unidade'), observacao = public._texto(p,'observacao'),
+      linha_id = (p->>'linha_id')::bigint, tempo_batelada_min = (p->>'tempo_batelada_min')::int, tolerancia_batelada_min = (p->>'tolerancia_batelada_min')::int,
+      ativo = coalesce((p->>'ativo')::boolean, true), atualizado_em = now(), atualizado_por = auth.uid()
+    where id = v_id;
+    for r in select fi.id, fi.produto_id, fi.quantidade, pr.descricao, pr.unidade_estoque, pr.categoria
+               from public.ficha_itens fi join public.produtos pr on pr.id = fi.produto_id
+              where fi.ficha_id = v_id order by fi.id loop
+      if not (v_novos ? r.produto_id::text) then
+        delete from public.ficha_itens where id = r.id;
+        v_desc := v_desc || format('retirou %s (%s %s)', r.descricao, public._fmt(r.quantidade),
+                                   case when r.categoria = 'embalagem' then 'por unidade produzida' else public._un(r.unidade_estoque, r.quantidade) end);
+      elsif abs((v_novos->>r.produto_id::text)::numeric - r.quantidade) > 0.00005 then
+        update public.ficha_itens set quantidade = (v_novos->>r.produto_id::text)::numeric where id = r.id;
+        v_desc := v_desc || format('%s: %s → %s %s', r.descricao, public._fmt(r.quantidade),
+                                   public._fmt((v_novos->>r.produto_id::text)::numeric),
+                                   case when r.categoria = 'embalagem' then 'por unidade produzida' else public._un(r.unidade_estoque, (v_novos->>r.produto_id::text)::numeric) end);
+      end if;
+      v_novos := v_novos - r.produto_id::text;
+    end loop;
+  end if;
+  for k, v in select key, value from jsonb_each_text(v_novos) loop
+    insert into public.ficha_itens (ficha_id, produto_id, quantidade) values (v_id, k::bigint, v::numeric);
+    if v_old.id is not null then
+      select * into v_pr from public.produtos where id = k::bigint;
+      v_desc := v_desc || format('incluiu %s (%s %s)', v_pr.descricao, public._fmt(v::numeric),
+                                 case when v_pr.categoria = 'embalagem' then 'por unidade produzida' else public._un(v_pr.unidade_estoque, v::numeric) end);
+    end if;
+  end loop;
+  if coalesce(array_length(v_desc, 1), 0) > 0 then
+    insert into public.fichas_historico (ficha_id, usuario_id, descricao)
+    values (v_id, auth.uid(), array_to_string(v_desc, '; '));
+  end if;
+  perform public._mistura_da_ficha(v_id);
+  return v_id;
+end $$;
+revoke execute on function public.salvar_ficha(jsonb) from public, anon;
+grant execute on function public.salvar_ficha(jsonb) to authenticated;
+
+-- ---------------------------------------------------------------------
+-- 2. QUEM FINALIZOU (padeiro) + FINALIZAR PELO PADEIRO
+-- ---------------------------------------------------------------------
+alter table public.bateladas add column if not exists finalizada_operador_id bigint references public.operadores(id);
+
+-- núcleo (o mesmo cálculo de antes: embalagem, custos, rendimento). Só é chamado pelas duas abaixo.
+create or replace function public._finalizar_bateladas(p jsonb, p_oper bigint)
+returns integer language plpgsql security definer set search_path = public, pg_temp as $$
+declare itj jsonb; b public.bateladas; v_q numeric; v_n int := 0; r record; v_un numeric; v_emb numeric; v_cemb numeric;
+        v_det jsonb; v_c public.batelada_custos; v_padrao numeric; v_mov bigint;
+begin
+  for itj in select * from jsonb_array_elements(coalesce(p->'itens','[]'::jsonb)) loop
+    select * into b from public.bateladas where id = (itj->>'id')::bigint for update;
+    if not found then raise exception 'Batelada % não encontrada.', itj->>'id'; end if;
+    if b.situacao <> 'em_producao' then continue; end if;
+    v_q := coalesce((itj->>'quantidade')::numeric, b.rendimento_padrao);
+    if v_q is null then raise exception 'A receita da batelada nº % não tem rendimento padrão: digite a quantidade produzida.', b.id; end if;
+    if v_q < 0 then raise exception 'Quantidade produzida não pode ser negativa.'; end if;
+    v_cemb := 0; v_det := '[]'::jsonb;
+    for r in select fi.produto_id, fi.quantidade, pr.* from public.ficha_itens fi join public.produtos pr on pr.id = fi.produto_id
+              where fi.ficha_id = b.ficha_id and pr.categoria = 'embalagem' loop
+      v_un := v_q * r.quantidade;                                         -- nº de embalagens
+      v_emb := case when lower(r.unidade_estoque) = 'kg' then v_un * coalesce(r.peso_embalagem_g, 0) / 1000
+                    when lower(r.unidade_estoque) = 'g' then v_un * coalesce(r.peso_embalagem_g, 0)
+                    else v_un end;                                         -- na unidade de estoque
+      v_cemb := v_cemb + v_emb * r.custo_medio;
+      v_det := v_det || jsonb_build_array(jsonb_build_object('produto_id', r.produto_id, 'embalagens', v_un, 'qtd_estoque', v_emb,
+                                                             'custo', round(v_emb * r.custo_medio, 4), 'baixou', r.baixa_producao and r.controla_estoque));
+      if r.baixa_producao and r.controla_estoque and v_emb > 0 then
+        v_mov := public._movimentar(r.produto_id, 'saida_receita', -v_emb, null,
+          jsonb_build_object('batelada_id', b.id, 'local_id', coalesce(public._local_tipo('pcp'), r.local_padrao_id), 'programacao_id', b.programacao_id,
+                             'observacao', format('Embalagem da batelada nº %s (%s un)', b.id, public._fmt(v_un))));
+      end if;
+    end loop;
+    -- custo padrão da ficha (comparação): ficha × custo médio de hoje
+    select coalesce(sum(case when pr.categoria = 'embalagem' then v_q * fi.quantidade *
+                              case when lower(pr.unidade_estoque) = 'kg' then coalesce(pr.peso_embalagem_g,0)/1000
+                                   when lower(pr.unidade_estoque) = 'g' then coalesce(pr.peso_embalagem_g,0) else 1 end
+                             else fi.quantidade end * pr.custo_medio), 0)
+      into v_padrao from public.ficha_itens fi join public.produtos pr on pr.id = fi.produto_id where fi.ficha_id = b.ficha_id;
+    select * into v_c from public.batelada_custos where batelada_id = b.id;
+    update public.batelada_custos set custo_embalagem = round(v_cemb, 4),
+           custo_total = round(coalesce(v_c.custo_mistura,0) + coalesce(v_c.custo_maceira,0) + v_cemb, 4),
+           custo_unitario = case when v_q > 0 then round((coalesce(v_c.custo_mistura,0) + coalesce(v_c.custo_maceira,0) + v_cemb) / v_q, 6) end,
+           custo_padrao = round(v_padrao, 4),
+           detalhe = coalesce(detalhe, '{}'::jsonb) || jsonb_build_object('embalagem', v_det)
+     where batelada_id = b.id;
+    update public.bateladas set situacao = 'finalizada', quantidade_produzida = v_q, finalizada_em = now(), finalizada_por = auth.uid(), finalizada_operador_id = p_oper
+     where id = b.id;
+    v_n := v_n + 1;
+  end loop;
+  if v_n = 0 then raise exception 'Nenhuma batelada em produção foi selecionada.'; end if;
+  return v_n;
+end $$;
+revoke execute on function public._finalizar_bateladas(jsonb, bigint) from public, anon, authenticated;
+
+-- engenharia / gestor / admin (tela Finalizar bateladas): como antes
+create or replace function public.finalizar_bateladas(p jsonb)
+returns integer language plpgsql security definer set search_path = public, pg_temp as $$
+begin
+  perform public._exigir('finalizar_batelada');
+  if jsonb_array_length(coalesce(p->'itens', '[]'::jsonb)) > 200 then raise exception 'Lista grande demais.'; end if;
+  return public._finalizar_bateladas(p, null);
+end $$;
+revoke execute on function public.finalizar_bateladas(jsonb) from public, anon;
+grant execute on function public.finalizar_bateladas(jsonb) to authenticated;
+
+-- PADEIRO: um toque + nome e senha. Sem quantidade: vale o rendimento médio da receita.
+create or replace function public.finalizar_batelada_padeiro(p jsonb)
+returns integer language plpgsql security definer set search_path = public, pg_temp as $$
+declare v_oper bigint := (p->>'operador_id')::bigint; b public.bateladas; v_rend numeric;
+begin
+  perform public._exigir('batelada');
+  if v_oper is null then raise exception 'Escolha o seu nome.'; end if;
+  if not public._operador_ok(v_oper, p->>'pin') then raise exception 'Senha do padeiro incorreta.'; end if;
+  select * into b from public.bateladas where id = (p->>'id')::bigint for update;
+  if not found then raise exception 'Batelada não encontrada.'; end if;
+  if b.situacao = 'finalizada' then return 0; end if;                          -- toque repetido: não faz nada
+  if b.situacao <> 'em_producao' then raise exception 'Esta batelada foi cancelada.'; end if;
+  v_rend := coalesce(b.rendimento_padrao, (select rendimento_qtd from public.fichas_tecnicas where id = b.ficha_id));
+  if v_rend is null then
+    raise exception 'Esta receita ainda não tem o rendimento médio cadastrado. Avise o engenheiro (Fichas técnicas).';
+  end if;
+  return public._finalizar_bateladas(jsonb_build_object('itens', jsonb_build_array(jsonb_build_object('id', b.id, 'quantidade', v_rend))), v_oper);
+end $$;
+revoke execute on function public.finalizar_batelada_padeiro(jsonb) from public, anon;
+grant execute on function public.finalizar_batelada_padeiro(jsonb) to authenticated;
+
+insert into public.versao_banco (versao, descricao)
+select '2.10.0', 'Padeiro finaliza a batelada (rendimento médio), tempo e tolerância por receita'
+where not exists (select 1 from public.versao_banco where versao = '2.10.0');
+
+-- ---------------------------------------------------------------------
+-- CONFERÊNCIA (todas as linhas devem dizer OK)
+-- ---------------------------------------------------------------------
+select 'Tolerância na receita' as verificacao,
+       case when exists (select 1 from information_schema.columns where table_name = 'fichas_tecnicas' and column_name = 'tolerancia_batelada_min') then 'OK' else 'ATENÇÃO' end as resultado
+union all
+select 'Tolerância padrão nos parâmetros', case when exists (select 1 from public.parametros where chave = 'producao_tolerancia_batelada_min') then 'OK' else 'ATENÇÃO' end
+union all
+select 'Padeiro que finalizou fica registrado', case when exists (select 1 from information_schema.columns where table_name = 'bateladas' and column_name = 'finalizada_operador_id') then 'OK' else 'ATENÇÃO' end
+union all
+select 'Núcleo de finalização fechado (só uso interno)',
+       case when not has_function_privilege('authenticated', 'public._finalizar_bateladas(jsonb, bigint)', 'execute')
+             and not has_function_privilege('anon', 'public._finalizar_bateladas(jsonb, bigint)', 'execute') then 'OK' else 'ATENÇÃO' end
+union all
+select 'Funções que alguém SEM LOGIN pode executar',
+       case when count(*) = 0 then 'OK (nenhuma)' else 'ATENÇÃO: ' || string_agg(p.proname, ', ') end
+  from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+ where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')
+   and not exists (select 1 from pg_depend d where d.objid = p.oid and d.deptype = 'e')
+union all
+select 'Tabelas SEM proteção por linha (RLS)',
+       case when count(*) = 0 then 'OK (nenhuma)' else 'ATENÇÃO: ' || string_agg(c.relname, ', ') end
+  from pg_class c join pg_namespace n on n.oid = c.relnamespace
+ where n.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity
+union all
+select 'Tabelas que o app consegue gravar direto',
+       case when count(*) = 0 then 'OK (nenhuma)' else 'ATENÇÃO: ' || string_agg(c.relname, ', ') end
+  from pg_class c join pg_namespace n on n.oid = c.relnamespace
+ where n.nspname = 'public' and c.relkind = 'r'
+   and (has_table_privilege('authenticated', c.oid, 'insert') or has_table_privilege('authenticated', c.oid, 'update')
+        or has_table_privilege('authenticated', c.oid, 'delete'))
+union all
+select 'Versão do banco', case when exists (select 1 from public.versao_banco where versao = '2.10.0') then 'OK (2.10.0)' else 'ATENÇÃO' end;
+
+
+-- =====================================================================
+-- Compras & Estoque PSS · ATUALIZAÇÃO DO BANCO v2.11 · PRÉ-CADASTRO NO RECEBIMENTO
+-- (aplicar DEPOIS da v2.10; pode rodar de novo sem problema; não apaga dados)
+--
+--  1. Recebimento SEM pedido: quem recebe pode fazer o PRÉ-CADASTRO de um fornecedor
+--     (só a razão social) e de um produto (nome curto + unidade + tipo), na hora.
+--  2. O pré-cadastro fica marcado até o COMPRADOR abrir e salvar o cadastro
+--     (aí sai do sininho dele). Fica registrado quem pré-cadastrou e quem revisou.
+--  3. Recebimento sem pedido exige fornecedor e número da nota fiscal (vale no banco).
+--  4. Sininho por responsável: cada pessoa marca o que já viu (tabela sininho_vistos, só dela).
+-- =====================================================================
+
+-- ---------------------------------------------------------------------
+-- 1. MARCAS DE PRÉ-CADASTRO
+-- ---------------------------------------------------------------------
+alter table public.produtos     add column if not exists pre_cadastro     boolean not null default false;
+alter table public.produtos     add column if not exists pre_cadastro_por uuid references auth.users(id);
+alter table public.produtos     add column if not exists pre_cadastro_em  timestamptz;
+alter table public.produtos     add column if not exists revisado_por     uuid references auth.users(id);
+alter table public.produtos     add column if not exists revisado_em      timestamptz;
+alter table public.fornecedores add column if not exists pre_cadastro     boolean not null default false;
+alter table public.fornecedores add column if not exists pre_cadastro_por uuid references auth.users(id);
+alter table public.fornecedores add column if not exists pre_cadastro_em  timestamptz;
+alter table public.fornecedores add column if not exists revisado_por     uuid references auth.users(id);
+alter table public.fornecedores add column if not exists revisado_em      timestamptz;
+create index if not exists produtos_pre_cadastro on public.produtos (id) where pre_cadastro;
+create index if not exists fornecedores_pre_cadastro on public.fornecedores (id) where pre_cadastro;
+
+-- ---------------------------------------------------------------------
+-- 2. PRÉ-CADASTRAR (quem recebe mercadoria: admin, almoxarifado, recebimento)
+-- ---------------------------------------------------------------------
+create or replace function public.pre_cadastrar_fornecedor(p jsonb)
+returns bigint language plpgsql security definer set search_path = public, pg_temp as $$
+declare v_nome text := btrim(regexp_replace(coalesce(p->>'nome', ''), '\s+', ' ', 'g')); v_id bigint;
+begin
+  perform public._exigir('recebimento');
+  if length(v_nome) < 3 or length(v_nome) > 150 then raise exception 'Escreva a razão social do fornecedor (de 3 a 150 letras).'; end if;
+  -- já existe com esse nome? usa o mesmo (não duplica)
+  select id into v_id from public.fornecedores
+   where lower(nome) = lower(v_nome) or lower(coalesce(razao_social, '')) = lower(v_nome) order by ativo desc, id limit 1;
+  if v_id is not null then
+    update public.fornecedores set ativo = true where id = v_id and not ativo;
+    return v_id;
+  end if;
+  insert into public.fornecedores (nome, razao_social, observacao, ativo, pre_cadastro, pre_cadastro_por, pre_cadastro_em)
+  values (v_nome, v_nome, 'Pré-cadastro feito no recebimento. O comprador precisa completar (CNPJ, contato, condição de pagamento).',
+          true, true, auth.uid(), now())
+  returning id into v_id;
+  return v_id;
+end $$;
+revoke execute on function public.pre_cadastrar_fornecedor(jsonb) from public, anon;
+grant execute on function public.pre_cadastrar_fornecedor(jsonb) to authenticated;
+
+create or replace function public.pre_cadastrar_produto(p jsonb)
+returns bigint language plpgsql security definer set search_path = public, pg_temp as $$
+declare v_desc text := btrim(regexp_replace(coalesce(p->>'descricao', ''), '\s+', ' ', 'g'));
+        v_un text := btrim(coalesce(p->>'unidade', '')); v_cat text := coalesce(nullif(btrim(p->>'categoria'), ''), 'outros');
+        v_id bigint; v_cod text; v_n bigint;
+begin
+  perform public._exigir('recebimento');
+  if length(v_desc) < 3 or length(v_desc) > 80 then raise exception 'Escreva um nome curto para o produto (de 3 a 80 letras). Ex.: Caneta azul.'; end if;
+  if v_un not in ('kg','g','L','mL','un','m','cx','pct','rolo','par') then raise exception 'Escolha a unidade (kg, g, L, mL, un, m, cx, pct, rolo ou par).'; end if;
+  if v_cat not in ('materia_prima','embalagem','escritorio','limpeza','outros') then raise exception 'Tipo de produto inválido.'; end if;
+  -- já existe um produto ativo com esse nome? usa o mesmo (não duplica)
+  select id into v_id from public.produtos where lower(descricao) = lower(v_desc) and ativo order by id limit 1;
+  if v_id is not null then return v_id; end if;
+  select coalesce(max(id), 0) + 1 into v_n from public.produtos;
+  loop
+    v_cod := 'PRE-' || lpad(v_n::text, 5, '0');
+    exit when not exists (select 1 from public.produtos where codigo = v_cod);
+    v_n := v_n + 1;
+  end loop;
+  insert into public.produtos (codigo, descricao, categoria, unidade_estoque, controla_estoque, baixa_producao, baixa_requisicao, observacao, ativo,
+                               pre_cadastro, pre_cadastro_por, pre_cadastro_em)
+  values (v_cod, v_desc, v_cat, v_un, true, false, true,
+          'Pré-cadastro feito no recebimento. O comprador precisa completar (grupo, unidade de compra, mínimo, fornecedor).', true,
+          true, auth.uid(), now())
+  returning id into v_id;
+  return v_id;
+end $$;
+revoke execute on function public.pre_cadastrar_produto(jsonb) from public, anon;
+grant execute on function public.pre_cadastrar_produto(jsonb) to authenticated;
+
+-- ---------------------------------------------------------------------
+-- 3. O COMPRADOR SALVOU O CADASTRO → deixa de ser pré-cadastro
+--    (movimento de estoque — saldo/custo — não conta como revisão)
+-- ---------------------------------------------------------------------
+create or replace function public._revisar_pre_produto()
+returns trigger language plpgsql security definer set search_path = public, pg_temp as $$
+begin
+  if old.pre_cadastro and new.pre_cadastro and public.pode('cadastro_produto')
+     and new.saldo is not distinct from old.saldo and new.custo_medio is not distinct from old.custo_medio then
+    new.pre_cadastro := false; new.revisado_por := auth.uid(); new.revisado_em := now();
+  end if;
+  return new;
+end $$;
+revoke execute on function public._revisar_pre_produto() from public, anon, authenticated;
+drop trigger if exists revisar_pre_cadastro on public.produtos;
+create trigger revisar_pre_cadastro before update on public.produtos for each row execute function public._revisar_pre_produto();
+
+create or replace function public._revisar_pre_fornecedor()
+returns trigger language plpgsql security definer set search_path = public, pg_temp as $$
+begin
+  if old.pre_cadastro and new.pre_cadastro and public.pode('cadastro_fornecedor') then
+    new.pre_cadastro := false; new.revisado_por := auth.uid(); new.revisado_em := now();
+  end if;
+  return new;
+end $$;
+revoke execute on function public._revisar_pre_fornecedor() from public, anon, authenticated;
+drop trigger if exists revisar_pre_cadastro on public.fornecedores;
+create trigger revisar_pre_cadastro before update on public.fornecedores for each row execute function public._revisar_pre_fornecedor();
+
+-- ---------------------------------------------------------------------
+-- 4. RECEBIMENTO SEM PEDIDO: fornecedor e nota fiscal obrigatórios
+-- ---------------------------------------------------------------------
+create or replace function public._recebimento_sem_pedido_ok()
+returns trigger language plpgsql security definer set search_path = public, pg_temp as $$
+begin
+  if new.pedido_id is null then
+    if new.fornecedor_id is null then raise exception 'Escolha o fornecedor (se não estiver cadastrado, toque no + para o pré-cadastro).'; end if;
+    if nullif(btrim(coalesce(new.nota_fiscal, '')), '') is null then raise exception 'Informe o número da nota fiscal.'; end if;
+  end if;
+  if new.nota_fiscal is not null and length(new.nota_fiscal) > 60 then raise exception 'Número da nota fiscal muito longo.'; end if;
+  return new;
+end $$;
+revoke execute on function public._recebimento_sem_pedido_ok() from public, anon, authenticated;
+drop trigger if exists sem_pedido_ok on public.recebimentos;
+create trigger sem_pedido_ok before insert on public.recebimentos for each row execute function public._recebimento_sem_pedido_ok();
+
+-- ---------------------------------------------------------------------
+-- 5. SININHO: o que cada pessoa já viu (avisos só informativos, ex.: "mercadoria recebida")
+--    Cada um lê e grava só os próprios registros.
+-- ---------------------------------------------------------------------
+create table if not exists public.sininho_vistos (
+  id         bigint generated always as identity unique,
+  usuario_id uuid not null default auth.uid() references auth.users(id),
+  chave      text not null check (chave ~ '^[a-z_]{2,20}:[0-9]{1,18}$'),
+  visto_em   timestamptz not null default now(),
+  primary key (usuario_id, chave)
+);
+alter table public.sininho_vistos enable row level security;
+alter table public.sininho_vistos force row level security;
+revoke all on public.sininho_vistos from anon, authenticated;
+grant select on public.sininho_vistos to authenticated;
+drop policy if exists proprio on public.sininho_vistos;
+create policy proprio on public.sininho_vistos for select to authenticated using (usuario_id = auth.uid());
+
+create or replace function public.marcar_vistos(p jsonb)
+returns integer language plpgsql security definer set search_path = public, pg_temp as $$
+declare v_n int;
+begin
+  if auth.uid() is null or not public.usuario_ativo() then raise exception 'Sem permissão.' using errcode = '42501'; end if;
+  if jsonb_typeof(coalesce(p, 'null'::jsonb)) <> 'array' or jsonb_array_length(p) > 300 then raise exception 'Lista inválida.'; end if;
+  insert into public.sininho_vistos (usuario_id, chave)
+  select auth.uid(), x from jsonb_array_elements_text(p) x where x ~ '^[a-z_]{2,20}:[0-9]{1,18}$'
+  on conflict do nothing;
+  get diagnostics v_n = row_count;
+  delete from public.sininho_vistos where usuario_id = auth.uid() and visto_em < now() - interval '120 days';   -- não acumula
+  return v_n;
+end $$;
+revoke execute on function public.marcar_vistos(jsonb) from public, anon;
+grant execute on function public.marcar_vistos(jsonb) to authenticated;
+
+insert into public.versao_banco (versao, descricao)
+select '2.11.0', 'Pré-cadastro no recebimento sem pedido (comprador revisa) e sininho por responsável'
+where not exists (select 1 from public.versao_banco where versao = '2.11.0');
+
+-- ---------------------------------------------------------------------
+-- CONFERÊNCIA (todas as linhas devem dizer OK)
+-- ---------------------------------------------------------------------
+select 'Pré-cadastro em produtos e fornecedores' as verificacao,
+       case when (select count(*) from information_schema.columns where table_name in ('produtos','fornecedores') and column_name = 'pre_cadastro') = 2
+            then 'OK' else 'ATENÇÃO' end as resultado
+union all
+select 'Revisão do comprador ligada', case when (select count(*) from pg_trigger where tgname = 'revisar_pre_cadastro') = 2 then 'OK' else 'ATENÇÃO' end
+union all
+select 'Sem pedido exige fornecedor e nota', case when exists (select 1 from pg_trigger where tgname = 'sem_pedido_ok') then 'OK' else 'ATENÇÃO' end
+union all
+select 'Funções novas só para quem tem login',
+       case when count(*) = 3 then 'OK' else 'ATENÇÃO' end
+  from pg_proc p where p.proname in ('pre_cadastrar_fornecedor','pre_cadastrar_produto','marcar_vistos')
+   and not has_function_privilege('anon', p.oid, 'execute') and has_function_privilege('authenticated', p.oid, 'execute')
+union all
+select 'Funções que alguém SEM LOGIN pode executar',
+       case when count(*) = 0 then 'OK (nenhuma)' else 'ATENÇÃO: ' || string_agg(p.proname, ', ') end
+  from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+ where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')
+   and not exists (select 1 from pg_depend d where d.objid = p.oid and d.deptype = 'e')
+union all
+select 'Tabelas SEM proteção por linha (RLS)',
+       case when count(*) = 0 then 'OK (nenhuma)' else 'ATENÇÃO: ' || string_agg(c.relname, ', ') end
+  from pg_class c join pg_namespace n on n.oid = c.relnamespace
+ where n.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity
+union all
+select 'Tabelas que o app consegue gravar direto',
+       case when count(*) = 0 then 'OK (nenhuma)' else 'ATENÇÃO: ' || string_agg(c.relname, ', ') end
+  from pg_class c join pg_namespace n on n.oid = c.relnamespace
+ where n.nspname = 'public' and c.relkind = 'r'
+   and (has_table_privilege('authenticated', c.oid, 'insert') or has_table_privilege('authenticated', c.oid, 'update')
+        or has_table_privilege('authenticated', c.oid, 'delete'))
+union all
+select 'Versão do banco', case when exists (select 1 from public.versao_banco where versao = '2.11.0') then 'OK (2.11.0)' else 'ATENÇÃO' end;
+
+
+-- =====================================================================
+-- Compras & Estoque PSS · ATUALIZAÇÃO DO BANCO v2.13 · PREFERÊNCIAS DE CADA PESSOA
+-- (aplicar DEPOIS da v2.11; pode rodar de novo sem problema; não apaga dados)
+--
+--  Guarda as escolhas de cada pessoa nas telas (ex.: quais colunas aparecem em cada
+--  relatório). Cada um lê e grava SÓ as próprias preferências; nada de dados da empresa.
+-- =====================================================================
+
+create table if not exists public.preferencias_usuario (
+  id            bigint generated always as identity unique,
+  usuario_id    uuid not null default auth.uid() references auth.users(id),
+  chave         text not null check (chave ~ '^[a-z0-9_.-]{2,60}$'),
+  valor         jsonb not null check (pg_column_size(valor) <= 8000),
+  atualizado_em timestamptz not null default now(),
+  primary key (usuario_id, chave)
+);
+alter table public.preferencias_usuario enable row level security;
+alter table public.preferencias_usuario force row level security;
+revoke all on public.preferencias_usuario from anon, authenticated;
+grant select on public.preferencias_usuario to authenticated;
+drop policy if exists proprio on public.preferencias_usuario;
+create policy proprio on public.preferencias_usuario for select to authenticated using (usuario_id = auth.uid());
+
+-- grava (ou apaga, com valor nulo = "voltar ao padrão") uma preferência da própria pessoa
+create or replace function public.salvar_preferencia(p_chave text, p_valor jsonb)
+returns boolean language plpgsql security definer set search_path = public, pg_temp as $$
+begin
+  if auth.uid() is null or not public.usuario_ativo() then raise exception 'Sem permissão.' using errcode = '42501'; end if;
+  if p_chave is null or p_chave !~ '^[a-z0-9_.-]{2,60}$' then raise exception 'Preferência inválida.'; end if;
+  if p_valor is null then
+    delete from public.preferencias_usuario where usuario_id = auth.uid() and chave = p_chave;
+    return true;
+  end if;
+  if pg_column_size(p_valor) > 8000 then raise exception 'Preferência grande demais.'; end if;
+  if (select count(*) from public.preferencias_usuario where usuario_id = auth.uid()) >= 200
+     and not exists (select 1 from public.preferencias_usuario where usuario_id = auth.uid() and chave = p_chave) then
+    raise exception 'Preferências demais para este usuário.';
+  end if;
+  insert into public.preferencias_usuario (usuario_id, chave, valor, atualizado_em)
+  values (auth.uid(), p_chave, p_valor, now())
+  on conflict (usuario_id, chave) do update set valor = excluded.valor, atualizado_em = now();
+  return true;
+end $$;
+revoke execute on function public.salvar_preferencia(text, jsonb) from public, anon;
+grant execute on function public.salvar_preferencia(text, jsonb) to authenticated;
+
+insert into public.versao_banco (versao, descricao)
+select '2.13.0', 'Preferências de cada pessoa (colunas visíveis nos relatórios)'
+where not exists (select 1 from public.versao_banco where versao = '2.13.0');
+
+-- ---------------------------------------------------------------------
+-- CONFERÊNCIA (todas as linhas devem dizer OK)
+-- ---------------------------------------------------------------------
+select 'Tabela de preferências protegida (RLS)' as verificacao,
+       case when (select relrowsecurity from pg_class where oid = 'public.preferencias_usuario'::regclass) then 'OK' else 'ATENÇÃO' end as resultado
+union all
+select 'Função nova só para quem tem login',
+       case when not has_function_privilege('anon', 'public.salvar_preferencia(text, jsonb)', 'execute')
+             and has_function_privilege('authenticated', 'public.salvar_preferencia(text, jsonb)', 'execute') then 'OK' else 'ATENÇÃO' end
+union all
+select 'Funções que alguém SEM LOGIN pode executar',
+       case when count(*) = 0 then 'OK (nenhuma)' else 'ATENÇÃO: ' || string_agg(p.proname, ', ') end
+  from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+ where n.nspname = 'public' and has_function_privilege('anon', p.oid, 'execute')
+   and not exists (select 1 from pg_depend d where d.objid = p.oid and d.deptype = 'e')
+union all
+select 'Tabelas SEM proteção por linha (RLS)',
+       case when count(*) = 0 then 'OK (nenhuma)' else 'ATENÇÃO: ' || string_agg(c.relname, ', ') end
+  from pg_class c join pg_namespace n on n.oid = c.relnamespace
+ where n.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity
+union all
+select 'Tabelas que o app consegue gravar direto',
+       case when count(*) = 0 then 'OK (nenhuma)' else 'ATENÇÃO: ' || string_agg(c.relname, ', ') end
+  from pg_class c join pg_namespace n on n.oid = c.relnamespace
+ where n.nspname = 'public' and c.relkind = 'r'
+   and (has_table_privilege('authenticated', c.oid, 'insert') or has_table_privilege('authenticated', c.oid, 'update')
+        or has_table_privilege('authenticated', c.oid, 'delete'))
+union all
+select 'Versão do banco', case when exists (select 1 from public.versao_banco where versao = '2.13.0') then 'OK (2.13.0)' else 'ATENÇÃO' end;

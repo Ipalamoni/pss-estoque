@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # =====================================================================
 # ARTAS INDÚSTRIA · GERAR BACKUP COMPLETO DA VERSÃO ATUAL
-# Uso:  python3 ferramentas/gerar_backup.py --saida /pasta/de/saida
+# Uso:  python3 ferramentas/gerar_backup.py --saida /pasta/de/saida   (--sem-dados para não incluir os dados)
 # Gera backup_artas_vX.Y.Z_AAAA-MM-DD.zip com TUDO para reconstruir do zero, idêntico:
 #   site/ (cópia exata do que está publicado), banco completo, função do servidor,
 #   PROMPT_RECONSTRUCAO.md (para qualquer IA), ESPECIFICACAO_DO_SISTEMA.md (gerada do código),
@@ -88,122 +88,12 @@ def especificacao(versao):
 # ---------------------------------------------------------------------
 # 3) PROMPT para qualquer IA reconstruir do zero
 # ---------------------------------------------------------------------
-PROMPT = r'''# PROMPT DE RECONSTRUÇÃO · ARTAS INDÚSTRIA v{versao}
-
-> Copie TODO este arquivo para uma IA (Claude, ChatGPT ou outra) junto com o arquivo zip.
-> Ela deve seguir os passos abaixo, na ordem, e só considerar terminado quando a CONFERÊNCIA (passo 7) passar.
-
-## Quem você é e o que deve fazer
-Você vai reconstruir do zero o sistema **Artas Indústria** (compras, estoque e produção, licenciado para a
-Pães São Sebastião), versão **{versao}** (código `{commit}`, gerado em {data}), e deixá-lo **idêntico** ao original:
-mesmas cores, logos, marca, menus, botões, telas, funções, regras de segurança e comportamento.
-
-**Regra principal: NÃO reescreva nem "melhore" nenhum código.** O sistema já está inteiro dentro de `site/` e o
-banco inteiro em `site/banco/00-instalar-banco-completo.sql`. A identidade exata vem de usar **esses arquivos sem
-alterar um byte**. As ÚNICAS mudanças permitidas são as do passo 4 (endereço e chave pública do Supabase novo),
-e só se o projeto do Supabase for outro. Não traduza, não reformate, não troque bibliotecas, não "atualize" versões.
-
-## O que é o sistema (para você entender)
-- Aplicativo web instalável (PWA) feito em JavaScript puro com Preact + htm (sem etapa de compilação).
-  Abre no navegador do computador, tablet e celular. Hospedado no **GitHub Pages**.
-- Dados no **Supabase** (PostgreSQL): login, banco, tempo real e uma função de servidor (`admin-usuarios`).
-- Toda regra de acesso fica no banco (RLS + funções `security definer`). O site só mostra.
-- Bibliotecas já incluídas em `site/js/vendor/` (nada precisa ser baixado da internet).
-- Tem modo demonstração (dados fictícios no navegador) controlado por `site/config.js` (`MODO: 'demo'`).
-- Detalhes (papéis, permissões, menu, cores, marca, telas): `ESPECIFICACAO_DO_SISTEMA.md`.
-
-## Passo 1 · Conferir o pacote ANTES de começar
-Rode `python3 CONFERENCIA/conferir_arquivos.py site` (na pasta do zip descompactado). Tem que dizer
-`TODOS OS ARQUIVOS IDÊNTICOS`. Se algum arquivo estiver diferente ou faltando, pare e avise o dono.
-
-## Passo 2 · Banco de dados (Supabase)
-1. Criar conta em supabase.com (ou entrar) e criar um **projeto novo**: nome `estoque-pss` (ou outro),
-   região **South America (São Paulo)**, senha forte do banco (guardar com o dono, NUNCA no zip).
-2. **SQL Editor › New query**: colar o arquivo `site/banco/00-instalar-banco-completo.sql` INTEIRO › **Run**.
-   No fim aparecem tabelas de CONFERÊNCIA: todas as linhas devem dizer `OK`.
-3. **Authentication › Sign In / Providers**:
-   - Email: **ligado** · "Allow new users to sign up": **DESLIGADO** · "Allow anonymous sign-ins": **DESLIGADO**
-   - (Os usuários são criados só pelo administrador, dentro do sistema.)
-4. **Project Settings › API**: anotar a **Project URL** (`https://XXXX.supabase.co`) e a chave
-   **publishable** (`sb_publishable_…`). A chave **secret / service_role NUNCA** vai para o site.
-
-## Passo 3 · Função do servidor que cria usuários
-1. **Edge Functions › Deploy a new function › Via Editor**: nome **exatamente** `admin-usuarios`.
-2. Colar o conteúdo de `site/supabase/functions/admin-usuarios/index.ts` sem alterar › Deploy.
-3. Nas configurações da função: **Verify JWT: DESLIGADO** (a função confere o login e o papel de admin por dentro).
-4. Variáveis (Edge Functions › Secrets): `SUPABASE_URL`, `SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY` já
-   existem sozinhas. Só crie `ORIGENS_PERMITIDAS` se o site ficar em endereço diferente de
-   `https://ipalamoni.github.io` (valor: o endereço do site, ex.: `https://NOVO-USUARIO.github.io`).
-
-## Passo 4 · Apontar o site para o Supabase (SÓ se o projeto do Supabase for NOVO)
-Trocar o endereço antigo `https://kuttfnmjvzgzebjpjvvy.supabase.co` pelo novo em EXATAMENTE 2 arquivos:
-1. `site/config.js`: `SUPABASE_URL` e `SUPABASE_CHAVE_PUBLICAVEL` (a publishable do passo 2.4). `MODO: 'supabase'`.
-2. `site/index.html`: na linha `Content-Security-Policy`, trocar o endereço nas DUAS ocorrências
-   (`https://…supabase.co` e `wss://…supabase.co`). Se esquecer, o site não consegue falar com o banco.
-Nada mais muda. (O passo 7 vai acusar só esses 2 arquivos como diferentes — é esperado.)
-
-## Passo 5 · Publicar o site (GitHub Pages)
-1. Em github.com, criar repositório **público** `pss-estoque` (ou outro nome).
-2. Enviar TODO o conteúdo de `site/` para a raiz do repositório (incluindo o arquivo oculto `.nojekyll`).
-3. **Settings › Pages › Build and deployment**: Source "Deploy from a branch", branch `main`, pasta `/ (root)` › Save.
-4. Em 1 a 2 minutos o site abre em `https://USUARIO.github.io/pss-estoque/`.
-5. Ligar a verificação em duas etapas (2FA) na conta do GitHub e do Supabase.
-
-## Passo 6 · Primeiro administrador e usuários
-1. Supabase › **Authentication › Users › Add user › Create new user**: e-mail `ithalo@estoque.pss`
-   (o login no sistema é a parte antes do @, ex.: `ithalo`; o domínio é sempre `@estoque.pss`), senha temporária
-   forte, marcar **Auto Confirm User**.
-2. SQL Editor (troque o e-mail se for outro):
-   ```sql
-   update public.perfis set nome = 'Ithalo', funcao = 'Controladoria', papeis = '{{admin}}', ativo = true
-    where user_id = (select id from auth.users where email = 'ithalo@estoque.pss');
-   ```
-3. Entrar no site com `ithalo` + a senha › trocar a senha › **Administração › Usuários e acessos › Novo usuário**
-   para cada pessoa (o sistema gera a senha temporária). Usuários e papéis da versão {versao}:
-{usuarios}
-4. Cadastros (produtos, fornecedores, receitas): **Configurações e locais › importar a planilha-modelo**, ou
-   restaurar os dados do backup do próprio Supabase (dados do dia a dia NÃO estão neste zip).
-
-## Passo 7 · CONFERÊNCIA (obrigatória)
-1. Arquivos: clonar o repositório publicado e rodar `python3 CONFERENCIA/conferir_arquivos.py <pasta-do-clone>`.
-   Esperado: `TODOS OS ARQUIVOS IDÊNTICOS` (ou só `config.js` e `index.html` diferentes, se fez o passo 4).
-2. Banco: SQL Editor › colar `CONFERENCIA/conferir-banco.sql` › Run. Todas as linhas `OK` e as contagens
-   iguais às de referência que estão no próprio arquivo.
-3. Visual: abrir o site e comparar com `ESPECIFICACAO_DO_SISTEMA.md` (menu na mesma ordem, marca Artas Indústria
-   grafite no tema claro e branca no escuro, logo PSS ao lado, ícone do app com o "A" de 3 colunas).
-4. Rodapé do menu deve mostrar **versão {versao}**.
-
-## O que NÃO está no pacote (de propósito)
-- Senhas de pessoas, senha do banco e a chave secreta (`sb_secret_…` / service_role).
-- Dados do dia a dia (pedidos, estoque, produção, histórico): vêm do backup do Supabase do dono.
-
-## Se algo der errado
-- "Não consegui abrir esta tela" / nada carrega: conferir o passo 4 (config.js e a linha da Content-Security-Policy).
-- "Só o administrador gerencia usuários" ao criar usuário: o seu perfil não tem `admin` (passo 6.2).
-- Erro ao criar usuário: conferir o nome `admin-usuarios` e "Verify JWT" desligado (passo 3).
-- Telas antigas depois de atualizar: fechar e abrir o app (o sistema guarda os arquivos para abrir rápido).
-'''
-
-LEIA = '''# LEIA PRIMEIRO · Backup Artas Indústria v{versao} · {data}
-
-Este zip tem TUDO para reconstruir o sistema do zero, idêntico ao que estava no ar em {data}.
-
-**Para reconstruir com uma IA:** entregue a ela o arquivo `PROMPT_RECONSTRUCAO.md` + este zip e peça:
-"Siga o PROMPT_RECONSTRUCAO.md à risca para reconstruir o sistema." Ela vai precisar que você entre nas suas
-contas do GitHub e do Supabase quando pedir (ninguém mais deve ter essas senhas).
-
-| Pasta / arquivo | O que é |
-|---|---|
-| `PROMPT_RECONSTRUCAO.md` | Passo a passo para a IA (ou uma pessoa técnica) reconstruir tudo |
-| `ESPECIFICACAO_DO_SISTEMA.md` | Papéis, permissões, menu, cores, marca e telas (gerado do código) |
-| `site/` | O sistema inteiro, exatamente como publicado (código `{commit}`) |
-| `site/banco/00-instalar-banco-completo.sql` | Cria o banco inteiro do zero (estrutura + regras + segurança) |
-| `site/supabase/functions/admin-usuarios/` | Função do servidor que cria usuários |
-| `CONFERENCIA/` | Impressão digital de cada arquivo e scripts que provam que ficou idêntico |
-
-**Não tem:** senhas, chave secreta e os dados do dia a dia (esses vêm do backup do Supabase).
-Guarde este zip no Drive, na pasta "Backups sistema estoque", sem apagar os anteriores.
-'''
+MODELOS = os.path.join(RAIZ, 'ferramentas', 'modelos_backup')
+def modelo(nome, **v):
+    txt = open(os.path.join(MODELOS, nome), encoding='utf-8').read()
+    for k, x in v.items(): txt = txt.replace('@@' + k.upper() + '@@', str(x))
+    if '@@' in txt: sys.exit('ERRO: marcador sem valor em ' + nome + ': ' + re.findall(r'@@\w+@@', txt)[0])
+    return txt
 
 CONFERIR_PY = r'''#!/usr/bin/env python3
 # Confere se uma pasta (o site publicado ou a cópia) é IDÊNTICA ao backup, arquivo por arquivo (SHA-256).
@@ -268,14 +158,107 @@ def referencia_banco(sql):
     if out.returncode != 0: sys.exit('ERRO: o banco completo não instalou num PostgreSQL de teste:\n' + out.stderr[-2000:])
     return json.loads(out.stdout.strip().split('\n')[-1])
 
-def usuarios_md(caminho):
-    # a lista de usuários NÃO fica no repositório (ele é público): vem de um arquivo privado (--usuarios)
-    if caminho and os.path.exists(caminho): return ''.join('   ' + l for l in open(caminho, encoding='utf-8'))
-    return '   (lista não informada: recrie conforme a equipe em Administração › Usuários e acessos)\n'
+# ---------------------------------------------------------------------
+# 4) DADOS DE HOJE (opcional, --dados): exporta do Supabase de produção pela Management API e gera
+#    DADOS_PRIVADOS/restaurar-dados.sql (recoloca tudo num banco NOVO, com os mesmos usuários, sem senhas).
+#    Nada disso vai para o repositório: só para dentro do zip, que é privado do dono.
+# ---------------------------------------------------------------------
+def api_sql(ref, sql):
+    import urllib.request
+    req = urllib.request.Request(f'https://api.supabase.com/v1/projects/{ref}/database/query',
+        data=json.dumps({'query': sql}).encode(), method='POST',
+        headers={'Content-Type': 'application/json', 'Authorization': 'Bearer ' + os.environ.get('SUPABASE_TOKEN', 'injetado-pelo-proxy'),
+                 'User-Agent': 'backup-artas'})
+    try:
+        with urllib.request.urlopen(req, timeout=120) as r: return json.loads(r.read())
+    except Exception as e:
+        sys.exit(f'ERRO ao ler os dados do Supabase ({e}). Sem acesso ao banco, rode sem --dados.')
+
+def exportar_dados(ref):
+    cols = api_sql(ref, """select table_name t, json_agg(json_build_object('c', column_name, 'id', is_identity = 'YES') order by ordinal_position) cols
+        from information_schema.columns c where table_schema = 'public' and is_generated = 'NEVER'
+         and table_name in (select tablename from pg_tables where schemaname = 'public') group by table_name order by table_name""")
+    tabelas = {r['t']: r['cols'] for r in cols if r['t'] != 'versao_banco'}
+    dados = {}
+    for t in tabelas:
+        dados[t] = api_sql(ref, f'select coalesce(json_agg(x), \'[]\') v from public."{t}" x')[0]['v']
+    usuarios = api_sql(ref, """select coalesce(json_agg(json_build_object('id', id, 'email', email, 'criado_em', created_at,
+        'confirmado_em', email_confirmed_at, 'app', raw_app_meta_data, 'meta', raw_user_meta_data) order by created_at), '[]') v from auth.users""")[0]['v']
+    versao = api_sql(ref, "select versao v from public.versao_banco where versao ~ '^[0-9.]+$' order by string_to_array(versao, '.')::int[] desc limit 1")[0]['v']
+    return tabelas, dados, usuarios, versao
+
+def sql_restaurar(tabelas, dados, usuarios, versao_banco, versao, data):
+    def lit(obj):
+        j = json.dumps(obj, ensure_ascii=False)
+        tag = '$dados$'
+        while tag in j: tag = tag[:-1] + 'x$'
+        return f'{tag}{j}{tag}::jsonb'
+    L = ['-- =====================================================================',
+         f'-- ARTAS INDÚSTRIA · RESTAURAR OS DADOS DE {data} (sistema v{versao}, banco v{versao_banco})',
+         '-- CONFIDENCIAL: contém os dados da empresa e a lista de usuários (SEM senhas). Não publique.',
+         '-- Quando usar: num projeto NOVO do Supabase, DEPOIS de rodar 00-instalar-banco-completo.sql.',
+         '--   Supabase › SQL Editor › New query › colar este arquivo inteiro › Run',
+         '-- O que faz: recria os usuários com o MESMO login (sem senha: ninguém entra até o admin definir),',
+         '--   e recoloca todos os cadastros, pedidos, estoque, produção e histórico exatamente como estavam.',
+         '-- Segurança: recusa rodar se o banco já tiver pedidos, movimentos ou produções (não sobrescreve).',
+         '-- =====================================================================', '',
+         'do $$ begin',
+         "  if exists (select 1 from public.pedidos) or exists (select 1 from public.movimentos) or exists (select 1 from public.producoes) then",
+         "    raise exception 'PARE: este banco já tem dados. A restauração só roda num banco recém-instalado.';",
+         '  end if;',
+         'end $$;', '',
+         'begin;',
+         '-- desliga gatilhos e conferências só durante a carga (volta sozinho no fim)',
+         'set local session_replication_role = replica;', '',
+         '-- 1) usuários de login (mesmo id e e-mail; senha aleatória que ninguém conhece)',
+         'insert into auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,',
+         '  raw_app_meta_data, raw_user_meta_data, created_at, updated_at, confirmation_token, recovery_token, email_change_token_new, email_change)',
+         "select '00000000-0000-0000-0000-000000000000', u.id, 'authenticated', 'authenticated', u.email,",
+         "  extensions.crypt(gen_random_uuid()::text, extensions.gen_salt('bf')), coalesce(u.confirmado_em, now()),",
+         "  coalesce(u.app, '{\"provider\":\"email\",\"providers\":[\"email\"]}'::jsonb), coalesce(u.meta, '{}'::jsonb) || '{\"trocar_senha\":true}'::jsonb,",
+         "  u.criado_em, now(), '', '', '', ''",
+         f'from jsonb_to_recordset({lit(usuarios)}) as u(id uuid, email text, criado_em timestamptz, confirmado_em timestamptz, app jsonb, meta jsonb)',
+         'on conflict (id) do nothing;',
+         'insert into auth.identities (provider_id, user_id, identity_data, provider, created_at, updated_at)',
+         "select u.id::text, u.id, jsonb_build_object('sub', u.id::text, 'email', u.email, 'email_verified', true), 'email', now(), now()",
+         'from auth.users u where not exists (select 1 from auth.identities i where i.user_id = u.id);', '',
+         '-- 2) limpa os dados iniciais da instalação (unidade Matriz, locais, parâmetros) para pôr os originais',
+         'truncate table ' + ', '.join(f'public."{t}"' for t in tabelas) + ' restart identity cascade;', '']
+    for t, cs in tabelas.items():
+        if not dados[t]: continue
+        nomes = ', '.join(f'"{c["c"]}"' for c in cs)
+        ov = ' overriding system value' if any(c['id'] for c in cs) else ''
+        L.append(f'-- {t}: {len(dados[t])} registro(s)')
+        L.append(f'insert into public."{t}" ({nomes}){ov}\nselect {nomes} from jsonb_populate_recordset(null::public."{t}", {lit(dados[t])});')
+    L += ['', '-- 3) numeração automática continua de onde parou']
+    for t, cs in tabelas.items():
+        for c in cs:
+            if c['id']:
+                L.append(f"select setval(pg_get_serial_sequence('public.\"{t}\"', '{c['c']}'), coalesce((select max(\"{c['c']}\") from public.\"{t}\"), 0) + 1, false);")
+    L += ['', 'commit;', '', '-- CONFERÊNCIA: a coluna "esperado" tem que ser igual a "encontrado" em todas as linhas']
+    partes = [f"select 'usuários de login' item, (select count(*) from auth.users)::int encontrado, {len(usuarios)} esperado"]
+    partes += [f"select '{t}', (select count(*) from public.\"{t}\")::int, {len(dados[t])}" for t in tabelas]
+    L.append('select item, encontrado, esperado, case when encontrado >= esperado then \'OK\' else \'ATENÇÃO\' end resultado from (\n  '
+             + '\n  union all '.join(partes) + '\n) r order by item;')
+    return '\n'.join(L) + '\n'
+
+def usuarios_de_dados(dados, usuarios):
+    email = {u['id']: u['email'] for u in usuarios}
+    linhas = ['| Login | Nome | Função | Papéis | Ativo |', '|---|---|---|---|---|']
+    for p in sorted(dados.get('perfis', []), key=lambda p: (p.get('nome') or '')):
+        login = (email.get(p['user_id']) or p.get('usuario') or '').split('@')[0]
+        linhas.append(f"| `{login}` | {p.get('nome') or ''} | {p.get('funcao') or ''} | {', '.join(p.get('papeis') or [])} | {'sim' if p.get('ativo') else 'não'} |")
+    ops = dados.get('operadores', [])
+    if ops: linhas += ['', 'Padeiros/operadores (entram com senha de 6 números no tablet): ' + ', '.join(sorted(o['nome'] for o in ops))]
+    return '\n'.join(linhas) + '\n'
 
 def main():
-    ap = argparse.ArgumentParser(); ap.add_argument('--saida', required=True); ap.add_argument('--usuarios', help='arquivo PRIVADO com a lista de usuários e papéis (sem senhas)'); a = ap.parse_args()
+    ap = argparse.ArgumentParser()
+    ap.add_argument('--saida', required=True)
+    ap.add_argument('--sem-dados', action='store_true', help='não incluir os dados de produção (só código e banco vazio)')
+    a = ap.parse_args()
     versao = re.search(r"VERSAO_APP = '([^']+)'", ler('versao.js')).group(1)
+    ref_proj = re.search(r'https://([a-z0-9]+)\.supabase\.co', ler('config.js')).group(1)
     mudou, _ = montar_banco()
     if mudou or git('status', '--porcelain'):
         sys.exit('PARE: há mudanças não commitadas (ou o banco completo foi atualizado agora). Faça commit e rode de novo.\n' + git('status', '--short'))
@@ -299,15 +282,36 @@ def main():
     ref = referencia_banco(os.path.join(pasta, 'site', 'banco', '00-instalar-banco-completo.sql'))
     ref['ultima'] = ref['versoes'].split(', ')[-1]
     open(os.path.join(pasta, 'CONFERENCIA', 'conferir-banco.sql'), 'w', encoding='utf-8').write(CONFERIR_SQL.format(versao=versao, **ref))
-    open(os.path.join(pasta, 'PROMPT_RECONSTRUCAO.md'), 'w', encoding='utf-8').write(PROMPT.format(versao=versao, commit=commit, data=data, usuarios=usuarios_md(a.usuarios)))
-    if a.usuarios and os.path.exists(a.usuarios): shutil.copy(a.usuarios, os.path.join(pasta, 'usuarios.md'))   # para o próximo backup
-    open(os.path.join(pasta, 'LEIA-PRIMEIRO.md'), 'w', encoding='utf-8').write(LEIA.format(versao=versao, commit=commit, data=data))
+    # dados de hoje (privados: só no zip)
+    admin, admin_nome, resumo = 'SEU-USUARIO', 'SEU NOME', ['- Dados de produção: **não incluídos** (backup feito com --sem-dados).']
+    if not a.sem_dados:
+        tabelas, dados, usuarios, versao_banco = exportar_dados(ref_proj)
+        if versao_banco != ref['ultima']:
+            sys.exit(f'PARE: o banco de produção está na versão {versao_banco} e o código na {ref["ultima"]}. Aplique a atualização antes do backup.')
+        priv = os.path.join(pasta, 'DADOS_PRIVADOS'); os.makedirs(priv)
+        sql = sql_restaurar(tabelas, dados, usuarios, versao_banco, versao, data)
+        open(os.path.join(priv, 'restaurar-dados.sql'), 'w', encoding='utf-8').write(sql)
+        open(os.path.join(priv, 'usuarios.md'), 'w', encoding='utf-8').write(f'# Usuários em {data} (CONFIDENCIAL · sem senhas)\n\n' + usuarios_de_dados(dados, usuarios))
+        email = {u['id']: u['email'] for u in usuarios}
+        adm = next((p for p in sorted(dados.get('perfis', []), key=lambda p: p.get('criado_em') or '') if 'admin' in (p.get('papeis') or []) and p.get('ativo')), None)
+        if adm: admin, admin_nome = (email.get(adm['user_id']) or adm['usuario']).split('@')[0], adm.get('nome') or adm['usuario']
+        n = {t: len(x) for t, x in dados.items()}
+        resumo = [f'- Banco de produção na versão **{versao_banco}**, dados exportados em {data}.',
+                  f'- {len(usuarios)} usuários de login, {n.get("operadores", 0)} padeiros/operadores, {n.get("produtos", 0)} produtos, '
+                  f'{n.get("fornecedores", 0)} fornecedores, {n.get("fichas_tecnicas", 0)} fichas técnicas, {n.get("pedidos", 0)} pedidos, '
+                  f'{n.get("movimentos", 0)} movimentos de estoque, {n.get("producoes", 0)} produções, {n.get("auditoria", 0)} registros de auditoria.',
+                  f'- {sum(n.values())} registros em {len(n)} tabelas, todos em `DADOS_PRIVADOS/restaurar-dados.sql`.']
+    resumo += [f'- Código `{commit}`: {len(linhas)} arquivos, conferidos por SHA-256. Nenhum segredo encontrado.']
+    v = dict(versao=versao, commit=commit, data=data, admin=admin, admin_nome=admin_nome, resumo='\n'.join(resumo))
+    for m in ('PROMPT_RECONSTRUCAO.md', 'GUIA_DO_DONO.md', 'LEIA-PRIMEIRO.md'):
+        open(os.path.join(pasta, m), 'w', encoding='utf-8').write(modelo(m, **v))
     open(os.path.join(pasta, 'ESPECIFICACAO_DO_SISTEMA.md'), 'w', encoding='utf-8').write(especificacao(versao))
     # autoconferência: o próprio pacote tem que bater com o manifesto
     r = subprocess.run([sys.executable, os.path.join(pasta, 'CONFERENCIA', 'conferir_arquivos.py'), os.path.join(pasta, 'site')], capture_output=True, text=True)
     if 'TODOS OS ARQUIVOS IDÊNTICOS' not in r.stdout: sys.exit('PARE: autoconferência falhou\n' + r.stdout)
     z = shutil.make_archive(pasta, 'zip', a.saida, nome)
     print(f'OK · versão {versao} · código {commit} · {len(linhas)} arquivos · segredos: nenhum')
+    print('\n'.join(resumo))
     print(f'banco de referência: {ref}')
     print(z)
 

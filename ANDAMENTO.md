@@ -24,7 +24,7 @@ Arquivo público: sem nomes de pessoas, senhas, tokens ou dados da empresa.
 ## Pendências do sistema
 - [ ] **Limpeza dos dados de teste**: só quando o dono disser "finalizei os testes". Os dados atuais
       são de teste (códigos com prefixo "T"); manter os cadastros reais sem "T" feitos pelo dono.
-- [ ] Subtítulo embaixo do nome da masseira: item 4 de um pedido ficou cortado; perguntar ao dono.
+- [ ] Subtítulo embaixo do nome da masseira: item 4 de um pedido ficou cortado. O dono vai conferir na tela e responder.
 - [ ] (Opcional, fase 2) Esconder custos também no banco para pesagem/padeiro (hoje só a tela esconde).
 - [ ] (Opcional) Refatoração: levar os testes para o repositório e consolidar o CSS; só se o dono aprovar.
 
@@ -35,4 +35,4 @@ Arquivo público: sem nomes de pessoas, senhas, tokens ou dados da empresa.
 - [ ] Embalagens em BOBINA: unidade de compra em kg + fator de conversão no cadastro.
 - [ ] Revogar tokens antigos do Supabase; GitHub: segundo e-mail e verificação em 2 etapas.
 - [ ] Comprar os tablets.
-- [ ] Backup: quando quiser, dizer "executar backup da versão atual".
+- [ ] Guardar no Drive ("Backups sistema estoque") o backup completo entregue em 24/11/2026.

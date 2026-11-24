@@ -18,15 +18,22 @@ Valem para TODA alteração neste projeto, sem precisar o dono pedir de novo.
 - Toda conversa nova: ler o `ANDAMENTO.md` antes de começar. Ao fim de cada entrega, atualizar o
   `ANDAMENTO.md` (situação, versões, pendências) e fazer commit junto.
 
-## BACKUP · quando o dono disser "executar backup da versão atual"
-1. Conferir que tudo está commitado e publicado (git status limpo, push feito).
-2. Rodar: `python3 ferramentas/gerar_backup.py --saida <pasta de rascunho> --usuarios <lista privada>` (ele monta o banco completo, gera o
-   PROMPT_RECONSTRUCAO.md, a ESPECIFICACAO_DO_SISTEMA.md, o manifesto SHA-256, confere tudo e recusa se achar segredo).
+## BACKUP · quando o dono disser "executar backup da versão atual" (ou "faça um backup")
+O backup é SEMPRE COMPLETO: uma pasta zipada com tudo para reconstruir o sistema do zero, idêntico, mesmo que o dono
+perca tudo (conta do Claude, GitHub, Supabase). Ele arrasta a pasta para qualquer IA e ela o guia passo a passo.
+Conteúdo: código inteiro (`site/`, com CLAUDE.md e ANDAMENTO.md), banco completo, dados do dia + usuários sem senhas
+(`DADOS_PRIVADOS/restaurar-dados.sql`, testado), PROMPT_RECONSTRUCAO.md (para a IA, inclusive como conduzir um dono
+não técnico), GUIA_DO_DONO.md (tela a tela), ESPECIFICACAO_DO_SISTEMA.md e CONFERENCIA/ (SHA-256 + conferência do banco).
+1. Conferir que tudo está commitado e publicado (git status limpo, push feito na `main`).
+2. Rodar: `python3 ferramentas/gerar_backup.py --saida <pasta de rascunho>` (lê os dados de produção pela Management
+   API com o token dos segredos de rede; sem token, avisar o dono e pedir, ou usar `--sem-dados` só se ele aceitar).
 3. Se o script disser que atualizou `banco/00-instalar-banco-completo.sql`, fazer commit + push e rodar de novo.
-4. Entregar o zip ao dono (SendUserFile, display attach) e lembrar de guardar no Drive em "Backups sistema estoque".
-5. Toda atualização nova do banco: arquivo `banco/atualizar-banco-vX.Y.sql` E acrescentar o mesmo conteúdo ao fim de
-   `js/demo/banco-demo.sql` (o backup monta o banco completo a partir dos dois). A lista de usuários (sem senhas) NUNCA vai para o repositório (é público): vem do último backup (arquivo
-   `usuarios.md` dentro do zip) e é passada com `--usuarios`.
+4. Testar a restauração dos dados num PostgreSQL de teste (PGlite com o banco completo) antes de entregar.
+5. Entregar o zip ao dono (SendUserFile, display attach) e lembrar de guardar no Drive em "Backups sistema estoque".
+6. Os textos do pacote ficam em `ferramentas/modelos_backup/` (marcadores @@...@@): melhorar lá quando preciso.
+7. Toda atualização nova do banco: arquivo `banco/atualizar-banco-vX.Y.sql` E acrescentar o mesmo conteúdo ao fim de
+   `js/demo/banco-demo.sql` (o backup monta o banco completo a partir dos dois). Dados e nomes de pessoas NUNCA vão para
+   o repositório (é público): só para dentro do zip.
 
 ## 1. Segurança máxima (prioridade número 1)
 - Nunca colocar segredo no código: chave `service_role`, senhas, tokens. Só a chave **publicável** do Supabase pode ficar no `config.js`.
