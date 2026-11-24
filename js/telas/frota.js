@@ -85,7 +85,7 @@ export function TelaFrotaPainel() {
   return html`
     <${Cabecalho} titulo="Painel da frota" sub=${`Manutenção de veículos: corretiva, preventiva e pneus (contas a pagar)${ultImp ? ` · dados de ${dataHora(ultImp.criado_em)}` : ''}`} />
     <${AvisosLinha} itens=${[
-      !f.lancamentos.length && { icone: 'frota-importar', texto: 'Sem despesas ainda', botao: 'Importar', acao: () => ir('frota-importar') },
+      !f.lancamentos.length && { icone: 'frota-importar', texto: 'Ainda não há despesas importadas' },
       pend > 0 && { icone: 'frota-apontar', texto: html`<b>${pend}</b> ${pend === 1 ? 'nota' : 'notas'} para apontar`, botao: 'Apontar', acao: () => ir('frota-apontar') },
       placasPend > 0 && { icone: 'frota-placas', texto: html`<b>${placasPend}</b> ${placasPend === 1 ? 'placa' : 'placas'} sem cadastro`, botao: 'Resolver', acao: () => ir('frota-placas') },
     ]} />

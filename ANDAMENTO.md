@@ -3,9 +3,11 @@
 Arquivo público: sem nomes de pessoas, senhas, tokens ou dados da empresa.
 
 ## Situação atual (24/11/2026)
-- Sistema publicado: https://ipalamoni.github.io/pss-estoque/ (versão do app 2.20.0).
-- Banco de produção (Supabase `kuttfnmjvzgzebjpjvvy`, "estoque-pss"): versão **2.20.0**, todas as
+- Sistema publicado: https://ipalamoni.github.io/pss-estoque/ (versão do app 2.21.0).
+- Banco de produção (Supabase `kuttfnmjvzgzebjpjvvy`, "estoque-pss"): versão **2.21.0**, todas as
   conferências OK. Não mexer no projeto Supabase `pss-vendas`.
+- v2.21.0 (24/11/2026): corrigida a importação da frota ("UPDATE requires a WHERE clause": o Supabase recusa UPDATE
+  sem WHERE); importar despesas só para o administrador (menu e banco); verificador ferramentas/checar_sql.py.
 - v2.20.0 (24/11/2026, banco + tela, PUBLICADO): módulo MANUTENÇÃO DE VEÍCULOS (Painel da frota com caminhões,
   utilitários e carros separados; Apontar despesas com divisão de nota entre veículos; Veículos com ficha/raio-x;
   Placas a resolver; Importar despesas; Tipos de manutenção). Banco v2.20 aplicado em produção; carga inicial feita

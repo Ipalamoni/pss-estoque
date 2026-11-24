@@ -112,7 +112,7 @@ const MENU = [
   { id: 'frota-apontar', titulo: 'Apontar despesas', papeis: ['admin', 'frota'], tela: TelaFrotaApontar },
   { id: 'frota-veiculos', titulo: 'Veículos', papeis: ['admin', 'frota'], tela: TelaFrotaVeiculos },
   { id: 'frota-placas', titulo: 'Placas a resolver', papeis: ['admin', 'frota'], tela: TelaFrotaPlacas },
-  { id: 'frota-importar', titulo: 'Importar despesas', papeis: ['admin', 'frota'], tela: TelaFrotaImportar },
+  { id: 'frota-importar', titulo: 'Importar despesas', papeis: ['admin'], tela: TelaFrotaImportar },   // só o administrador importa
   { id: 'frota-tipos', titulo: 'Tipos de manutenção', papeis: ['admin', 'frota'], tela: TelaFrotaTipos },
   { grupo: 'Administração', papeis: ['admin', 'diretoria'] },
   { id: 'usuarios', titulo: 'Usuários e acessos', papeis: ['admin'], tela: TelaUsuarios },

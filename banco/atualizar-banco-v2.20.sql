@@ -369,7 +369,7 @@ create or replace function public.frota_importar(p jsonb)
 returns jsonb language plpgsql security definer set search_path = public, pg_temp as $$
 declare v_desde date; v_novas int; v_alt int; v_rem int; v_imp bigint; v_n int; v_placas jsonb; v_serv_novos int;
 begin
-  perform public._exigir('frota');
+  perform public._exigir('importacao');   -- importar despesas: só o ADMINISTRADOR
   if jsonb_typeof(p->'linhas') <> 'array' then raise exception 'Arquivo sem linhas.'; end if;
   if jsonb_array_length(p->'linhas') > 50000 then raise exception 'Arquivo grande demais (máximo 50.000 linhas de manutenção).'; end if;
 
@@ -400,7 +400,8 @@ begin
                  row_number() over (partition by fornecedor_codigo, titulo, parcela, conta, placa order by seq)) as chave from _frota_imp) k
    where k.seq = i.seq;
   update _frota_imp set assinatura = md5(concat_ws('|', fornecedor_nome, cnpj, emissao, entrada, vencimento, pagamento, valor_titulo, juros, desconto,
-                                                   valor_pago, centro_custo, valor, observacao, status, placa_original, tipo_documento));
+                                                   valor_pago, centro_custo, valor, observacao, status, placa_original, tipo_documento))
+   where true;   -- o Supabase recusa UPDATE sem WHERE (proteção contra alterar a tabela inteira sem querer)
   v_desde := date_trunc('year', (select min(entrada) from _frota_imp))::date;
 
   select count(*) into v_novas from _frota_imp i where not exists (select 1 from public.frota_lancamentos l where l.chave = i.chave);

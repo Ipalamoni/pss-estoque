@@ -46,6 +46,8 @@ não técnico), GUIA_DO_DONO.md (tela a tela), ESPECIFICACAO_DO_SISTEMA.md e CON
 - Registrar em auditoria tudo que altera dados.
 - Ao mexer em login, sessão, senha, permissões ou dados sensíveis: revisar o impacto de segurança antes de publicar.
 - Recomendar ao dono o que só ele pode ligar (ex.: proteção de senha vazada, MFA, backups) quando for relevante.
+- O Supabase RECUSA `UPDATE`/`DELETE` sem `WHERE` (proteção safeupdate; o banco de teste não tem). Antes de aplicar
+  rode `python3 ferramentas/checar_sql.py banco/atualizar-banco-vX.Y.sql`; quando for de propósito, use `where true`.
 - Mudança no banco = arquivo novo em `banco/` (idempotente, com bloco de CONFERÊNCIA no fim), testado antes no banco
   de demonstração configurado como o Supabase (privilégios padrão + RLS ligado) e com o ataque de teste (sem login,
   conta sem perfil, papéis de pouco acesso). O dono cola no SQL Editor do Supabase.
@@ -75,7 +77,7 @@ não técnico), GUIA_DO_DONO.md (tela a tela), ESPECIFICACAO_DO_SISTEMA.md e CON
   a pessoa marca as duas. Exceção: quando o cálculo exige um só (ex.: saldo do Kardex por local).
 
 ### 2.0.1 Módulo MANUTENÇÃO DE VEÍCULOS (frota)
-- Acesso: admin + papel `frota`. Dados do contas a pagar (contas Manutenção corretiva/preventiva e Pneus) entram por
+- Acesso: admin + papel `frota`; IMPORTAR despesas é só do administrador. Dados do contas a pagar (contas Manutenção corretiva/preventiva e Pneus) entram por
   `frota_importar` (CSV hoje; consulta ao Firebird depois, mesma função). Importação INCREMENTAL do ano inteiro:
   linhas novas entram, alteradas atualizam, sumidas saem (removido_em). Apontamento (etiquetas, obs., km) fica em
   `frota_servicos` (nota × veículo) e NUNCA se perde. Placas erradas → `frota_placa_apelidos`.
