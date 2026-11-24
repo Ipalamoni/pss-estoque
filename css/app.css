@@ -1608,6 +1608,7 @@ html[data-tema="escuro"] { --fr-corretiva: #c97a18; --fr-preventiva: #34a07c; --
   border: 1.5px solid #2b3440; border-radius: 5px; background: #fff; color: #111; font-size: .86rem; line-height: 1; overflow: hidden; white-space: nowrap; }
 .placa i { align-self: stretch; width: 6px; background: #1f4fa3; margin-right: 6px; }
 .placa { padding-right: 6px; min-height: 24px; }
+.placa { flex-shrink: 0; }   /* a placa nunca encolhe (nome de fornecedor comprido ao lado não corta a placa) */
 .placa-g { font-size: 1.25rem; min-height: 38px; border-width: 2px; padding-right: 10px; }
 .placa-g i { width: 9px; margin-right: 9px; }
 .placa-desconhecida { border-style: dashed; border-color: var(--laranja); }
@@ -1657,7 +1658,7 @@ html[data-tema="escuro"] .placa:not(.placa-geral) { border-color: #9aa4ae; }
 .placas-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 12px; margin-bottom: 14px; }
 .placa-card { background: var(--cartao); border: 1px solid var(--borda); border-left: 4px solid var(--laranja); border-radius: var(--raio); padding: 12px; box-shadow: var(--sombra);
   display: flex; flex-direction: column; gap: 10px; }
-.pc-topo { display: flex; gap: 12px; align-items: center; } .pc-topo > div { display: flex; flex-direction: column; } .pc-topo small { color: var(--texto-2); }
+.pc-topo { display: flex; gap: 12px; align-items: center; } .pc-topo > div { display: flex; flex-direction: column; min-width: 0; } .pc-topo small { color: var(--texto-2); }
 .pc-obs { margin: 0; font-size: .85rem; color: var(--texto-2); font-style: italic; }
 .pc-sugestao { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; background: var(--verde-f); border-radius: 8px; padding: 8px 10px; }
 .pc-sugestao small { color: var(--texto-2); }

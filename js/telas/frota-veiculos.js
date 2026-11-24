@@ -15,9 +15,11 @@ import { Placa, SeletorBase, TagsLidas, ModalApontar, AvisosLinha, TextoComPlaca
 const COR_SIT = { ativo: 'verde', parado: 'laranja', vendido: 'cinza' };
 
 export function TelaFrotaVeiculos() {
-  const { estadoRota, setEstadoRota } = useApp();
+  const { estadoRota, setEstadoRota, voltar } = useApp();
   const { f, erro } = useFrota();
   const [abrir, setAbrir] = useState(estadoRota?.abrir || null);
+  // veio de outra tela direto para a ficha (ex.: ranking do Painel): o "voltar" retorna para lá, não para a lista
+  const [veioDeFora] = useState(!!estadoRota?.abrir);
   const [editando, setEditando] = useState(estadoRota?.novo ? { placa: estadoRota.novo } : null);
   const [busca, setBusca] = useState('');
   const [cat, setCat] = useState([]); const [sit, setSit] = useState(['ativo', 'parado']); const [uso, setUso] = useState([]);
@@ -25,7 +27,7 @@ export function TelaFrotaVeiculos() {
   if (erro) return html`<${Cabecalho} titulo="Veículos" /><${Vazio} texto="Não consegui carregar a frota. Confira a internet e tente de novo." />`;
   if (!f) return html`<${Cabecalho} titulo="Veículos" /><${Carregando} />`;
   const v = abrir && f.mapa.veiculo.get(abrir);
-  if (v) return html`<${FichaVeiculo} f=${f} v=${v} aoVoltar=${() => setAbrir(null)} aoEditar=${() => setEditando(v)} />
+  if (v) return html`<${FichaVeiculo} f=${f} v=${v} aoVoltar=${veioDeFora ? voltar : () => setAbrir(null)} aoEditar=${() => setEditando(v)} />
     ${editando && html`<${FormVeiculo} f=${f} veiculo=${editando} aoFechar=${() => setEditando(null)} />`}`;
 
   const ano = f.anos[0] || Number(hojeISO().slice(0, 4));
