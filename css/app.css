@@ -1552,3 +1552,42 @@ html[data-tema="escuro"] { --zebra: #272a2e; --zebra-hover: #2c3532; }
 .tabela-barra { display: flex; justify-content: flex-end; margin: 0 0 6px; }
 .colunas-lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 4px 14px; }
 .colunas-item { min-height: 40px; }
+
+/* ---------- relatórios: filtros + contagem + Exportar + Colunas numa faixa só (v2.14) ----------
+   Tudo lado a lado; só desce para a linha de baixo quando não cabe. Sobra o máximo de tela para a tabela. */
+.filtros-com-acoes { gap: 8px 10px; }
+.filtros-com-acoes > .busca { flex: 1 1 200px; min-width: 180px; max-width: 360px; }
+.filtros-com-acoes > .busca .busca { min-width: 0; max-width: none; width: 100%; }
+.filtros-com-acoes .entrada { min-width: 0; }
+.filtros-com-acoes .check { white-space: nowrap; }
+.filtros-acoes { display: flex; align-items: center; gap: 6px 10px; flex-wrap: wrap; justify-content: flex-end; margin-left: auto; }
+.filtros-acoes > .nota { margin: 0; white-space: nowrap; }
+.filtros-acoes .exportar { margin-left: 0; }
+.filtros .tabela-barra, .filtros-acoes .tabela-barra { margin: 0; }
+/* seleção de vários (caixinhas) */
+.multi { position: relative; display: inline-block; }
+.multi-botao { display: inline-flex; align-items: center; justify-content: space-between; gap: 8px; width: auto; min-width: 150px; max-width: 240px;
+  text-align: left; cursor: pointer; }
+.multi-texto { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.multi-seta { color: var(--texto-2); font-size: .8rem; }
+.multi-botao.multi-com { border-color: var(--cor); }
+.multi-botao:focus-visible { outline: 2px solid var(--cor); outline-offset: 1px; }
+.multi-lista { position: absolute; z-index: 70; left: 0; top: calc(100% + 4px); min-width: 230px; max-width: min(340px, calc(100vw - 32px));
+  max-height: 340px; overflow-y: auto; background: var(--cartao); border: 1px solid var(--borda); border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(16,24,40,.18); padding: 6px; display: flex; flex-direction: column; }
+.multi-item { min-height: 40px; padding: 4px 8px; border-radius: 6px; }
+.multi-item:hover { background: var(--cor-clara); }
+.multi-todos { border-bottom: 1px solid var(--borda); border-radius: 6px 6px 0 0; margin-bottom: 2px; font-weight: 600; }
+.multi-ok { margin: 6px 4px 2px; min-height: 40px; }
+@media (max-width: 640px) {
+  .multi, .multi-botao { width: 100%; max-width: none; flex: 1 1 100%; }
+  .multi-lista { position: static; max-width: none; box-shadow: none; margin-top: 4px; }
+  .filtros-acoes { width: 100%; justify-content: space-between; margin-left: 0; flex-wrap: nowrap; }
+  .filtros-acoes .exportar { width: auto; flex: 0 0 auto; justify-content: flex-end; flex-wrap: nowrap; margin-left: auto; }
+  .filtros-acoes .exportar > .btn { flex: 0 0 auto; padding: 6px 12px; }
+  .filtros-acoes > .nota { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+}
+@media (max-width: 860px), (pointer: coarse) { .multi-item { min-height: 44px; } }
+@media print { .filtros-acoes { display: none !important; } }
+.filtros .chips { margin-bottom: 0; }
+.filtros-cel.com-fixo > .filtros-acoes { grid-column: 1 / -1; }

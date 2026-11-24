@@ -22,16 +22,16 @@ export function TelaFichas() {
 
   return html`
     <${Cabecalho} titulo="Fichas técnicas" sub="Receitas usadas na saída da pesagem (quantidades por 1 receita)">
+      ${pode && html`<button class="btn btn-pri" onClick=${() => setEditando({})}><${Icone} nome="mais" tam=${18} /> Nova ficha</button>`}
+    </${Cabecalho}>
+    <${Filtros} acoes=${html`<span class="nota">${pl(linhas.length, 'receita', 'receitas')}</span>
       <${Exportar} titulo="Fichas técnicas" filtros=${pl(linhas.length, 'receita', 'receitas')} arquivo=${`fichas-tecnicas-${hojeISO()}`} linhas=${linhas.flatMap((f) => itensDe(f.id).map((it, i) => ({ f, it, i })))}
         colunas=${[{ titulo: 'Código', valor: (x) => (x.i === 0 ? x.f.codigo : '') }, { titulo: 'Receita', valor: (x) => (x.i === 0 ? x.f.nome : ''), largura: 28 },
           { titulo: 'Produto final', valor: (x) => (x.i === 0 ? x.f.produto_final : '') }, { titulo: 'Rende por receita', valor: (x) => (x.i === 0 && x.f.rendimento_qtd ? Number(x.f.rendimento_qtd) : '') },
           { titulo: 'Unid. rendimento', valor: (x) => (x.i === 0 ? x.f.rendimento_unidade || '' : '') },
           { titulo: 'Cód. ingrediente', valor: (x) => dados.mapa.produto.get(x.it.produto_id)?.codigo }, { titulo: 'Ingrediente', valor: (x) => dados.mapa.produto.get(x.it.produto_id)?.descricao, largura: 32 },
           { titulo: 'Quantidade por receita', valor: (x) => Number(x.it.quantidade), num: true }, { titulo: 'Unid.', valor: (x) => dados.mapa.produto.get(x.it.produto_id)?.unidade_estoque },
-          verCusto && { titulo: 'Custo estimado', valor: (x) => Math.round(Number(x.it.quantidade) * Number(dados.mapa.produto.get(x.it.produto_id)?.custo_medio || 0) * 100) / 100, num: true }].filter(Boolean)} />
-      ${pode && html`<button class="btn btn-pri" onClick=${() => setEditando({})}><${Icone} nome="mais" tam=${18} /> Nova ficha</button>`}
-    </${Cabecalho}>
-    <${Filtros} ativos=${inativos ? 1 : 0} fixo=${html`<${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Buscar receita" />`}>
+          verCusto && { titulo: 'Custo estimado', valor: (x) => Math.round(Number(x.it.quantidade) * Number(dados.mapa.produto.get(x.it.produto_id)?.custo_medio || 0) * 100) / 100, num: true }].filter(Boolean)} />`} ativos=${inativos ? 1 : 0} fixo=${html`<${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Buscar receita" />`}>
       <label class="check"><input type="checkbox" checked=${inativos} onChange=${(e) => setInativos(e.target.checked)} /> Mostrar inativas</label>
     </${Filtros}>
     <${Tabela} linhas=${linhas} aoClicar=${setEditando} ordemInicial=${{ chave: 'nome', dir: 1 }}

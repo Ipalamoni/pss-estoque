@@ -235,9 +235,9 @@ function Historico({ aoAbrir, meus, gestao }) {
     .filter((t) => contem(`${t.id} ${nomeLocal(dados, t.origem_id)} ${nomeLocal(dados, t.destino_id)} ${t.itens.map((i) => dados.mapa.produto.get(i.produto_id)?.descricao).join(' ')}`, busca));
   const texto = (t) => t.itens.map((i) => `${num(i.quantidade, 3)} ${dados.mapa.produto.get(i.produto_id)?.unidade_estoque} ${dados.mapa.produto.get(i.produto_id)?.descricao}`).join(' · ');
   const pes = (u) => dados.mapa.perfil.get(u)?.nome || '';
-  return html`<div class="filtros"><input class="entrada" type="date" value=${de} onChange=${(e) => setDe(e.target.value)} /> até <input class="entrada" type="date" value=${ate} onChange=${(e) => setAte(e.target.value)} />
-      <input class="entrada busca" placeholder="Buscar produto, local, nº" value=${busca} onInput=${(e) => setBusca(e.target.value)} />
-      <${Exportar} titulo="Relatório de transferências" filtros=${`${de} a ${ate}`} arquivo="transferencias" linhas=${linhas} colunas=${[
+  return html`<div class="filtros filtros-com-acoes"><label class="campo-inline">De <input class="entrada" type="date" value=${de} onChange=${(e) => setDe(e.target.value)} /></label> <label class="campo-inline">até <input class="entrada" type="date" value=${ate} onChange=${(e) => setAte(e.target.value)} /></label>
+      <div class="busca"><input class="entrada busca" type="search" aria-label="Buscar" placeholder="Buscar produto, local, nº" value=${busca} onInput=${(e) => setBusca(e.target.value)} /></div>
+      <div class="filtros-acoes"><${Exportar} titulo="Relatório de transferências" filtros=${`${de} a ${ate}`} arquivo="transferencias" linhas=${linhas} colunas=${[
         { titulo: 'Nº', valor: (t) => t.id }, { titulo: 'Situação', valor: (t) => SITUACAO_TRANSF[t.situacao] },
         { titulo: 'Origem', valor: (t) => nomeLocal(dados, t.origem_id) }, { titulo: 'Destino', valor: (t) => nomeLocal(dados, t.destino_id) },
         { titulo: 'Itens', valor: texto, largura: 50 },
@@ -245,7 +245,7 @@ function Historico({ aoAbrir, meus, gestao }) {
         { titulo: 'Recebido', valor: (t) => t.itens.reduce((s, i) => s + Number(i.recebido || 0), 0), num: true },
         { titulo: 'Separou', valor: (t) => `${pes(t.separado_por)} ${dataHora(t.separado_em)}` }, { titulo: 'Enviou', valor: (t) => (t.enviado_em ? `${pes(t.enviado_por)} ${dataHora(t.enviado_em)}` : '') },
         { titulo: 'Recebeu', valor: (t) => (t.recebido_em ? `${pes(t.recebido_por)} ${dataHora(t.recebido_em)}` : '') },
-        { titulo: 'Cancelou', valor: (t) => (t.cancelado_em ? `${pes(t.cancelado_por)} · ${t.cancelado_motivo}` : '') }]} /></div>
+        { titulo: 'Cancelou', valor: (t) => (t.cancelado_em ? `${pes(t.cancelado_por)} · ${t.cancelado_motivo}` : '') }]} /></div></div>
     <${Tabela} linhas=${linhas} aoClicar=${(t) => aoAbrir(t.id)} vazio="Nenhuma transferência no período." colunas=${[
       { chave: 'id', titulo: 'Nº', num: true },
       { chave: 'sep', titulo: 'Data', valor: (t) => t.separado_em, render: (t) => dataHora(t.separado_em) },

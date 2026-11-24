@@ -5,7 +5,7 @@
 //  - Estoque valorizado por local (inclui em trânsito)
 //  - Saídas avulsas e perdas valorizadas à parte (não entram no custo do produto)
 // =====================================================================
-import { html, useState, useEffect, useMemo, useApp, Tabela, Cartao, Etiqueta, Carregando, avisar, useFiltroMudou } from '../ui.js';
+import { html, useState, useEffect, useMemo, useApp, Tabela, Cartao, Etiqueta, Carregando, avisar, useFiltroMudou, MultiEscolha, casaVarios } from '../ui.js';
 import { TIPOS_PRODUTO, tipoProduto, dataHora, hojeISO, somarDias, num, moeda, mensagemErro, contem } from '../util.js';
 import { Exportar } from '../exportar.js';
 import { nomeLocal } from '../producao-util.js';
@@ -14,15 +14,17 @@ import { Colunas } from '../graficos.js';
 const m4 = (v) => (v === null || v === undefined || !Number.isFinite(Number(v)) ? '–' : 'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 }));
 const inicioDia = (iso) => new Date(iso + 'T00:00:00').toISOString();
 
-function Periodo({ de, ate, setDe, setAte }) {
+// período + filtros extras + ações (Exportar/Colunas) numa faixa só
+function Periodo({ de, ate, setDe, setAte, children, acoes }) {
   const h = hojeISO();
-  return html`<div class="filtros">
+  return html`<div class="filtros filtros-com-acoes">
     <label class="campo-inline">De <input class="entrada" type="date" value=${de} onChange=${(e) => setDe(e.target.value)} /></label>
     <label class="campo-inline">até <input class="entrada" type="date" value=${ate} onChange=${(e) => setAte(e.target.value)} /></label>
     <span class="chips"><button class="chip" onClick=${() => { setDe(h); setAte(h); }}>Hoje</button>
       <button class="chip" onClick=${() => { setDe(somarDias(h, -1)); setAte(somarDias(h, -1)); }}>Ontem</button>
       <button class="chip" onClick=${() => { setDe(somarDias(h, -6)); setAte(h); }}>7 dias</button>
-      <button class="chip" onClick=${() => { setDe(h.slice(0, 8) + '01'); setAte(h); }}>Este mês</button></span></div>`;
+      <button class="chip" onClick=${() => { setDe(h.slice(0, 8) + '01'); setAte(h); }}>Este mês</button></span>
+    ${children}${acoes && html`<div class="filtros-acoes">${acoes}</div>`}</div>`;
 }
 
 // ------------------------------ PRODUTO ACABADO ----------------------
@@ -67,16 +69,16 @@ export function CustoProdutoAcabado() {
     { titulo: 'Produzido', valor: (b) => b.q, num: true }, { titulo: 'Custo base', valor: (b) => b.mis, num: true }, { titulo: 'Custo farinha/fermento', valor: (b) => b.mac, num: true },
     { titulo: 'Custo embalagem', valor: (b) => b.emb, num: true }, { titulo: 'Custo total', valor: (b) => b.tot, num: true },
     { titulo: 'Custo unitário', valor: (b) => Number(b.custo_unitario || 0), texto: (b) => m4(b.custo_unitario), num: true }, { titulo: 'Custo padrão', valor: (b) => b.pad, num: true }];
-  return html`<${Periodo} de=${de} ate=${ate} setDe=${setDe} setAte=${setAte} />
+  return html`<${Periodo} de=${de} ate=${ate} setDe=${setDe} setAte=${setAte} acoes=${html`<${Exportar} tabela="custos-producao.custoprodutoacabado" titulo="Custo do produto acabado" filtros=${`${de} a ${ate}`} arquivo=${`custo-produto-${de}-a-${ate}`} colunas=${vis === 'receita' ? colR : colB} linhas=${vis === 'receita' ? porReceita : lista} />`}>
+      <span class="chips" role="group" aria-label="Como ver"><button class=${'chip' + (vis === 'receita' ? ' ativo' : '')} aria-pressed=${!!(vis === 'receita')} onClick=${() => setVis('receita')}>Por receita</button>
+      <button class=${'chip' + (vis === 'batelada' ? ' ativo' : '')} aria-pressed=${!!(vis === 'batelada')} onClick=${() => setVis('batelada')}>Por batelada</button></span>
+    </${Periodo}>
     <div class="cartoes">
       <${Cartao} titulo="Bateladas finalizadas" valor=${num(lista.length, 0)} />
       <${Cartao} titulo="Custo total produzido" valor=${moeda(tot)} />
       <${Cartao} titulo="Custo padrão (ficha)" valor=${moeda(pad)} />
       <${Cartao} titulo="Real × padrão" valor=${pad > 0 ? `${tot > pad ? '+' : ''}${num(((tot - pad) / pad) * 100, 1)}%` : '–'} cor=${pad > 0 && tot > pad * 1.02 ? 'c-vermelho' : pad > 0 && tot < pad * 0.98 ? 'c-verde' : ''} />
     </div>
-    <div class="filtros"><span class="chips"><button class=${'chip' + (vis === 'receita' ? ' ativo' : '')} aria-pressed=${!!(vis === 'receita')} onClick=${() => setVis('receita')}>Por receita</button>
-      <button class=${'chip' + (vis === 'batelada' ? ' ativo' : '')} aria-pressed=${!!(vis === 'batelada')} onClick=${() => setVis('batelada')}>Por batelada</button></span>
-      <${Exportar} tabela="custos-producao.custoprodutoacabado" titulo="Custo do produto acabado" filtros=${`${de} a ${ate}`} arquivo=${`custo-produto-${de}-a-${ate}`} colunas=${vis === 'receita' ? colR : colB} linhas=${vis === 'receita' ? porReceita : lista} /></div>
     ${vis === 'receita' ? html`<${Tabela} id="custos-producao.custoprodutoacabado" linhas=${porReceita} vazio="Nenhuma batelada finalizada no período." colunas=${[
         { chave: 'r', titulo: 'Receita', valor: (r) => f(r.id)?.nome, render: (r) => html`<b>${f(r.id)?.codigo}</b> ${f(r.id)?.nome}` },
         { chave: 'n', titulo: 'Bateladas', num: true },
@@ -107,12 +109,12 @@ export function CustoProdutoAcabado() {
 // ------------------------------ ESTOQUE VALORIZADO -------------------
 export function EstoqueValorizado() {
   const { dados } = useApp();
-  const [tipo, setTipo] = useState('');
+  const [tipo, setTipo] = useState([]);   // vários (vazio = todos)
   const [busca, setBusca] = useState('');
   const transito = useMemo(() => { const m = new Map(); const tm = new Map(dados.transferencias.map((x) => [x.id, x])); dados.transfItens.forEach((i) => { const t = tm.get(i.transferencia_id);
     if (t && t.situacao === 'enviada') m.set(i.produto_id, (m.get(i.produto_id) || 0) + Number(i.quantidade)); }); return m; }, [dados]);
   const locais = dados.locais.filter((l) => l.ativo);
-  const linhas = dados.produtos.filter((p) => p.controla_estoque !== false && (!tipo || tipoProduto(p) === tipo) && contem(`${p.codigo} ${p.descricao}`, busca)).map((p) => {
+  const linhas = dados.produtos.filter((p) => p.controla_estoque !== false && casaVarios(tipo, tipoProduto(p)) && contem(`${p.codigo} ${p.descricao}`, busca)).map((p) => {
     const cm = Number(p.custo_medio || 0); const por = {}; let fis = 0;
     locais.forEach((l) => { const e = dados.mapa.saldoLocal.get(`${p.id}|${l.id}`); const q = e ? Number(e.disponivel) + Number(e.separado) : 0; por[l.id] = q; fis += q; });
     const tr = transito.get(p.id) || 0;
@@ -128,14 +130,14 @@ export function EstoqueValorizado() {
       ${totTr > 0 && html`<${Cartao} titulo="Em trânsito" valor=${moeda(totTr)} cor="c-azul" />`}
     </div>
     ${porTipo.length > 0 && html`<div class="barra-tipos">${porTipo.map((x) => html`<span style=${`flex:${x.v}`} title=${`${TIPOS_PRODUTO[x.k]}: ${moeda(x.v)}`}><b>${TIPOS_PRODUTO[x.k]}</b> ${num((x.v / total) * 100, 0)}%</span>`)}</div>`}
-    <div class="filtros"><input class="entrada busca" placeholder="Buscar produto" value=${busca} onInput=${(e) => setBusca(e.target.value)} />
-      <select class="entrada" value=${tipo} onChange=${(e) => setTipo(e.target.value)}><option value="">Todos os tipos</option>${Object.entries(TIPOS_PRODUTO).map(([k, v]) => html`<option value=${k}>${v}</option>`)}</select>
-      <${Exportar} tabela="custos-producao.estoquevalorizado" titulo="Estoque valorizado por local" filtros=${dataHora(new Date())} arquivo=${`estoque-valorizado-${hojeISO()}`} linhas=${linhas} colunas=${[
+    <div class="filtros filtros-com-acoes"><div class="busca"><input class="entrada busca" type="search" aria-label="Buscar produto" placeholder="Buscar produto" value=${busca} onInput=${(e) => setBusca(e.target.value)} /></div>
+      <${MultiEscolha} todos="Todos os tipos" rotulo="Tipos" valor=${tipo} aoMudar=${setTipo} opcoes=${Object.entries(TIPOS_PRODUTO).map(([k, v]) => ({ valor: k, rotulo: v }))} />
+      <div class="filtros-acoes"><span class="nota">${linhas.length} produto${linhas.length === 1 ? '' : 's'}</span><${Exportar} tabela="custos-producao.estoquevalorizado" titulo="Estoque valorizado por local" filtros=${dataHora(new Date())} arquivo=${`estoque-valorizado-${hojeISO()}`} linhas=${linhas} colunas=${[
         { titulo: 'Código', valor: (p) => p.codigo }, { titulo: 'Produto', valor: (p) => p.descricao, largura: 32 }, { titulo: 'Tipo', valor: (p) => TIPOS_PRODUTO[tipoProduto(p)] },
         { titulo: 'Unid.', valor: (p) => p.unidade_estoque }, ...locais.map((l) => ({ titulo: nomeLocal(dados, l.id), valor: (p) => Math.round(p.por[l.id] * 1000) / 1000, num: true })),
         { titulo: 'Em trânsito', valor: (p) => p.tr, num: true }, { titulo: 'Total', valor: (p) => Math.round((p.fis + p.tr) * 1000) / 1000, num: true },
         { titulo: 'Custo médio', valor: (p) => p.cm, texto: (p) => m4(p.cm), num: true }, { titulo: 'Valor', valor: (p) => Math.round(p.valor * 100) / 100, texto: (p) => moeda(p.valor), num: true }]}
-        totais=${['TOTAL', '', '', '', ...locais.map((l) => moeda(totLocal(l.id))), moeda(totTr), '', '', moeda(total)]} /></div>
+        totais=${['TOTAL', '', '', '', ...locais.map((l) => moeda(totLocal(l.id))), moeda(totTr), '', '', moeda(total)]} /></div></div>
     <${Tabela} id="custos-producao.estoquevalorizado" linhas=${linhas} ordemInicial=${{ chave: 'valor', dir: -1 }} max=${400} colunas=${[
       { chave: 'cod', titulo: 'Código', valor: (p) => p.codigo, render: (p) => p.codigo }, { chave: 'descricao', titulo: 'Produto', classe: 'col-desc', render: (p) => html`<b>${p.descricao}</b>` },
       ...locais.map((l) => ({ chave: 'l' + l.id, titulo: l.nome, num: true, valor: (p) => p.por[l.id], render: (p) => (Math.abs(p.por[l.id]) > 0.0001 ? html`<span class=${p.por[l.id] < 0 ? 'texto-vermelho' : ''}>${num(p.por[l.id], 2)}</span>` : html`<span class="texto-cinza">–</span>`) })),
@@ -165,7 +167,11 @@ export function AvulsasPerdas() {
   const quem = (m) => [dados.mapa.perfil.get(m.usuario_id)?.nome, m.operador_id && `padeiro ${dados.mapa.operador.get(m.operador_id)?.nome}`].filter(Boolean).join(' · ');
   const porProd = new Map(); movs.forEach((m) => porProd.set(m.produto_id, (porProd.get(m.produto_id) || 0) + v(m)));
   const top = [...porProd].sort((a, b) => b[1] - a[1]).slice(0, 8);
-  return html`<${Periodo} de=${de} ate=${ate} setDe=${setDe} setAte=${setAte} />
+  return html`<${Periodo} de=${de} ate=${ate} setDe=${setDe} setAte=${setAte} acoes=${html`<${Exportar} tabela="custos-producao.avulsasperdas" titulo="Saídas avulsas e perdas" filtros=${`${de} a ${ate}`} arquivo=${`avulsas-perdas-${de}-a-${ate}`} linhas=${movs} colunas=${[
+      { titulo: 'Data/hora', valor: (m) => dataHora(m.data_hora) }, { titulo: 'Tipo', valor: (m) => (m.tipo === 'perda' ? 'Perda' : 'Saída avulsa') },
+      { titulo: 'Produto', valor: (m) => pr(m)?.descricao, largura: 32 }, { titulo: 'Quantidade', valor: (m) => -Number(m.quantidade), num: true }, { titulo: 'Unid.', valor: (m) => pr(m)?.unidade_estoque },
+      { titulo: 'Local', valor: (m) => nomeLocal(dados, m.local_id) }, { titulo: 'Valor', valor: v, texto: (m) => moeda(v(m)), num: true },
+      { titulo: 'Quem', valor: quem }, { titulo: 'Motivo / observação', valor: (m) => m.observacao || '', largura: 40 }]} />`} />
     <div class="cartoes">
       <${Cartao} titulo="Saídas avulsas" valor=${moeda(av.reduce((s, m) => s + v(m), 0))} sub=${`${av.length} lançamento(s)`} cor="c-laranja" />
       <${Cartao} titulo="Perdas de base" valor=${moeda(pe.reduce((s, m) => s + v(m), 0))} sub=${`${pe.length} lançamento(s)`} cor="c-vermelho" />
@@ -173,11 +179,6 @@ export function AvulsasPerdas() {
     ${top.length > 0 && html`<h3 class="titulo-secao">Onde mais saiu dinheiro</h3>
       <div class="barras-h">${top.map(([id, val]) => html`<div class="bh-linha"><span class="bh-rotulo">${dados.mapa.produto.get(id)?.descricao}</span>
         <span class="bh-trilho"><span class="bh-barra" style=${`width:${(val / top[0][1]) * 100}%`}></span></span><span class="bh-valor">${moeda(val)}</span></div>`)}</div>`}
-    <div class="filtros"><${Exportar} tabela="custos-producao.avulsasperdas" titulo="Saídas avulsas e perdas" filtros=${`${de} a ${ate}`} arquivo=${`avulsas-perdas-${de}-a-${ate}`} linhas=${movs} colunas=${[
-      { titulo: 'Data/hora', valor: (m) => dataHora(m.data_hora) }, { titulo: 'Tipo', valor: (m) => (m.tipo === 'perda' ? 'Perda' : 'Saída avulsa') },
-      { titulo: 'Produto', valor: (m) => pr(m)?.descricao, largura: 32 }, { titulo: 'Quantidade', valor: (m) => -Number(m.quantidade), num: true }, { titulo: 'Unid.', valor: (m) => pr(m)?.unidade_estoque },
-      { titulo: 'Local', valor: (m) => nomeLocal(dados, m.local_id) }, { titulo: 'Valor', valor: v, texto: (m) => moeda(v(m)), num: true },
-      { titulo: 'Quem', valor: quem }, { titulo: 'Motivo / observação', valor: (m) => m.observacao || '', largura: 40 }]} /></div>
     <${Tabela} id="custos-producao.avulsasperdas" linhas=${movs} vazio="Nenhuma saída avulsa ou perda no período." colunas=${[
       { chave: 'data_hora', titulo: 'Data/hora', render: (m) => dataHora(m.data_hora) },
       { chave: 'tipo', titulo: 'Tipo', render: (m) => html`<${Etiqueta} cor=${m.tipo === 'perda' ? 'vermelho' : 'laranja'}>${m.tipo === 'perda' ? 'Perda' : 'Avulsa'}</${Etiqueta}>` },

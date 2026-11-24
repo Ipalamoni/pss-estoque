@@ -3,10 +3,16 @@
 Arquivo público: sem nomes de pessoas, senhas, tokens ou dados da empresa.
 
 ## Situação atual (24/11/2026)
-- Sistema publicado: https://ipalamoni.github.io/pss-estoque/ (versão do app 2.13.0).
+- Sistema publicado: https://ipalamoni.github.io/pss-estoque/ (versão do app 2.14.0).
 - Banco de produção (Supabase `kuttfnmjvzgzebjpjvvy`, "estoque-pss"): versão **2.13.0**, todas as
   conferências OK. Não mexer no projeto Supabase `pss-vendas`.
-- Últimas entregas: fila inteligente das masseiras e da pesagem, avisos amarelos, tempo/tolerância por
+- v2.14.0 (24/11/2026, só tela; banco continua 2.13.0): relatórios com filtros + contagem + Excel/PDF/Imprimir/
+  WhatsApp/Colunas numa faixa só, e filtros de vários itens com caixinhas (locais, tipos, categorias, situações,
+  grupos, usuários, padeiros...) em Estoque por local, Posição de estoque, Kardex, Produtos, Fornecedores, Pedidos,
+  Pedidos a pagar, Auditoria, Histórico da produção, Fichas, Relatórios, Central de Custos, Programado × produzido,
+  Saídas da produção, Inventário, Requisições, Transferências e Finalizar bateladas.
+- Backup completo (24/11/2026): código + banco + dados do dia + usuários sem senhas + guia do dono + prompt.
+- Entregas anteriores: fila inteligente das masseiras e da pesagem, avisos amarelos, tempo/tolerância por
   receita, sininho por responsabilidade, pré-cadastro no recebimento sem pedido, relatórios em modo
   planilha (cabeçalho e 1ª coluna travados, colunas separadas, botão "Colunas" salvo no perfil).
 

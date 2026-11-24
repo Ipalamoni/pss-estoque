@@ -2,7 +2,7 @@
 // exportar.js — botões padrão de exportação (Excel, PDF, Imprimir, WhatsApp)
 // usados em todas as telas de consulta e relatórios
 // =====================================================================
-import { html, useState, useEffect, useRef, useApp, avisar, useCelular } from './ui.js';
+import { html, useState, useEffect, useRef, useApp, avisar, useCelular, BotaoColunas } from './ui.js';
 import { excelBlob, pdfTabela, pdfBlob, imprimirPDF, baixar, compartilhar } from './export.js';
 import { mensagemErro, hojeISO } from './util.js';
 import { Icone } from './icones.js';
@@ -16,6 +16,7 @@ const limpar = (t) => String(t || 'relatorio').normalize('NFD').replace(/[̀-ͯ]
 //  abas: () => [{nome, colunas, linhas}]   (Excel com mais abas/colunas, opcional)
 //  pdf: async (params) => doc               (PDF próprio, opcional)
 //  sem: ['imprimir', ...]                   (esconder botões)
+//  tabela: id da <Tabela id> desta lista     (Excel/PDF seguem as colunas escolhidas e o botão "Colunas" fica aqui ao lado)
 export function Exportar(props) {
   const { dados } = useApp();
   const [menu, setMenu] = useState(false);
@@ -67,6 +68,7 @@ export function Exportar(props) {
       <button onClick=${() => fazer('pdf', true)}><${Icone} nome="whatsapp" tam=${16} /> WhatsApp (PDF)</button>
       <button onClick=${() => fazer('excel', true)}><${Icone} nome="whatsapp" tam=${16} /> WhatsApp (Excel)</button>
     </div>`}
+    ${props.tabela && html`<${BotaoColunas} id=${props.tabela} />`}
   </div>`;
   return html`<div class="exportar" ref=${ref}>
     <button class="btn btn-sec btn-peq" disabled=${ocupado} title="Baixar em Excel" onClick=${() => fazer('excel')}><${Icone} nome="excel" tam=${16} /> Excel</button>
@@ -80,5 +82,6 @@ export function Exportar(props) {
         <button onClick=${() => fazer('excel', true)}><${Icone} nome="excel" tam=${16} /> Enviar em Excel</button>
       </div>`}
     </span>
+    ${props.tabela && html`<${BotaoColunas} id=${props.tabela} />`}
   </div>`;
 }

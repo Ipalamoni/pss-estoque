@@ -4,7 +4,7 @@
 //  - marca "lançado no sistema" / "pendente"
 //  - comprador ou financeiro ajustam a previsão de pagamento (com motivo)
 // =====================================================================
-import { html, useState, useMemo, useEffect, useApp, Tabela, Cartao, Cabecalho, Etiqueta, Busca, useAcao, avisar, useHistorico, Filtros } from '../ui.js';
+import { html, useState, useMemo, useEffect, useApp, Tabela, Cartao, Cabecalho, Etiqueta, Busca, useAcao, avisar, useHistorico, Filtros, MultiEscolha, casaVarios } from '../ui.js';
 import { STATUS_PEDIDO, numeroPedido, data, dataHora, hojeISO, somarDias, diasEntre, diaLocal, moeda, pl, contem, nomeUsuario, formatarDoc } from '../util.js';
 import { resumoPedido, PedidoDetalhe, AjustarPagamento } from './pedidos.js';
 import { Exportar } from '../exportar.js';
@@ -70,7 +70,7 @@ export function TelaFinanceiro() {
   const [venDe, setVenDe] = useState('');
   const [venAte, setVenAte] = useState('');
   const [lanc, setLanc] = useState('');
-  const [ent, setEnt] = useState('');
+  const [ent, setEnt] = useState([]);   // vários (vazio = todas)
   const [aberto, setAberto] = useState(null);
   const [ajustar, setAjustar] = useState(null);
   useHistorico([somarDias(hoje, -180), pedDe].filter(Boolean).sort()[0]);   // pagamentos podem vencer bem depois da compra
@@ -88,9 +88,9 @@ export function TelaFinanceiro() {
     if (venAte && (!p.previsao_pagamento || p.previsao_pagamento > venAte)) return false;
     if (lanc === 'sim' && !p.fin_lancado) return false;
     if (lanc === 'nao' && p.fin_lancado) return false;
-    if (ent && p.ent.id !== ent) return false;
+    if (!casaVarios(ent, p.ent.id)) return false;
     return contem(`${numeroPedido(p.id)} ${p.id} ${p.r.fornecedor?.nome} ${p.r.fornecedor?.cnpj || ''} ${formatarDoc(p.r.fornecedor?.cnpj, p.r.fornecedor?.tipo_pessoa)}`, busca);
-  }), [todos, rapido, pedDe, pedAte, venDe, venAte, lanc, ent, busca]);
+  }), [todos, rapido, pedDe, pedAte, venDe, venAte, lanc, ent.join(), busca]);
   const total = linhas.reduce((s, p) => s + (p.status === 'cancelado' ? 0 : p.r.valor), 0);
 
   const ativos = todos.filter((p) => p.status !== 'cancelado');
@@ -118,7 +118,7 @@ export function TelaFinanceiro() {
   }
   const filtrosTxt = [RAPIDOS[rapido].t, pedDe || pedAte ? `pedido ${data(pedDe) || '…'} a ${data(pedAte) || '…'}` : '',
     venDe || venAte ? `vencimento ${venDe ? data(venDe) : '…'} a ${venAte ? data(venAte) : '…'}` : '',
-    lanc === 'sim' ? 'lançados' : lanc === 'nao' ? 'pendentes de lançar' : '', ent ? `entrega: ${ent}` : '',
+    lanc === 'sim' ? 'lançados' : lanc === 'nao' ? 'pendentes de lançar' : '', ent.length ? `entrega: ${ent.join(', ')}` : '',
     pl(linhas.length, 'pedido', 'pedidos')].filter(Boolean).join(' · ');
   const perfil = (id) => dados.mapa.perfil.get(id);
   const colExp = [
@@ -148,14 +148,12 @@ export function TelaFinanceiro() {
       { titulo: 'Unid.', valor: (x) => x.i.unidade }, { titulo: 'Preço unit.', valor: (x) => Number(x.i.preco_unitario) },
       { titulo: 'Total', valor: (x) => Number(x.i.valor_total) }] },
   ];
-  const limpar = () => { setRapido('todos'); setBusca(''); setPedDe(''); setPedAte(''); setVenDe(''); setVenAte(''); setLanc(''); setEnt(''); };
+  const limpar = () => { setRapido('todos'); setBusca(''); setPedDe(''); setPedAte(''); setVenDe(''); setVenAte(''); setLanc(''); setEnt([]); };
   const pedidoAberto = aberto && dados.pedidos.find((p) => p.id === aberto);
   const pedidoAjustar = ajustar && dados.pedidos.find((p) => p.id === ajustar);
 
   return html`
     <${Cabecalho} titulo="Financeiro · pedidos a pagar" sub="Pedidos de compra, previsão de pagamento e situação da entrega">
-      <${Exportar} tabela="financeiro.telafinanceiro" titulo="Financeiro - pedidos a pagar" filtros=${filtrosTxt} arquivo=${`financeiro-pedidos-${hoje}`}
-        colunas=${colPdf} linhas=${linhas} abas=${abas} totais=${['', '', '', 'TOTAL', moeda(total), '', '', '', '', '', '']} />
     </${Cabecalho}>
     <div class="cartoes">
       ${cards.map((c) => html`<${Cartao} titulo=${c.t} valor=${c.n} sub=${c.sub} cor=${(rapido === c.k ? 'c-ativo ' : '') + c.cor}
@@ -166,7 +164,9 @@ export function TelaFinanceiro() {
     <div class="chips">
       ${Object.entries(RAPIDOS).map(([k, v]) => html`<button class=${'chip' + (rapido === k ? ' ativo' : '')} aria-pressed=${!!(rapido === k)} onClick=${() => setRapido(k)}>${v.t}</button>`)}
     </div>
-    <${Filtros} ativos=${[pedDe, pedAte, venDe, venAte, lanc, ent].filter(Boolean).length} fixo=${html`<${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Nº do pedido ou fornecedor" />`}>
+    <${Filtros} acoes=${html`<span class="nota">${pl(linhas.length, 'pedido', 'pedidos')}</span>
+      <${Exportar} tabela="financeiro.telafinanceiro" titulo="Financeiro - pedidos a pagar" filtros=${filtrosTxt} arquivo=${`financeiro-pedidos-${hoje}`}
+        colunas=${colPdf} linhas=${linhas} abas=${abas} totais=${['', '', '', 'TOTAL', moeda(total), '', '', '', '', '', '']} />`} ativos=${[pedDe, pedAte, venDe, venAte, lanc, ent.length].filter(Boolean).length} fixo=${html`<${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Nº do pedido ou fornecedor" />`}>
       <label class="campo-inline">Pedido de <input class="entrada" type="date" value=${pedDe} onChange=${(e) => setPedDe(e.target.value)} /></label>
       <label class="campo-inline">até <input class="entrada" type="date" value=${pedAte} onChange=${(e) => setPedAte(e.target.value)} /></label>
       <label class="campo-inline">Vencimento de <input class="entrada" type="date" value=${venDe} onChange=${(e) => setVenDe(e.target.value)} /></label>
@@ -174,10 +174,8 @@ export function TelaFinanceiro() {
       <select class="entrada" value=${lanc} onChange=${(e) => setLanc(e.target.value)}>
         <option value="">Lançado e pendente</option><option value="nao">Só pendentes de lançar</option><option value="sim">Só lançados</option>
       </select>
-      <select class="entrada" value=${ent} onChange=${(e) => setEnt(e.target.value)}>
-        <option value="">Entrega: todas</option><option value="pendente">Pendente</option><option value="parcial">Parcial</option>
-        <option value="recebido">Recebido</option><option value="cancelado">Cancelado</option>
-      </select>
+      <${MultiEscolha} todos="Entrega: todas" rotulo="Situação da entrega" valor=${ent} aoMudar=${setEnt}
+        opcoes=${[['pendente', 'Pendente'], ['parcial', 'Parcial'], ['recebido', 'Recebido'], ['cancelado', 'Cancelado']].map(([k, v]) => ({ valor: k, rotulo: `Entrega: ${v.toLowerCase()}` }))} />
       <button class="btn btn-sec btn-peq" onClick=${limpar}>Limpar filtros</button>
     </${Filtros}>
     <${Tabela} id="financeiro.telafinanceiro" linhas=${linhas} aoClicar=${(p) => setAberto(p.id)} ordemInicial=${{ chave: 'pgto', dir: 1 }}

@@ -5,8 +5,8 @@
 // somado; numa unidade/local, soma no destino ("chegando") e na origem
 // aparece só como aviso ("saindo").
 // =====================================================================
-import { html, useState, useMemo, useApp, Cabecalho, Abas, Busca, Tabela, Etiqueta, Vazio, Filtros } from '../ui.js';
-import { MP_EMB, casaCategoria, num, qu, moeda, contem, TIPOS_PRODUTO, tipoProduto, operaLocal, ehGestao, dataHora, pl, SITUACAO_TRANSF } from '../util.js';
+import { html, useState, useMemo, useApp, Cabecalho, Abas, Busca, Tabela, Etiqueta, Vazio, Filtros, MultiEscolha, casaVarios } from '../ui.js';
+import { MP_EMB_LISTA, casaCategoria, textoVarios, num, qu, moeda, contem, TIPOS_PRODUTO, tipoProduto, operaLocal, ehGestao, dataHora, pl, SITUACAO_TRANSF } from '../util.js';
 import { Exportar } from '../exportar.js';
 import { nomeLocal, minutos, tempoTexto } from '../producao-util.js';
 
@@ -20,9 +20,9 @@ export function TelaEstoqueLocal() {
   const gestao = ehGestao(papeis);
   const verCusto = podeFazer('custos');
   const [visao, setVisao] = useState(estadoRota?.visao || 'resumo');
-  const [unid, setUnid] = useState('');
-  const [loc, setLoc] = useState('');
-  const [tipo, setTipo] = useState(MP_EMB);
+  const [unid, setUnid] = useState([]);       // listas: vazia = todos
+  const [loc, setLoc] = useState([]);
+  const [tipo, setTipo] = useState(MP_EMB_LISTA);
   const [busca, setBusca] = useState('');
   const [soSaldo, setSoSaldo] = useState(true);
   const [soMov, setSoMov] = useState(false);
@@ -30,9 +30,10 @@ export function TelaEstoqueLocal() {
 
   // locais que a pessoa pode ver (gestão vê todos; operador vê os seus)
   const permitidos = dados.locais.filter((l) => l.ativo && (gestao || operaLocal(papeis, l)));
-  const escopo = permitidos.filter((l) => (!unid || String(l.unidade_id) === unid) && (!loc || String(l.id) === loc));
+  const locaisDaUnid = permitidos.filter((l) => casaVarios(unid, l.unidade_id));
+  const escopo = locaisDaUnid.filter((l) => casaVarios(loc, l.id));
   const ids = new Set(escopo.map((l) => l.id));
-  const tudo = !unid && !loc && gestao;
+  const tudo = !unid.length && !loc.length && gestao;
 
   const calc = useMemo(() => {
     const porProd = new Map();
@@ -54,7 +55,7 @@ export function TelaEstoqueLocal() {
       else { c.saindo += q; lc(t.origem_id).saindo += q; }
     });
     return porProd;
-  }, [dados.carregadoEm, unid, loc, papeis]);
+  }, [dados.carregadoEm, unid.join(), loc.join(), papeis]);
 
   const produtos = dados.produtos.filter((p) => p.controla_estoque && casaCategoria(tipo, tipoProduto(p))
     && contem(`${p.codigo} ${p.descricao} ${p.grupo || ''} ${p.marca || ''}`, busca));
@@ -65,31 +66,34 @@ export function TelaEstoqueLocal() {
     return { id: p.id, p, c, disp, sep, transito: c.transito, chegando: c.chegando, saindo: c.saindo, total, q2, valor: total * Number(p.custo_medio || 0) };
   }).filter((l) => (!soSaldo || Math.abs(l.total) > 0.0001 || l.saindo > 0) && (!soMov || l.sep > 0 || l.transito > 0 || l.chegando > 0 || l.saindo > 0));
 
-  const nFiltros = [unid, loc, tipo, !soSaldo, soMov].filter(Boolean).length;
-  const filtros = html`<${Filtros} ativos=${nFiltros} fixo=${html`<div class="busca"><${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Buscar produto, grupo, marca" /></div>`}>
-    ${multi && html`<select class="entrada" value=${unid} onChange=${(e) => { setUnid(e.target.value); setLoc(''); }}><option value="">Todas as unidades</option>
-      ${dados.unidades.filter((u) => u.ativa).map((u) => html`<option value=${String(u.id)}>${u.nome}</option>`)}</select>`}
-    <select class="entrada" value=${loc} onChange=${(e) => setLoc(e.target.value)}><option value="">${gestao ? 'Todos os locais' : 'Todos os meus locais'}</option>
-      ${permitidos.filter((l) => !unid || String(l.unidade_id) === unid).map((l) => html`<option value=${String(l.id)}>${nomeLocal(dados, l.id)}</option>`)}</select>
-    <select class="entrada" value=${tipo} onChange=${(e) => setTipo(e.target.value)}><option value="">Todos os tipos</option><option value=${MP_EMB}>Matéria-prima e embalagem</option>
-      ${Object.entries(TIPOS_PRODUTO).map(([k, v]) => html`<option value=${k}>${v}</option>`)}</select>
+  const nFiltros = [unid.length, loc.length, tipo.length, !soSaldo, soMov].filter(Boolean).length;
+  const unidades = dados.unidades.filter((u) => u.ativa);
+  // filtros + (contagem, Exportar, Colunas) numa faixa só: cada formato passa as ações dele
+  const barra = (acoes) => html`<${Filtros} ativos=${nFiltros} acoes=${acoes} fixo=${html`<div class="busca"><${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Buscar produto, grupo, marca" /></div>`}>
+    ${multi && html`<${MultiEscolha} todos="Todas as unidades" rotulo="Unidades" valor=${unid} aoMudar=${(v) => { setUnid(v); setLoc([]); }}
+      opcoes=${unidades.map((u) => ({ valor: String(u.id), rotulo: u.nome }))} />`}
+    <${MultiEscolha} todos=${gestao ? 'Todos os locais' : 'Todos os meus locais'} rotulo="Locais" valor=${loc} aoMudar=${setLoc}
+      opcoes=${locaisDaUnid.map((l) => ({ valor: String(l.id), rotulo: nomeLocal(dados, l.id) }))} />
+    <${MultiEscolha} todos="Todos os tipos" rotulo="Tipos" valor=${tipo} aoMudar=${setTipo}
+      opcoes=${Object.entries(TIPOS_PRODUTO).map(([k, v]) => ({ valor: k, rotulo: v }))} />
     <label class="check"><input type="checkbox" checked=${soSaldo} onChange=${(e) => setSoSaldo(e.target.checked)} /> só com saldo</label>
     <label class="check"><input type="checkbox" checked=${soMov} onChange=${(e) => setSoMov(e.target.checked)} /> só com separado ou trânsito</label>
   </${Filtros}>`;
-  const rotuloEscopo = tudo ? 'Empresa toda' : [unid && dados.mapa.unidade.get(Number(unid))?.nome, loc ? nomeLocal(dados, Number(loc)) : (gestao ? 'todos os locais' : 'meus locais')].filter(Boolean).join(' · ');
+  const rotuloEscopo = tudo ? 'Empresa toda' : [unid.length && textoVarios(unid.map(Number), Object.fromEntries(unidades.map((u) => [u.id, u.nome])), ''),
+    loc.length ? loc.map((x) => nomeLocal(dados, Number(x))).join(', ') : (gestao ? 'todos os locais' : 'meus locais')].filter(Boolean).join(' · ');
+  const rotuloTipo = textoVarios(tipo, TIPOS_PRODUTO, 'todos os tipos');
   const un = (l, v) => qu(v, l.p.unidade_estoque);
 
   return html`
     <${Cabecalho} titulo="Estoque por local" sub=${`${rotuloEscopo} · disponível + separado + o que está chegando. O que está saindo aparece só como aviso.`} />
     <${Abas} abas=${VISOES} ativa=${visao} aoMudar=${setVisao} />
-    ${visao !== 'transito' && filtros}
-    ${visao === 'resumo' && html`<${Resumo} linhas=${linhas} tudo=${tudo} verCusto=${verCusto} un=${un} rotulo=${rotuloEscopo} />`}
-    ${visao === 'mapa' && html`<${Mapa} linhas=${linhas} escopo=${escopo} unid=${unid} multi=${multi} tudo=${tudo} un=${un} rotulo=${rotuloEscopo} />`}
-    ${visao === 'detalhe' && html`<${Detalhado} linhas=${linhas} un=${un} rotulo=${rotuloEscopo} verCusto=${verCusto} />`}
+    ${visao === 'resumo' && html`<${Resumo} barra=${barra} linhas=${linhas} tudo=${tudo} verCusto=${verCusto} un=${un} rotulo=${`${rotuloEscopo} · ${rotuloTipo}`} />`}
+    ${visao === 'mapa' && html`<${Mapa} barra=${barra} linhas=${linhas} escopo=${escopo} unid=${unid} multi=${multi} tudo=${tudo} un=${un} rotulo=${`${rotuloEscopo} · ${rotuloTipo}`} />`}
+    ${visao === 'detalhe' && html`<${Detalhado} barra=${barra} linhas=${linhas} un=${un} rotulo=${`${rotuloEscopo} · ${rotuloTipo}`} verCusto=${verCusto} />`}
     ${visao === 'transito' && html`<${Abertas} ids=${new Set(permitidos.map((l) => l.id))} gestao=${gestao} />`}`;
 }
 
-function Resumo({ linhas, tudo, verCusto, un, rotulo }) {
+function Resumo({ barra, linhas, tudo, verCusto, un, rotulo }) {
   const segunda = (l) => (l.p.unidade2 && l.q2 > 0 ? html`<small> · ${num(l.q2, 0)} ${l.p.unidade2}${l.q2 === 1 ? '' : 's'}</small>` : '');
   const cols = [
     { chave: 'cod', titulo: 'Código', valor: (l) => l.p.codigo, render: (l) => l.p.codigo }, { chave: 'p', titulo: 'Produto', valor: (l) => l.p.descricao, render: (l) => html`<b>${l.p.descricao}</b>`, classe: 'col-desc' }, { chave: 'marca', titulo: 'Marca', valor: (l) => l.p.marca || '', render: (l) => l.p.marca || '–' },
@@ -106,15 +110,15 @@ function Resumo({ linhas, tudo, verCusto, un, rotulo }) {
     { titulo: tudo ? 'Em trânsito' : 'Chegando', valor: (l) => l.transito + l.chegando, num: true }, ...(!tudo ? [{ titulo: 'Saindo (aviso)', valor: (l) => l.saindo, num: true }] : []),
     { titulo: 'Total', valor: (l) => l.total, num: true }, ...(verCusto ? [{ titulo: 'Valor', valor: (l) => Math.round(l.valor * 100) / 100, num: true }] : [])];
   const valor = linhas.reduce((s, l) => s + l.valor, 0);
-  return html`<div class="titulo-com-acao"><span class="nota">${pl(linhas.length, 'produto', 'produtos')}${verCusto ? ` · valor total ${moeda(valor)}` : ''}</span>
-    <${Exportar} tabela="estoque-local.resumo" titulo="Estoque por local · resumo" filtros=${rotulo} arquivo="estoque-resumo" colunas=${exp} linhas=${linhas} /></div>
+  return html`${barra(html`<span class="nota">${pl(linhas.length, 'produto', 'produtos')}${verCusto ? ` · ${moeda(valor)}` : ''}</span>
+    <${Exportar} tabela="estoque-local.resumo" titulo="Estoque por local · resumo" filtros=${rotulo} arquivo="estoque-resumo" colunas=${exp} linhas=${linhas} />`)}
     <${Tabela} id="estoque-local.resumo" linhas=${linhas} colunas=${cols} vazio="Nenhum produto com estes filtros." ordemInicial=${{ chave: 'p', dir: 1 }} />`;
 }
 
-function Mapa({ linhas, escopo, unid, multi, tudo, un, rotulo }) {
+function Mapa({ barra, linhas, escopo, unid, multi, tudo, un, rotulo }) {
   const { dados } = useApp();
   // colunas: unidades (quando "todas" e há mais de uma) ou os locais
-  const porUnidade = multi && !unid;
+  const porUnidade = multi && !unid.length;
   const colunas = porUnidade ? dados.unidades.filter((u) => u.ativa && escopo.some((l) => l.unidade_id === u.id)).map((u) => ({ id: u.id, nome: u.nome, locais: escopo.filter((l) => l.unidade_id === u.id).map((l) => l.id) }))
     : escopo.map((l) => ({ id: l.id, nome: l.nome, locais: [l.id] }));
   const cel = (l, c) => c.locais.reduce((s, lid) => { const v = l.c.porLocal.get(lid); return s + (v ? v.disp + v.sep + (porUnidade ? 0 : v.chegando - (tudo ? v.chegando : 0)) : 0); }, 0);
@@ -127,20 +131,20 @@ function Mapa({ linhas, escopo, unid, multi, tudo, un, rotulo }) {
   const exp = [{ titulo: 'Produto', valor: (l) => l.p.descricao, largura: 34 }, { titulo: 'Unid.', valor: (l) => l.p.unidade_estoque },
     ...colunas.map((c) => ({ titulo: c.nome, valor: (l) => cel(l, c), num: true })), { titulo: tudo ? 'Em trânsito' : 'Chegando', valor: (l) => l.transito + l.chegando, num: true },
     { titulo: 'Total', valor: (l) => l.total, num: true }];
-  return html`<div class="titulo-com-acao"><span class="nota">Cada coluna = disponível + separado ${porUnidade ? 'da unidade' : 'do local'}. Toque no produto no formato "Detalhado" para ver cada local.</span>
-    <${Exportar} tabela="estoque-local.mapa" titulo="Estoque por local · mapa" filtros=${rotulo} arquivo="estoque-mapa" colunas=${exp} linhas=${linhas} /></div>
+  return html`${barra(html`<span class="nota" title=${`Cada coluna = disponível + separado ${porUnidade ? 'da unidade' : 'do local'}.`}>${pl(linhas.length, 'produto', 'produtos')} · disponível + separado</span>
+    <${Exportar} tabela="estoque-local.mapa" titulo="Estoque por local · mapa" filtros=${rotulo} arquivo="estoque-mapa" colunas=${exp} linhas=${linhas} />`)}
     <${Tabela} id="estoque-local.mapa" linhas=${linhas} colunas=${cols} vazio="Nenhum produto com estes filtros." ordemInicial=${{ chave: 'p', dir: 1 }} />`;
 }
 
-function Detalhado({ linhas, un, rotulo, verCusto }) {
+function Detalhado({ barra, linhas, un, rotulo, verCusto }) {
   const { dados } = useApp();
   const linhasExp = linhas.flatMap((l) => [...l.c.porLocal.entries()].map(([lid, v]) => ({ l, lid, v })));
-  return html`<div class="titulo-com-acao"><span class="nota">Por local: disponível + separado + chegando. "Saindo" é só aviso (já saiu do local).</span>
+  return html`${barra(html`<span class="nota">${pl(linhas.length, 'produto', 'produtos')}</span>
     <${Exportar} titulo="Estoque por local · detalhado" filtros=${rotulo} arquivo="estoque-detalhado" linhas=${linhasExp} colunas=${[
       { titulo: 'Produto', valor: (x) => x.l.p.descricao, largura: 32 }, { titulo: 'Local', valor: (x) => nomeLocal(dados, x.lid), largura: 22 }, { titulo: 'Unid.', valor: (x) => x.l.p.unidade_estoque },
       { titulo: 'Disponível', valor: (x) => x.v.disp, num: true }, { titulo: 'Separado', valor: (x) => x.v.sep, num: true },
       { titulo: 'Saindo', valor: (x) => x.v.saindo, num: true }, { titulo: 'Chegando', valor: (x) => x.v.chegando, num: true },
-      { titulo: 'Total do local', valor: (x) => x.v.disp + x.v.sep + x.v.chegando, num: true }]} /></div>
+      { titulo: 'Total do local', valor: (x) => x.v.disp + x.v.sep + x.v.chegando, num: true }]} />`)}
     ${!linhas.length ? html`<${Vazio} texto="Nenhum produto com estes filtros." />` : html`<div class="tabela-rolagem"><table class="tabela tabela-det">
       <thead><tr><th>Produto / local</th><th class="n">Disponível</th><th class="n">Separado</th><th class="n">Saindo (aviso)</th><th class="n">Chegando (+)</th><th class="n">Total</th>${verCusto && html`<th class="n">Valor</th>`}</tr></thead>
       <tbody>${linhas.map((l) => html`

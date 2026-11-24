@@ -7,8 +7,8 @@
 //   ex.: 100 kg a R$ 1,00 → saem 50 → ficam 50 a R$ 1,00 → entram 100 a R$ 1,10
 //        → médio = (50×1,00 + 100×1,10) ÷ 150 = R$ 1,0667/kg
 // =====================================================================
-import { html, useState, useEffect, useMemo, useApp, Tabela, Modal, Cartao, Cabecalho, Etiqueta, Busca, Abas, Carregando, avisar, Filtros } from '../ui.js';
-import { MP_EMB, casaCategoria, CATEGORIAS, data, dataHora, hojeISO, num, qtd, moeda, pl, contem, numeroPedido, mensagemErro } from '../util.js';
+import { html, useState, useEffect, useMemo, useApp, Tabela, Modal, Cartao, Cabecalho, Etiqueta, Busca, Abas, Carregando, avisar, Filtros, MultiEscolha } from '../ui.js';
+import { MP_EMB_LISTA, casaCategoria, textoVarios, CATEGORIAS, data, dataHora, hojeISO, num, qtd, moeda, pl, contem, numeroPedido, mensagemErro } from '../util.js';
 import { Exportar } from '../exportar.js';
 import { CustoProdutoAcabado, EstoqueValorizado, AvulsasPerdas } from './custos-producao.js';
 
@@ -42,7 +42,7 @@ export function TelaCustos() {
 // ------------------------------- PRODUTOS ----------------------------
 function CustosProdutos({ ult }) {
   const { dados } = useApp();
-  const [cat, setCat] = useState(MP_EMB);
+  const [cat, setCat] = useState(MP_EMB_LISTA);   // vários (vazio = todas)
   const [busca, setBusca] = useState('');
   const [inativos, setInativos] = useState(false);
   const linhas = useMemo(() => dados.produtos.filter((p) => (inativos || p.ativo) && casaCategoria(cat, p.categoria)
@@ -68,21 +68,18 @@ function CustosProdutos({ ult }) {
     { titulo: 'Valor em estoque (médio)', valor: (p) => Math.round(p.valor * 100) / 100, texto: (p) => moeda(p.valor), num: true },
   ];
   return html`
-    <div class="titulo-com-acao"><span></span>
-      <${Exportar} tabela="custos.custosprodutos" titulo="Gestão de custos - produtos" filtros=${`${cat === MP_EMB ? 'Matéria-prima e embalagem' : cat ? CATEGORIAS[cat] : 'Todas as categorias'} · ${pl(linhas.length, 'produto', 'produtos')}`}
-        arquivo=${`custos-produtos-${hojeISO()}`} colunas=${colExp} linhas=${linhas} /></div>
     <div class="cartoes">
-      <${Cartao} titulo="Produtos" valor=${linhas.length} sub=${cat === MP_EMB ? 'matéria-prima e embalagem' : cat ? CATEGORIAS[cat] : 'todas as categorias'} />
+      <${Cartao} titulo="Produtos" valor=${linhas.length} sub=${textoVarios(cat, CATEGORIAS, 'todas as categorias').toLowerCase()} />
       <${Cartao} titulo="Valor em estoque (custo médio)" valor=${moeda(totalValor)} />
       <${Cartao} titulo="Último custo acima do médio (+5%)" valor=${subiram} cor=${subiram ? 'c-laranja' : ''} sub="preço subiu na última compra" />
       <${Cartao} titulo="Sem custo de compra" valor=${semCusto} cor=${semCusto ? 'c-laranja' : ''} sub="ainda sem entrada com preço" />
     </div>
-    <${Filtros} ativos=${[cat, inativos].filter(Boolean).length} fixo=${html`<${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Código, produto, grupo, classificação ou marca" />`}>
-      <div class="chips">
-        <button class=${'chip' + (!cat ? ' ativo' : '')} aria-pressed=${!!(!cat)} onClick=${() => setCat('')}>Todas</button>
-        <button class=${'chip' + (cat === MP_EMB ? ' ativo' : '')} aria-pressed=${cat === MP_EMB} onClick=${() => setCat(MP_EMB)}>Matéria-prima e embalagem</button>
-        ${Object.entries(CATEGORIAS).map(([k, v]) => html`<button class=${'chip' + (cat === k ? ' ativo' : '')} aria-pressed=${!!(cat === k)} onClick=${() => setCat(k)}>${v}</button>`)}
-      </div>
+    <${Filtros} ativos=${[cat.length, inativos].filter(Boolean).length} fixo=${html`<${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Código, produto, grupo, classificação ou marca" />`}
+      acoes=${html`<span class="nota">${pl(linhas.length, 'produto', 'produtos')}</span>
+      <${Exportar} tabela="custos.custosprodutos" titulo="Gestão de custos - produtos" filtros=${`${textoVarios(cat, CATEGORIAS, 'Todas as categorias')} · ${pl(linhas.length, 'produto', 'produtos')}`}
+        arquivo=${`custos-produtos-${hojeISO()}`} colunas=${colExp} linhas=${linhas} />`}>
+      <${MultiEscolha} todos="Todas as categorias" rotulo="Categorias" valor=${cat} aoMudar=${setCat}
+        opcoes=${Object.entries(CATEGORIAS).map(([k, v]) => ({ valor: k, rotulo: v }))} />
       <label class="check"><input type="checkbox" checked=${inativos} onChange=${(e) => setInativos(e.target.checked)} /> Mostrar inativos</label>
     </${Filtros}>
     <${Tabela} id="custos.custosprodutos" linhas=${linhas} ordemInicial=${{ chave: 'descricao', dir: 1 }}
@@ -144,9 +141,9 @@ function CustosFichas({ ult }) {
   ];
   const fichaAberta = aberta && linhas.find((f) => f.id === aberta);
   return html`
-    <div class="titulo-com-acao"><span></span>
-      <${Exportar} tabela="custos.custosfichas" titulo="Gestão de custos - fichas" filtros=${pl(linhas.length, 'receita', 'receitas')} arquivo=${`custos-fichas-${hojeISO()}`} colunas=${colExp} linhas=${linhas} abas=${abasExcel} /></div>
-    <div class="filtros"><${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Receita ou produto acabado" /></div>
+    <${Filtros} fixo=${html`<${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Receita ou produto acabado" />`}
+      acoes=${html`<span class="nota">${pl(linhas.length, 'receita', 'receitas')}</span>
+      <${Exportar} tabela="custos.custosfichas" titulo="Gestão de custos - fichas" filtros=${pl(linhas.length, 'receita', 'receitas')} arquivo=${`custos-fichas-${hojeISO()}`} colunas=${colExp} linhas=${linhas} abas=${abasExcel} />`} />
     <${Tabela} id="custos.custosfichas" linhas=${linhas} aoClicar=${(f) => setAberta(f.id)} ordemInicial=${{ chave: 'nome', dir: 1 }}
       colunas=${[
         { chave: 'nome', titulo: 'Receita / produto acabado', render: (f) => html`<b>${f.produto_final || f.nome}</b>` }, { chave: 'rec', titulo: 'Receita', render: (f) => html`${f.codigo} · ${f.nome}` },

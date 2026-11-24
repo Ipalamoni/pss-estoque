@@ -34,7 +34,12 @@ export const TIPOS_PRODUTO = {
 };
 // filtro de tipo dos relatórios: começa em "Matéria-prima e embalagem" (o resto quase não se usa)
 export const MP_EMB = 'mp_emb';
-export const casaCategoria = (filtro, categoria) => !filtro || (filtro === MP_EMB ? ['materia_prima', 'embalagem'].includes(categoria) : categoria === filtro);
+export const MP_EMB_LISTA = ['materia_prima', 'embalagem'];   // padrão dos filtros de vários (caixinhas)
+// filtro: '' (todos), MP_EMB, um código, ou uma LISTA de códigos (lista vazia = todos)
+export const casaCategoria = (filtro, categoria) => (Array.isArray(filtro) ? !filtro.length || filtro.includes(categoria)
+  : !filtro || (filtro === MP_EMB ? MP_EMB_LISTA.includes(categoria) : categoria === filtro));
+// texto do filtro de vários para o PDF/Excel e subtítulos: "Matéria-prima, Embalagem" ou o texto de "todos"
+export const textoVarios = (lista, nomes, todos) => (!lista || !lista.length ? todos : lista.map((v) => nomes[v] || v).join(', '));
 export const tipoProduto = (p) => (['escritorio', 'limpeza', 'outros'].includes(p?.categoria) ? 'uso' : p?.categoria);
 
 export const TIPOS_LOCAL = {

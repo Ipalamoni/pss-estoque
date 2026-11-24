@@ -197,12 +197,12 @@ function Historico() {
   if (!r) return html`<${Carregando} />`;
   const texto = (x) => x.itens.map((i) => { const p = dados.mapa.produto.get(i.produto_id); return `${p?.descricao}: ${num(i.atendido, 3)}/${num(i.quantidade, 3)} ${p?.unidade_estoque}`; }).join(' · ');
   const linhas = r.rs.map((x) => ({ ...x, itens: r.its.filter((i) => i.requisicao_id === x.id) })).filter((x) => contem(`${x.id} ${texto(x)} ${x.observacao || ''}`, busca));
-  return html`<div class="filtros"><input class="entrada" type="date" value=${de} onChange=${(e) => setDe(e.target.value)} /> até <input class="entrada" type="date" value=${ate} onChange=${(e) => setAte(e.target.value)} />
-      <input class="entrada busca" placeholder="Buscar" value=${busca} onInput=${(e) => setBusca(e.target.value)} />
-      <${Exportar} titulo="Relatório de requisições" filtros=${`${de} a ${ate}`} arquivo="requisicoes" linhas=${linhas} colunas=${[
+  return html`<div class="filtros filtros-com-acoes"><label class="campo-inline">De <input class="entrada" type="date" value=${de} onChange=${(e) => setDe(e.target.value)} /></label> <label class="campo-inline">até <input class="entrada" type="date" value=${ate} onChange=${(e) => setAte(e.target.value)} /></label>
+      <div class="busca"><input class="entrada busca" type="search" aria-label="Buscar" placeholder="Buscar" value=${busca} onInput=${(e) => setBusca(e.target.value)} /></div>
+      <div class="filtros-acoes"><${Exportar} titulo="Relatório de requisições" filtros=${`${de} a ${ate}`} arquivo="requisicoes" linhas=${linhas} colunas=${[
         { titulo: 'Nº', valor: (x) => x.id }, { titulo: 'Data', valor: (x) => dataHora(x.criado_em) }, { titulo: 'Situação', valor: (x) => SITUACAO_REQ[x.situacao] },
         { titulo: 'Pediu', valor: (x) => dados.mapa.perfil.get(x.solicitante_id)?.nome || '' }, { titulo: 'Atende', valor: (x) => nomeLocal(dados, x.origem_id) },
-        { titulo: 'Para', valor: (x) => nomeLocal(dados, x.destino_id) }, { titulo: 'Itens (atendido/pedido)', valor: texto, largura: 60 }, { titulo: 'Motivo encerramento', valor: (x) => x.encerrada_motivo || '' }]} /></div>
+        { titulo: 'Para', valor: (x) => nomeLocal(dados, x.destino_id) }, { titulo: 'Itens (atendido/pedido)', valor: texto, largura: 60 }, { titulo: 'Motivo encerramento', valor: (x) => x.encerrada_motivo || '' }]} /></div></div>
     <${Tabela} linhas=${linhas} vazio="Nenhuma requisição no período." colunas=${[
       { chave: 'id', titulo: 'Nº', num: true }, { chave: 'criado_em', titulo: 'Data', render: (x) => dataHora(x.criado_em) },
       { chave: 'sit', titulo: 'Situação', valor: (x) => x.situacao, render: (x) => html`<${Etiqueta} cor=${COR[x.situacao]}>${SITUACAO_REQ[x.situacao]}</${Etiqueta}>` },

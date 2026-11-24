@@ -1,5 +1,5 @@
 // Posição de estoque: saldo, valor, consumo médio, cobertura, mínimos, sugestão de compra
-import { html, useState, useMemo, useEffect, useApp, Modal, Busca, Etiqueta, Cabecalho, Tabela, avisar, Filtros } from '../ui.js';
+import { html, useState, useMemo, useEffect, useApp, Modal, Busca, Etiqueta, Cabecalho, Tabela, avisar, Filtros, MultiEscolha, casaVarios } from '../ui.js';
 import { STATUS_ESTOQUE } from '../calc.js';
 import { veValores, CATEGORIAS, qtd, num, moeda, contem, qtdDupla, dataHora, hojeISO, mensagemErro, qu, plural, pl } from '../util.js';
 import { pdfTabela } from '../export.js';
@@ -11,22 +11,22 @@ const v = (x, c = 2) => (x === null || x === undefined ? '–' : num(x, c));
 export function TelaEstoque() {
   const { dados, estadoRota, setEstadoRota, ir, papeis } = useApp();
   const vv = veValores(papeis);   // pesagem/padeiro: sem custo nem valor
-  const [cats, setCats] = useState(() => new Set(estadoRota?.categoria ? [estadoRota.categoria] : ['materia_prima', 'embalagem']));   // padrão: matéria-prima e embalagem (o resto quase não se usa)
-  const [status, setStatus] = useState(estadoRota?.status || '');
+  // filtros de vários (lista vazia = todos). Padrão: matéria-prima e embalagem (o resto quase não se usa)
+  const [cats, setCats] = useState(() => (estadoRota?.categoria ? [estadoRota.categoria] : ['materia_prima', 'embalagem']));
+  const [status, setStatus] = useState(() => (estadoRota?.status === 'alerta' ? ['zerado', 'critico'] : estadoRota?.status ? [estadoRota.status] : []));
   const [busca, setBusca] = useState('');
   const [completo, setCompleto] = useState(window.innerWidth > 760);
   const [aberto, setAberto] = useState(null);
-  const [grupo, setGrupo] = useState('');
-  const [classif, setClassif] = useState('');
+  const [grupo, setGrupo] = useState([]);
+  const [classif, setClassif] = useState([]);
   const [agrupar, setAgrupar] = useState(false);
   useEffect(() => { if (estadoRota) setEstadoRota(null); }, []);
   const distintos = (l, c) => [...new Set(l.map((x) => x[c]).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
   const grupos = distintos(dados.produtos, 'grupo');
-  const classifs = distintos(dados.produtos.filter((p) => !grupo || p.grupo === grupo), 'classificacao');
-  const alternar = (k) => setCats((s) => { const x = new Set(s); x.has(k) ? x.delete(k) : x.add(k); return x; });
+  const classifs = distintos(dados.produtos.filter((p) => casaVarios(grupo, p.grupo)), 'classificacao');
 
-  const linhas = useMemo(() => dados.ind.filter((p) => p.ativo && cats.has(p.categoria) && (!status || p.status === status || (status === 'alerta' && (p.status === 'zerado' || p.status === 'critico')))
-    && (!grupo || p.grupo === grupo) && (!classif || p.classificacao === classif)
+  const linhas = useMemo(() => dados.ind.filter((p) => p.ativo && casaVarios(cats, p.categoria) && casaVarios(status, p.status)
+    && casaVarios(grupo, p.grupo) && casaVarios(classif, p.classificacao)
     && contem(`${p.codigo} ${p.descricao} ${p.marca || ''}`, busca)), [dados, cats, status, busca, grupo, classif]);
   // visão somada por grupo + classificação (ex.: toda a farinha tipo A, de todas as marcas)
   const grupos2 = useMemo(() => {
@@ -90,31 +90,29 @@ export function TelaEstoque() {
       totais: colsExp.map((c, i) => (i === iValor ? moeda(valorTotal) : i === 0 ? 'TOTAL' : '')) }); };
 
   return html`
-    <${Cabecalho} titulo="Posição de estoque" sub=${`Atualizado em ${dataHora(dados.carregadoEm)} · consumo médio dos últimos ${params.janela_consumo_dias || 90} dias`}>
+    <${Cabecalho} titulo="Posição de estoque" sub=${`Atualizado em ${dataHora(dados.carregadoEm)} · consumo médio dos últimos ${params.janela_consumo_dias || 90} dias`} />
+    <${Filtros} ativos=${[status.length, grupo.length, classif.length, cats.length, completo].filter(Boolean).length} fixo=${html`<${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Buscar produto" />`}
+      acoes=${html`<span class="nota">${agrupar ? pl(grupos2.length, 'grupo', 'grupos') : pl(linhas.length, 'item', 'itens')}</span>
       ${agrupar ? html`<${Exportar} tabela="estoque.telaestoque" titulo="Estoque por grupo e classificação" filtros=${dataHora(new Date())} arquivo=${`estoque-por-classificacao-${hojeISO()}`}
           colunas=${colsGrupo} linhas=${grupos2} totais=${['TOTAL', '', '', '', '', moeda(valorTotal), '', '', '', '']} />`
-        : html`<${Exportar} tabela="estoque.telaestoque" titulo="Posição de estoque" filtros=${`${pl(linhas.length, 'item', 'itens')} · ${dataHora(new Date())}`} arquivo=${`posicao-estoque-${hojeISO()}`}
-          colunas=${colsExp} linhas=${linhas} abas=${abasExcel} pdf=${pdfEstoque} />`}
-    </${Cabecalho}>
-    <${Filtros} ativos=${[status, grupo, classif, cats.size < Object.keys(CATEGORIAS).length, completo].filter(Boolean).length} fixo=${html`<${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Buscar produto" />`}>
-      <div class="grupo-checks">${Object.entries(CATEGORIAS).map(([k, t]) => html`<label class="check"><input type="checkbox" checked=${cats.has(k)} onChange=${() => alternar(k)} /> ${t}</label>`)}</div>
-      <select class="entrada" value=${status} onChange=${(e) => setStatus(e.target.value)}>
-        <option value="">Todas as situações</option>
-        <option value="alerta">Zerados ou críticos</option>
-        ${Object.entries(STATUS_ESTOQUE).map(([k, s]) => html`<option value=${k}>${s.rotulo}</option>`)}
-      </select>
-      <select class="entrada" value=${grupo} onChange=${(e) => { setGrupo(e.target.value); setClassif(''); }}>
-        <option value="">Todos os grupos</option>${grupos.map((g) => html`<option>${g}</option>`)}</select>
-      <select class="entrada" value=${classif} onChange=${(e) => setClassif(e.target.value)}>
-        <option value="">Todas as classificações</option>${classifs.map((c) => html`<option value=${c}>Classificação ${c}</option>`)}</select>
-      ${!agrupar && html`<label class="check"><input type="checkbox" checked=${completo} onChange=${(e) => setCompleto(e.target.checked)} /> Mostrar todas as colunas</label>`}
+        : html`<${Exportar} tabela="estoque.telaestoque-2" titulo="Posição de estoque" filtros=${`${pl(linhas.length, 'item', 'itens')} · ${dataHora(new Date())}`} arquivo=${`posicao-estoque-${hojeISO()}`}
+          colunas=${colsExp} linhas=${linhas} abas=${abasExcel} pdf=${pdfEstoque} />`}`}>
+      <div class="seg seg-visao" role="group" aria-label="Como ver">
+        <button class=${!agrupar ? 'ativo' : ''} aria-pressed=${!agrupar} onClick=${() => setAgrupar(false)}>Por produto</button>
+        <button class=${agrupar ? 'ativo' : ''} aria-pressed=${agrupar} onClick=${() => setAgrupar(true)}>Por grupo</button>
+      </div>
+      <${MultiEscolha} todos="Todas as categorias" rotulo="Categorias" valor=${cats} aoMudar=${setCats}
+        opcoes=${Object.entries(CATEGORIAS).map(([k, t]) => ({ valor: k, rotulo: t }))} />
+      <${MultiEscolha} todos="Todas as situações" rotulo="Situações" valor=${status} aoMudar=${setStatus}
+        opcoes=${Object.entries(STATUS_ESTOQUE).map(([k, x]) => ({ valor: k, rotulo: x.rotulo }))} />
+      <${MultiEscolha} todos="Todos os grupos" rotulo="Grupos" valor=${grupo} aoMudar=${(v) => { setGrupo(v); setClassif([]); }}
+        opcoes=${grupos.map((g) => ({ valor: g, rotulo: g }))} />
+      <${MultiEscolha} todos="Todas as classificações" rotulo="Classificações" valor=${classif} aoMudar=${setClassif}
+        opcoes=${classifs.map((c) => ({ valor: c, rotulo: `Classificação ${c}` }))} />
+      ${!agrupar && html`<label class="check"><input type="checkbox" checked=${completo} onChange=${(e) => setCompleto(e.target.checked)} /> Todas as colunas</label>`}
     </${Filtros}>
-    <div class="seg seg-visao" role="group" aria-label="Como ver">
-      <button class=${!agrupar ? 'ativo' : ''} onClick=${() => setAgrupar(false)}>Por produto</button>
-      <button class=${agrupar ? 'ativo' : ''} onClick=${() => setAgrupar(true)}>Por grupo</button>
-    </div>
     ${agrupar ? html`<${Tabela} id="estoque.telaestoque" linhas=${grupos2} chave="k" ordemInicial=${{ chave: 'grupo', dir: 1 }}
-        aoClicar=${(g) => { setGrupo(g.grupo === '(sem grupo)' ? '' : g.grupo); setClassif(g.classificacao); setAgrupar(false); }}
+        aoClicar=${(g) => { setGrupo(g.grupo === '(sem grupo)' ? [] : [g.grupo]); setClassif(g.classificacao ? [g.classificacao] : []); setAgrupar(false); }}
         colunas=${[
           { chave: 'grupo', titulo: 'Grupo', valor: (g) => `${g.grupo} ${g.classificacao}`, render: (g) => html`<b>${g.grupo}</b>` },
           { chave: 'classificacao', titulo: 'Classificação', render: (g) => (g.classificacao ? html`<${Etiqueta} cor="azul">${g.classificacao}</${Etiqueta}>` : '–') },

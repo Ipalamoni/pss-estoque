@@ -161,8 +161,8 @@ function Finalizadas() {
     { titulo: 'Padrão', valor: (b) => Number(b.rendimento_padrao || 0), num: true }, { titulo: 'Produzido', valor: (b) => Number(b.quantidade_produzida || 0), num: true },
     { titulo: 'Diferença', valor: (b) => dif(b) ?? '', num: true }, { titulo: 'Finalizou', valor: (b) => `${pes(b.finalizada_por)} ${b.finalizada_em ? dataHora(b.finalizada_em) : ''}` },
     { titulo: 'Motivo cancelamento', valor: (b) => b.cancelada_motivo || '' }];
-  return html`<div class="filtros"><input class="entrada" type="date" value=${de} onChange=${(e) => setDe(e.target.value)} /> até <input class="entrada" type="date" value=${ate} onChange=${(e) => setAte(e.target.value)} />
-      ${lista && html`<${Exportar} tabela="finalizar.finalizadas" titulo="Bateladas finalizadas" filtros=${`${de} a ${ate}`} arquivo="bateladas" linhas=${lista} colunas=${colunasExp} />`}</div>
+  return html`<div class="filtros filtros-com-acoes"><label class="campo-inline">De <input class="entrada" type="date" value=${de} onChange=${(e) => setDe(e.target.value)} /></label> <label class="campo-inline">até <input class="entrada" type="date" value=${ate} onChange=${(e) => setAte(e.target.value)} /></label>
+      <div class="filtros-acoes">${lista && html`<${Exportar} tabela="finalizar.finalizadas" titulo="Bateladas finalizadas" filtros=${`${de} a ${ate}`} arquivo="bateladas" linhas=${lista} colunas=${colunasExp} />`}</div></div>
     ${!lista ? html`<${Carregando} />` : html`<${Tabela} id="finalizar.finalizadas" linhas=${lista} vazio="Nenhuma batelada finalizada no período." colunas=${[
       { chave: 'id', titulo: 'Nº', num: true },
       { chave: 'ini', titulo: 'Início', valor: (b) => b.iniciada_em, render: (b) => dataHora(b.iniciada_em) },

@@ -58,6 +58,14 @@ não técnico), GUIA_DO_DONO.md (tela a tela), ESPECIFICACAO_DO_SISTEMA.md e CON
 - Textos claros e iguais em todo lugar (o nome no menu = título da tela = atalho). Botões dizem a ação ("Salvar pedido", não "OK").
 - Cartões e atalhos levam ao lugar certo já filtrado. Sem informação repetida na mesma tela.
 
+### 2.0 Relatórios e listas com tabela (para analista: o máximo de tela para os dados)
+- Busca, filtros, contagem e botões de ação (Excel, PDF, Imprimir, WhatsApp, Colunas) numa FAIXA SÓ, lado a lado
+  (`<Filtros acoes=...>`); só descem para a linha de baixo quando não cabem. Nada de faixas extras acima da tabela.
+- O botão "Colunas" vai junto do Exportar (`<Exportar tabela="id da Tabela">`), nunca numa faixa própria.
+- Filtros de escolha (locais, tipos, categorias, situações, grupos, usuários...) são de VÁRIOS itens com caixinhas
+  (`MultiEscolha` + `casaVarios`; lista vazia = todos). Nada de opções combinadas tipo "Matéria-prima e embalagem":
+  a pessoa marca as duas. Exceção: quando o cálculo exige um só (ex.: saldo do Kardex por local).
+
 ### 2.1 Telas da PRODUÇÃO (padeiros, pesagem, operários): simplicidade acima de tudo
 - Quem usa tem pouca familiaridade com informática (muitos não usam computador). Pensar como aplicativo de celular feito para quem tem dificuldade.
 - Botões GRANDES (≥ 56 px de altura no tablet), de apertar com o dedo; uma ação principal por tela; nada de menus escondidos, teclado ou digitação além da senha de 6 números.

@@ -280,10 +280,12 @@ export function useCelular(px = 640) {
     return () => (q.removeEventListener ? q.removeEventListener('change', f) : q.removeListener(f)); }, []);
   return cel;
 }
-export function Filtros({ ativos = 0, fixo, resumo, children, rotulo = 'Filtros' }) {
+export function Filtros({ ativos = 0, fixo, resumo, children, rotulo = 'Filtros', acoes }) {
+  // acoes: contagem + Exportar + Colunas na MESMA faixa dos filtros (relatórios: o máximo de espaço para a tabela)
   const cel = useCelular();
   const [aberto, setAberto] = useState(false);
-  if (!cel) return html`<div class="filtros">${fixo}${children}</div>`;
+  const ladoDireito = acoes && html`<div class="filtros-acoes">${acoes}</div>`;
+  if (!cel) return html`<div class=${'filtros' + (acoes ? ' filtros-com-acoes' : '')}>${fixo}${children}${ladoDireito}</div>`;
   return html`<div class=${'filtros filtros-cel' + (fixo ? ' com-fixo' : '')}>
     ${fixo}
     <button type="button" class=${'btn btn-sec btn-filtros' + (ativos ? ' com-filtro' : '')} aria-expanded=${aberto} onClick=${() => setAberto(!aberto)}>
@@ -291,8 +293,43 @@ export function Filtros({ ativos = 0, fixo, resumo, children, rotulo = 'Filtros'
       <span class="bf-txt">${resumo || rotulo}</span>${ativos ? html`<span class="bf-n">${ativos}</span>` : ''} <span class="seta-filtros">${aberto ? '▲' : '▼'}</span></button>
     ${aberto && html`<div class="filtros-gaveta">${children}
       <button type="button" class="btn btn-pri btn-peq bf-ok" onClick=${() => setAberto(false)}>Ver resultado</button></div>`}
+    ${ladoDireito}
   </div>`;
 }
+
+// Seleção de VÁRIOS itens (ex.: locais, tipos): parece um campo de escolha; abre uma lista com caixinhas.
+// valor = lista de códigos (texto). Lista vazia = "todos". Ex.: Almoxarifado + Pesagem; Matéria-prima + Embalagem.
+// opcoes: [{ valor, rotulo }]
+export function MultiEscolha({ todos, opcoes, valor = [], aoMudar, rotulo }) {
+  const [aberto, setAberto] = useState(false);
+  const ref = useRef(null);
+  const botao = useRef(null);
+  useEffect(() => {
+    if (!aberto) return;
+    const fora = (e) => { if (ref.current && !ref.current.contains(e.target)) setAberto(false); };
+    const tecla = (e) => { if (e.key === 'Escape') { setAberto(false); botao.current && botao.current.focus(); } };
+    document.addEventListener('mousedown', fora); document.addEventListener('touchstart', fora); document.addEventListener('keydown', tecla);
+    return () => { document.removeEventListener('mousedown', fora); document.removeEventListener('touchstart', fora); document.removeEventListener('keydown', tecla); };
+  }, [aberto]);
+  const sel = valor.filter((v) => opcoes.some((o) => String(o.valor) === String(v)));
+  const nomeDe = (v) => opcoes.find((o) => String(o.valor) === String(v))?.rotulo || v;
+  const texto = !sel.length ? todos : sel.length === 1 ? nomeDe(sel[0]) : `${nomeDe(sel[0])} +${sel.length - 1}`;
+  const alternar = (v) => { const s = new Set(sel.map(String)); if (s.has(String(v))) s.delete(String(v)); else s.add(String(v));
+    const nova = opcoes.map((o) => String(o.valor)).filter((x) => s.has(x)); aoMudar(nova.length === opcoes.length ? [] : nova); };
+  return html`<div class="multi" ref=${ref}>
+    <button type="button" ref=${botao} class=${'entrada multi-botao' + (sel.length ? ' multi-com' : '')} aria-haspopup="true" aria-expanded=${aberto}
+      aria-label=${`${rotulo || todos}: ${sel.length ? sel.map(nomeDe).join(', ') : todos}`} title=${sel.length > 1 ? sel.map(nomeDe).join(', ') : null}
+      onClick=${() => setAberto(!aberto)}><span class="multi-texto">${texto}</span><span class="multi-seta" aria-hidden="true">▾</span></button>
+    ${aberto && html`<div class="multi-lista" role="group" aria-label=${rotulo || todos}>
+      <label class="check multi-item multi-todos"><input type="checkbox" checked=${!sel.length} onChange=${() => aoMudar([])} /> ${todos}</label>
+      ${opcoes.map((o) => html`<label class="check multi-item" key=${o.valor}>
+        <input type="checkbox" checked=${sel.map(String).includes(String(o.valor))} onChange=${() => alternar(o.valor)} /> ${o.rotulo}</label>`)}
+      <button type="button" class="btn btn-pri btn-peq multi-ok" onClick=${() => { setAberto(false); botao.current && botao.current.focus(); }}>Aplicar</button>
+    </div>`}
+  </div>`;
+}
+// filtro de vários: lista vazia = todos
+export const casaVarios = (lista, v) => !lista || !lista.length || lista.map(String).includes(String(v));
 
 export const Etiqueta = ({ cor = 'cinza', children, titulo }) => html`<span class=${'etq etq-' + cor} title=${titulo}>${children}</span>`;
 export const Vazio = ({ texto = 'Nada por aqui ainda.' }) => html`<div class="vazio">${texto}</div>`;
@@ -336,6 +373,25 @@ const Seta = () => html`<svg width="18" height="18" viewBox="0 0 24 24" fill="no
 // ------------------------------ Tabela -------------------------------
 // colunas: [{ chave, titulo, valor:(l)=>valor p/ ordenar, render:(l)=>conteúdo, num:true, classe }]
 // id: liga o botão "Colunas" (cada pessoa escolhe as colunas visíveis; fica salvo no perfil dela)
+// Botão "Colunas" junto do Exportar (mesma faixa dos filtros): a tabela registra as colunas dela aqui
+const colunasDaTabela = new Map();      // id -> títulos
+const botoesColunas = new Map();        // id -> quantos botões "Colunas" externos estão na tela
+const ouvintesColunas = new Set();
+export function BotaoColunas({ id }) {
+  const [, atualizar] = useState(0);
+  const [escolher, setEscolher] = useState(false);
+  botoesColunas.set(id, Math.max(1, botoesColunas.get(id) || 0));
+  useEffect(() => { const f = () => atualizar((x) => x + 1); ouvintesColunas.add(f);
+    return () => { ouvintesColunas.delete(f); botoesColunas.delete(id); }; }, [id]);
+  const escondidas = usePreferencia(`colunas.${id}`, []);
+  const todas = colunasDaTabela.get(id);
+  if (!todas) return null;
+  const vis = todas.filter((t, i) => i === 0 || !escondidas.includes(t)).length;
+  return html`<button type="button" class="btn btn-sec btn-peq" onClick=${() => setEscolher(true)} aria-haspopup="dialog" title="Escolher as colunas da tabela">
+      <span aria-hidden="true">☰</span> Colunas${vis < todas.length ? ` (${vis} de ${todas.length})` : ''}</button>
+    ${escolher && html`<${EscolherColunas} id=${id} todas=${todas.map((t) => ({ titulo: t }))} escondidas=${escondidas} aoFechar=${() => setEscolher(false)} />`}`;
+}
+
 export function Tabela({ id, colunas: colunasBrutas, linhas, aoClicar, vazio, rodape, totais, ordemInicial, chave = 'id', classeLinha, max, aoVerTodos }) {
   const todas = colunasBrutas.filter(Boolean);   // coluna escondida (ex.: valores para pesagem) chega como false
   const escondidas = usePreferencia(id ? `colunas.${id}` : '_', []);
@@ -350,8 +406,11 @@ export function Tabela({ id, colunas: colunasBrutas, linhas, aoClicar, vazio, ro
     return ordenar(linhas, c.valor || ((l) => l[c.chave]), ord.dir);
   }, [linhas, ord]);
   const mostrar = max ? lista.slice(0, max) : lista;
+  const titulos = todas.map((c) => String(c.titulo));
+  useEffect(() => { if (!id) return;
+    if ((colunasDaTabela.get(id) || []).join('|') !== titulos.join('|')) { colunasDaTabela.set(id, titulos); ouvintesColunas.forEach((f) => f()); } });
   if (!linhas.length) return html`<${Vazio} texto=${vazio || 'Nenhum registro encontrado.'} />`;
-  const barra = id && html`<div class="tabela-barra">
+  const barra = id && !botoesColunas.has(id) && html`<div class="tabela-barra">
     <button type="button" class="btn btn-sec btn-peq" onClick=${() => setEscolher(true)} aria-haspopup="dialog">
       <span aria-hidden="true">☰</span> Colunas${colunas.length < todas.length ? ` (${colunas.length} de ${todas.length})` : ''}</button>
     ${escolher && html`<${EscolherColunas} id=${id} todas=${todas} escondidas=${escondidas} aoFechar=${() => setEscolher(false)} />`}</div>`;

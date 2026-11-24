@@ -492,7 +492,7 @@ function ProgramacaoPeriodo({ aoAbrirDia }) {
   const [ate, setAte] = useState(somarDias(h, 1));
   const progs = dados.programacoes.filter((p) => p.data >= de && p.data <= ate && p.situacao === 'ativa');
   const prods = useProducoes(de, ate, progs.map((p) => p.id));
-  const filtros = html`<div class="filtros">
+  const filtros = (acoes) => html`<div class="filtros filtros-com-acoes">
     <label class="campo-inline">De <input class="entrada" type="date" value=${de} onChange=${(e) => setDe(e.target.value)} /></label>
     <label class="campo-inline">até <input class="entrada" type="date" value=${ate} onChange=${(e) => setAte(e.target.value)} /></label>
     <span class="chips">
@@ -500,8 +500,8 @@ function ProgramacaoPeriodo({ aoAbrirDia }) {
       <button class="chip" onClick=${() => { setDe(somarDias(h, -6)); setAte(h); }}>Últimos 7 dias</button>
       <button class="chip" onClick=${() => { setDe(h.slice(0, 8) + '01'); setAte(h); }}>Este mês</button>
       <button class="chip" onClick=${() => { setDe(h); setAte(somarDias(h, 6)); }}>Próximos 7 dias</button>
-    </span></div>`;
-  if (!prods) return html`${filtros}<${Carregando} />`;
+    </span>${acoes && html`<div class="filtros-acoes">${acoes}</div>`}</div>`;
+  if (!prods) return html`${filtros()}<${Carregando} />`;
   const fm = somaFeito(prods);
   const ficha = (id) => dados.mapa.ficha.get(id);
   const linhas = progs.map((p) => ({ ...p, feito: fm.get(p.id) || 0, sit: situacao(p, fm.get(p.id) || 0) })).sort((a, b) => a.data.localeCompare(b.data) || String(ficha(a.ficha_id)?.codigo).localeCompare(String(ficha(b.ficha_id)?.codigo)));
@@ -513,13 +513,12 @@ function ProgramacaoPeriodo({ aoAbrirDia }) {
     { titulo: 'Pendente', valor: pend, num: true }, { titulo: 'Situação', valor: (p) => p.sit.rotulo },
     { titulo: 'Alteração', valor: (p) => (p.itens_alterados ? 'sim' : '') }, { titulo: 'Observação', valor: (p) => p.observacao, largura: 35 },
   ];
-  return html`${filtros}
+  return html`${filtros(html`<${Exportar} tabela="producao.programacaoperiodo" titulo="Programação de produção" filtros=${`${data(de)} a ${data(ate)}`} arquivo=${`programacao-${de}-a-${ate}`} colunas=${cols} linhas=${linhas}
+      totais=${['TOTAL', '', '', num(tP, 3), num(tF, 3), num(Math.max(tP - tF, 0), 3), '', '', '']} />`)}
     <div class="cartoes">
       <${Cartao} titulo="Programado" valor=${rec(tP)} /><${Cartao} titulo="Produzido" valor=${rec(tF)} sub=${tP ? `${num((tF / tP) * 100, 0)}% atendido` : '–'} />
       <${Cartao} titulo="Pendente" valor=${rec(Math.max(tP - tF, 0))} cor=${tP - tF > 0 ? 'c-laranja' : ''} />
     </div>
-    <div class="filtros"><${Exportar} tabela="producao.programacaoperiodo" titulo="Programação de produção" filtros=${`${data(de)} a ${data(ate)}`} arquivo=${`programacao-${de}-a-${ate}`} colunas=${cols} linhas=${linhas}
-      totais=${['TOTAL', '', '', num(tP, 3), num(tF, 3), num(Math.max(tP - tF, 0), 3), '', '', '']} /></div>
     <${Tabela} id="producao.programacaoperiodo" linhas=${linhas} aoClicar=${(p) => aoAbrirDia(p.data)} vazio="Nada programado neste período." colunas=${[
       { chave: 'data', titulo: 'Dia', render: (p) => rotuloDia(p.data) },
       { chave: 'r', titulo: 'Receita', valor: (p) => ficha(p.ficha_id)?.nome, render: (p) => html`<b>${ficha(p.ficha_id)?.codigo} · ${ficha(p.ficha_id)?.nome}</b>${p.itens_alterados ? html` <${Etiqueta} cor="laranja">alterada</${Etiqueta}>` : ''}` },
@@ -550,7 +549,7 @@ export function TelaSaidasProducao() {
     return () => { vivo = false; };
   }, [de, ate, dados.carregadoEm]);
 
-  const filtros = html`<div class="filtros">
+  const barra = (acoes) => html`<div class="filtros filtros-com-acoes">
     <label class="campo-inline">De <input class="entrada" type="date" value=${de} onChange=${(e) => setDe(e.target.value)} /></label>
     <label class="campo-inline">até <input class="entrada" type="date" value=${ate} onChange=${(e) => setAte(e.target.value)} /></label>
     <span class="chips">
@@ -558,17 +557,16 @@ export function TelaSaidasProducao() {
       <button class="chip" onClick=${() => { setDe(somarDias(h, -1)); setAte(somarDias(h, -1)); }}>Ontem</button>
       <button class="chip" onClick=${() => { setDe(somarDias(h, -6)); setAte(h); }}>7 dias</button>
       <button class="chip" onClick=${() => { setDe(h.slice(0, 8) + '01'); setAte(h); }}>Este mês</button>
-    </span></div>`;
-  const corpo = !prods || !movs ? html`<${Carregando} />` : html`<${SaidasProducaoConteudo} aba=${aba} de=${de} ate=${ate} prods=${prods.filter((p) => diaLocal(p.data_hora) >= de && diaLocal(p.data_hora) <= ate)} movs=${movs} />`;
+    </span>${acoes && html`<div class="filtros-acoes">${acoes}</div>`}</div>`;
+  const corpo = !prods || !movs ? html`${barra()}<${Carregando} />` : html`<${SaidasProducaoConteudo} barra=${barra} aba=${aba} de=${de} ate=${ate} prods=${prods.filter((p) => diaLocal(p.data_hora) >= de && diaLocal(p.data_hora) <= ate)} movs=${movs} />`;
   return html`
     <${Cabecalho} titulo="Saídas da produção" sub="Só o que saiu na pesagem para produzir: receitas feitas e saídas avulsas de matéria-prima" />
-    ${filtros}
     <${Abas} abas=${[{ id: 'resumo', titulo: 'Resumo por receita' }, { id: 'lancamentos', titulo: 'Receitas pesadas' }, { id: 'avulsas', titulo: 'Saídas avulsas' }, { id: 'consumo', titulo: 'Matéria-prima consumida' }]}
       ativa=${aba} aoMudar=${setAba} />
     ${corpo}`;
 }
 
-function SaidasProducaoConteudo({ aba, de, ate, prods, movs }) {
+function SaidasProducaoConteudo({ aba, de, ate, prods, movs, barra }) {
   const { dados, podeFazer, papeis } = useApp();
   const verCusto = podeFazer('custos') || papeis.includes('diretoria');   // custo não aparece para engenharia/pesagem
   const [aberta, setAberta] = useState(null);
@@ -602,14 +600,14 @@ function SaidasProducaoConteudo({ aba, de, ate, prods, movs }) {
       { titulo: 'Fora da programação', valor: (x) => x.foraProg, num: true }, { titulo: 'Lançamentos', valor: (x) => x.lanc, num: true },
       { titulo: 'Com alteração', valor: (x) => x.alt, num: true }, { titulo: 'Custo', valor: (x) => Math.round(x.custo * 100) / 100, texto: (x) => moeda(x.custo), num: true }];
     return html`
+      ${barra(html`<${ExportarC} verCusto=${verCusto} titulo="Saídas da produção — resumo por receita" filtros=${periodo} arquivo=${`saidas-producao-resumo-${de}-a-${ate}`} colunas=${cols} linhas=${linhas}
+        totais=${['TOTAL', '', num(tR, 3), num(tP, 3), '', '', '', moeda(tC)]} />`)}
       <div class="cartoes">
         <${Cartao} titulo="Receitas feitas" valor=${rec(tR)} sub=${pl(prods.length, 'lançamento', 'lançamentos')} />
         <${Cartao} titulo="Programado no período" valor=${rec(tP)} sub=${tP ? `${num((Math.min(tR, tP) / tP) * 100, 0)}% atendido` : '–'} />
         ${verCusto && html`<${Cartao} titulo="Custo da matéria-prima" valor=${moeda(tC)} sub="pelas receitas" />`}
         <${Cartao} titulo="Saídas avulsas" valor=${avulsas.length} sub=${verCusto ? moeda(Math.abs(avulsas.reduce((s, m) => s + Number(m.valor), 0))) : ''} cor=${avulsas.length ? 'c-laranja' : ''} />
       </div>
-      <div class="filtros"><${ExportarC} verCusto=${verCusto} titulo="Saídas da produção — resumo por receita" filtros=${periodo} arquivo=${`saidas-producao-resumo-${de}-a-${ate}`} colunas=${cols} linhas=${linhas}
-        totais=${['TOTAL', '', num(tR, 3), num(tP, 3), '', '', '', moeda(tC)]} /></div>
       <${TabelaC} verCusto=${verCusto} linhas=${linhas} vazio="Nenhuma receita pesada neste período." colunas=${[
         { chave: 'r', titulo: 'Receita', valor: (x) => ficha(x.id)?.nome, render: (x) => html`<b>${ficha(x.id)?.codigo} · ${ficha(x.id)?.nome}</b>` },
         { chave: 'receitas', titulo: 'Feitas', num: true, render: (x) => html`<b>${num(x.receitas, 3)}</b>` },
@@ -632,7 +630,7 @@ function SaidasProducaoConteudo({ aba, de, ate, prods, movs }) {
         { titulo: 'Quantidade', valor: (x) => -Number(x.m.quantidade) }, { titulo: 'Unid.', valor: (x) => prod(x.m.produto_id)?.unidade_estoque },
         { titulo: 'Custo', valor: (x) => -Number(x.m.valor) }, { titulo: 'Tipo', valor: (x) => (x.m.tipo === 'correcao' ? 'correção' : '') }] }];
     return html`
-      <div class="filtros"><${ExportarC} verCusto=${verCusto} titulo="Receitas pesadas" filtros=${periodo} arquivo=${`receitas-pesadas-${de}-a-${ate}`} colunas=${cols} linhas=${prods} abas=${abas} /></div>
+      ${barra(html`<${ExportarC} verCusto=${verCusto} titulo="Receitas pesadas" filtros=${periodo} arquivo=${`receitas-pesadas-${de}-a-${ate}`} colunas=${cols} linhas=${prods} abas=${abas} />`)}
       <${TabelaC} verCusto=${verCusto} linhas=${prods} aoClicar=${setAberta} ordemInicial=${{ chave: 'id', dir: -1 }} vazio="Nenhuma receita pesada neste período." colunas=${[
         { chave: 'id', titulo: 'Data/hora', valor: (p) => p.id, render: (p) => dataHora(p.data_hora) },
         { chave: 'r', titulo: 'Receita', valor: (p) => ficha(p.ficha_id)?.nome, render: (p) => html`<b>${ficha(p.ficha_id)?.codigo} · ${ficha(p.ficha_id)?.nome}</b>
@@ -660,7 +658,7 @@ function SaidasProducaoConteudo({ aba, de, ate, prods, movs }) {
       { titulo: 'Custo', valor: (m) => -Number(m.valor), texto: (m) => moeda(-m.valor), num: true }, { titulo: 'Quem', valor: (m) => nomeUsuario(perfil(m.usuario_id)), largura: 28 },
       { titulo: 'Justificativa', valor: (m) => (m.tipo === 'correcao' ? `Correção: ${m.motivo || ''}` : m.observacao), largura: 45 }];
     return html`
-      <div class="filtros"><${ExportarC} verCusto=${verCusto} titulo="Saídas avulsas da pesagem" filtros=${periodo} arquivo=${`saidas-avulsas-${de}-a-${ate}`} colunas=${cols} linhas=${lista} /></div>
+      ${barra(html`<${ExportarC} verCusto=${verCusto} titulo="Saídas avulsas da pesagem" filtros=${periodo} arquivo=${`saidas-avulsas-${de}-a-${ate}`} colunas=${cols} linhas=${lista} />`)}
       <${TabelaC} verCusto=${verCusto} linhas=${lista} ordemInicial=${{ chave: 'id', dir: -1 }} vazio="Nenhuma saída avulsa neste período." colunas=${[
         { chave: 'id', titulo: 'Data/hora', valor: (m) => m.id, render: (m) => dataHora(m.data_hora) },
         { chave: 'p', titulo: 'Produto', valor: (m) => prod(m.produto_id)?.descricao, render: (m) => html`<b>${prod(m.produto_id)?.descricao}</b>${m.tipo === 'correcao' ? html` <${Etiqueta} cor="roxo">correção</${Etiqueta}>` : ''}` },
@@ -687,8 +685,8 @@ function SaidasProducaoConteudo({ aba, de, ate, prods, movs }) {
     { titulo: 'Unid.', valor: un }, { titulo: 'Custo', valor: (x) => Math.round(x.valor * 100) / 100, texto: (x) => moeda(x.valor), num: true }];
   const tV = linhas.reduce((s, x) => s + x.valor, 0);
   return html`
-    <div class="filtros"><${ExportarC} verCusto=${verCusto} titulo="Matéria-prima consumida na produção" filtros=${periodo} arquivo=${`consumo-producao-${de}-a-${ate}`} colunas=${cols} linhas=${linhas}
-      totais=${['TOTAL', '', '', '', '', '', '', moeda(tV)]} /></div>
+      ${barra(html`<${ExportarC} verCusto=${verCusto} titulo="Matéria-prima consumida na produção" filtros=${periodo} arquivo=${`consumo-producao-${de}-a-${ate}`} colunas=${cols} linhas=${linhas}
+      totais=${['TOTAL', '', '', '', '', '', '', moeda(tV)]} />`)}
     <${TabelaC} verCusto=${verCusto} linhas=${linhas} vazio="Nenhum consumo neste período." colunas=${[
       { chave: 'cod', titulo: 'Código', valor: (x) => prod(x.id)?.codigo, render: (x) => prod(x.id)?.codigo }, { chave: 'p', titulo: 'Matéria-prima', valor: (x) => prod(x.id)?.descricao, render: (x) => html`<b>${prod(x.id)?.descricao}</b>`, classe: 'col-desc' }, { chave: 'classif', titulo: 'Classif.', valor: (x) => prod(x.id)?.classificacao || '', render: (x) => prod(x.id)?.classificacao || '–' },
       { chave: 'receita', titulo: 'Pelas receitas', num: true, render: (x) => qu(x.receita, un(x)) },

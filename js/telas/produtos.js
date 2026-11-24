@@ -1,5 +1,5 @@
 // Cadastro de produtos (matérias-primas, embalagens e outros)
-import { html, useState, useMemo, useEffect, useApp, Tabela, Modal, Campo, Numero, Escolher, Busca, Etiqueta, Cabecalho, useAcao, confirmar, n, Filtros } from '../ui.js';
+import { html, useState, useMemo, useEffect, useApp, Tabela, Modal, Campo, Numero, Escolher, Busca, Etiqueta, Cabecalho, useAcao, confirmar, n, Filtros, MultiEscolha, casaVarios } from '../ui.js';
 import { veValores, CATEGORIAS, CATEGORIAS_CADASTRO, UNIDADES_ESTOQUE, UNIDADES_COMPRA, contem, qtdDupla, num, moeda, qu, pl, hojeISO } from '../util.js';
 import { Icone } from '../icones.js';
 import { UltimaAlteracao, HistoricoAuditoria } from '../historico.js';
@@ -10,9 +10,9 @@ const distintos = (lista, campo) => [...new Set(lista.map((x) => x[campo]).filte
 export function TelaProdutos() {
   const { dados, podeFazer, estadoRota, setEstadoRota } = useApp();
   const [busca, setBusca] = useState('');
-  const [cat, setCat] = useState('');
-  const [grupo, setGrupo] = useState('');
-  const [classif, setClassif] = useState('');
+  const [cat, setCat] = useState([]);       // vários (vazio = todos)
+  const [grupo, setGrupo] = useState([]);
+  const [classif, setClassif] = useState([]);
   const [inativos, setInativos] = useState(false);
   const [editando, setEditando] = useState(null);
   const pode = podeFazer('cadastro_produto');
@@ -20,34 +20,32 @@ export function TelaProdutos() {
   useEffect(() => { const id = estadoRota?.abrirId; if (id) { const p = dados.mapa.produto.get(id); if (p) setEditando(p); setEstadoRota(null); } }, [estadoRota]);
   const pre = dados.produtos.filter((p) => p.pre_cadastro);
   const grupos = distintos(dados.produtos, 'grupo');
-  const classifs = distintos(dados.produtos.filter((p) => !grupo || p.grupo === grupo), 'classificacao');
+  const classifs = distintos(dados.produtos.filter((p) => casaVarios(grupo, p.grupo)), 'classificacao');
 
-  const linhas = useMemo(() => dados.ind.filter((p) => (inativos || p.ativo) && (!cat || p.categoria === cat)
-    && (!grupo || p.grupo === grupo) && (!classif || p.classificacao === classif)
+  const linhas = useMemo(() => dados.ind.filter((p) => (inativos || p.ativo) && casaVarios(cat, p.categoria)
+    && casaVarios(grupo, p.grupo) && casaVarios(classif, p.classificacao)
     && contem(`${p.codigo} ${p.descricao} ${p.id} ${p.marca || ''} ${p.grupo || ''}`, busca)), [dados, busca, cat, grupo, classif, inativos]);
 
   return html`
     <${Cabecalho} titulo="Produtos" sub="Matérias-primas, embalagens e materiais controlados no estoque">
+      ${pode && html`<button class="btn btn-pri" onClick=${() => setEditando({})}><${Icone} nome="mais" tam=${18} /> Novo produto</button>`}
+    </${Cabecalho}>
+    ${pre.length > 0 && html`<div class="alerta alerta-pre"><b>${pl(pre.length, 'produto pré-cadastrado', 'produtos pré-cadastrados')} no recebimento.</b> ${pode ? 'Abra, complete e salve:' : 'O comprador vai completar:'}
+      <span class="pre-lista">${pre.map((p) => html`<button type="button" class="chip" key=${p.id} onClick=${() => setEditando(p)}>${p.descricao}</button>`)}</span></div>`}
+    <${Filtros} acoes=${html`<span class="nota">${pl(linhas.length, 'produto', 'produtos')}</span>
       <${Exportar} tabela="produtos.telaprodutos" titulo="Cadastro de produtos" filtros=${pl(linhas.length, 'produto', 'produtos')} arquivo=${`produtos-${hojeISO()}`} linhas=${linhas} colunas=${[
         { titulo: 'Código', valor: (p) => p.codigo }, { titulo: 'Código ERP', valor: (p) => p.codigo_erp }, { titulo: 'Descrição', valor: (p) => p.descricao, largura: 36 },
         { titulo: 'Categoria', valor: (p) => CATEGORIAS[p.categoria] }, { titulo: 'Grupo', valor: (p) => p.grupo }, { titulo: 'Classif.', valor: (p) => p.classificacao },
         { titulo: 'Marca', valor: (p) => p.marca }, { titulo: 'Unid. estoque', valor: (p) => p.unidade_estoque }, { titulo: 'Unid. compra', valor: (p) => p.unidade_compra },
         { titulo: 'Fator', valor: (p) => (p.unidade_compra ? Number(p.fator_compra) : ''), num: true }, { titulo: 'Saldo', valor: (p) => Math.round(p.saldo * 1000) / 1000, texto: (p) => qtdDupla(p, p.saldo), num: true },
         { titulo: 'Mín. definido', valor: (p) => p.min_definido, num: true }, { titulo: 'Prazo (dias)', valor: (p) => p.prazo_entrega_dias, num: true },
-        { titulo: 'Fornecedor principal', valor: (p) => dados.mapa.fornecedor.get(p.fornecedor_padrao_id)?.nome }, { titulo: 'Ativo', valor: (p) => (p.ativo ? 'sim' : 'não') }]} />
-      ${pode && html`<button class="btn btn-pri" onClick=${() => setEditando({})}><${Icone} nome="mais" tam=${18} /> Novo produto</button>`}
-    </${Cabecalho}>
-    ${pre.length > 0 && html`<div class="alerta alerta-pre"><b>${pl(pre.length, 'produto pré-cadastrado', 'produtos pré-cadastrados')} no recebimento.</b> ${pode ? 'Abra, complete e salve:' : 'O comprador vai completar:'}
-      <span class="pre-lista">${pre.map((p) => html`<button type="button" class="chip" key=${p.id} onClick=${() => setEditando(p)}>${p.descricao}</button>`)}</span></div>`}
-    <${Filtros} ativos=${[cat, grupo, classif].filter(Boolean).length} fixo=${html`<${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Buscar por código, descrição ou marca" />`}>
-      <select class="entrada" value=${cat} onChange=${(e) => setCat(e.target.value)}>
-        <option value="">Todas as categorias</option>
-        ${Object.entries(CATEGORIAS).map(([k, v]) => html`<option value=${k}>${v}</option>`)}
-      </select>
-      <select class="entrada" value=${grupo} onChange=${(e) => { setGrupo(e.target.value); setClassif(''); }}>
-        <option value="">Todos os grupos</option>${grupos.map((g) => html`<option>${g}</option>`)}</select>
-      <select class="entrada" value=${classif} onChange=${(e) => setClassif(e.target.value)}>
-        <option value="">Todas as classificações</option>${classifs.map((c) => html`<option value=${c}>Classificação ${c}</option>`)}</select>
+        { titulo: 'Fornecedor principal', valor: (p) => dados.mapa.fornecedor.get(p.fornecedor_padrao_id)?.nome }, { titulo: 'Ativo', valor: (p) => (p.ativo ? 'sim' : 'não') }]} />`} ativos=${[cat.length, grupo.length, classif.length, inativos].filter(Boolean).length} fixo=${html`<${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Buscar por código, descrição ou marca" />`}>
+      <${MultiEscolha} todos="Todas as categorias" rotulo="Categorias" valor=${cat} aoMudar=${setCat}
+        opcoes=${Object.entries(CATEGORIAS).map(([k, v]) => ({ valor: k, rotulo: v }))} />
+      <${MultiEscolha} todos="Todos os grupos" rotulo="Grupos" valor=${grupo} aoMudar=${(v) => { setGrupo(v); setClassif([]); }}
+        opcoes=${grupos.map((g) => ({ valor: g, rotulo: g }))} />
+      <${MultiEscolha} todos="Todas as classificações" rotulo="Classificações" valor=${classif} aoMudar=${setClassif}
+        opcoes=${classifs.map((c) => ({ valor: c, rotulo: `Classificação ${c}` }))} />
       <label class="check"><input type="checkbox" checked=${inativos} onChange=${(e) => setInativos(e.target.checked)} /> Mostrar inativos</label>
     </${Filtros}>
     <${Tabela} id="produtos.telaprodutos" linhas=${linhas} aoClicar=${(p) => setEditando(p)} ordemInicial=${{ chave: 'codigo', dir: 1 }}

@@ -1,5 +1,5 @@
 // Inventário: contagem física pelo celular e ajuste das diferenças
-import { html, useRascunho, useState, useMemo, useEffect, useApp, Modal, Campo, QtdUnidade, Busca, Etiqueta, Cabecalho, Abas, Tabela, Carregando, useAcao, confirmar, avisar, n, Filtros } from '../ui.js';
+import { html, useRascunho, useState, useMemo, useEffect, useApp, Modal, Campo, QtdUnidade, Busca, Etiqueta, Cabecalho, Abas, Tabela, Carregando, useAcao, confirmar, avisar, n, Filtros, MultiEscolha, casaVarios } from '../ui.js';
 import { CATEGORIAS, MOTIVOS_INVENTARIO, qtd, moeda, num, contem, fator, qtdDupla, dataHora, mensagemErro, qu, plural, pl, nomeUsuario, hojeISO } from '../util.js';
 import { Exportar } from '../exportar.js';
 import { SeletorLocal, useLocalInicial } from '../producao-util.js';
@@ -14,7 +14,7 @@ export function TelaInventario() {
 
 function Contagem({ aoConcluir }) {
   const { dados, recarregar, api } = useApp();
-  const [cats, setCats] = useState(new Set(['materia_prima']));
+  const [cats, setCats] = useState(['materia_prima']);   // vários (vazio = todas)
   const [busca, setBusca] = useState('');
   const [so, setSo] = useState(false);
   const [ocupado, executar] = useAcao();
@@ -28,14 +28,13 @@ function Contagem({ aoConcluir }) {
   const aqui = (p) => { const e = dados.mapa.saldoLocal.get(`${p.id}|${loc}`); return e ? Number(e.disponivel) + Number(e.separado) : 0; };
   const mp = useMemo(() => new Map([...mpBase].map(([id, p]) => [id, { ...p, saldo: loc ? aqui(p) : p.saldo }])), [dados, loc]);
 
-  const itens = useMemo(() => [...mp.values()].filter((p) => p.ativo && p.controla_estoque !== false && cats.has(p.categoria) && contem(`${p.codigo} ${p.descricao}`, busca)
+  const itens = useMemo(() => [...mp.values()].filter((p) => p.ativo && p.controla_estoque !== false && casaVarios(cats, p.categoria) && contem(`${p.codigo} ${p.descricao}`, busca)
     && (!so || cont[p.id]?.q)).sort((a, b) => a.descricao.localeCompare(b.descricao)), [mp, cats, busca, so, cont]);
   const mudar = (id, ch) => setCont((c) => ({ ...c, [id]: { un: mp.get(id).unidade_compra || mp.get(id).unidade_estoque, ...c[id], ...ch } }));
   const dif = (p) => { const c = cont[p.id]; if (!c || c.q === '' || c.q === undefined || n(c.q) === null) return null; return Math.round((n(c.q) * fator(p, c.un) - p.saldo) * 10000) / 10000; };
   const contados = Object.entries(cont).filter(([, c]) => c.q !== '' && c.q !== undefined && n(c.q) !== null);
   const comDif = contados.filter(([id]) => dif(mp.get(Number(id))) !== 0);
   const valorDif = comDif.reduce((s, [id]) => { const p = mp.get(Number(id)); return s + dif(p) * p.custo_medio; }, 0);
-  const alternar = (k) => setCats((s) => { const x = new Set(s); x.has(k) ? x.delete(k) : x.add(k); return x; });
 
   async function finalizar() {
     const faltaMotivo = comDif.find(([id, c]) => !c.motivo || (c.motivo === 'outros' && !(c.obs || '').trim()));
@@ -54,17 +53,17 @@ function Contagem({ aoConcluir }) {
 
   return html`
     <div class="filtros"><${SeletorLocal} valor=${loc} aoMudar=${(v) => setLoc(v)} rotulo="Contando o local" /></div>
-    <${Filtros} ativos=${cats.size < Object.keys(CATEGORIAS).length ? 1 : 0} fixo=${html`<${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Buscar item" />`}>
-      <div class="grupo-checks">${Object.entries(CATEGORIAS).map(([k, v]) => html`<label class="check"><input type="checkbox" checked=${cats.has(k)} onChange=${() => alternar(k)} /> ${v}</label>`)}</div>
-    </${Filtros}>
-    <div class="filtros">
+    <${Filtros} ativos=${[cats.length, so].filter(Boolean).length} fixo=${html`<${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Buscar item" />`}
+      acoes=${html`<span class="nota">${pl(itens.length, 'item', 'itens')}</span>
       <${Exportar} titulo="Folha de contagem de estoque" filtros=${`${pl(itens.length, 'item', 'itens')} · ${dataHora(new Date())}`} arquivo=${`folha-contagem-${hojeISO()}`} linhas=${itens} paisagem=${false}
         colunas=${[{ titulo: 'Código', valor: (p) => p.codigo }, { titulo: 'Produto', valor: (p) => p.descricao, largura: 38 }, { titulo: 'Unid.', valor: (p) => p.unidade_compra || p.unidade_estoque },
           { titulo: 'No sistema', valor: (p) => Math.round(p.saldo * 1000) / 1000, texto: (p) => qtdDupla(p, p.saldo), num: true },
           { titulo: 'Contado', valor: (p) => (cont[p.id]?.q ? n(cont[p.id].q) : ''), texto: (p) => (cont[p.id]?.q ? `${cont[p.id].q} ${cont[p.id].un}` : '________'), num: true },
-          { titulo: 'Observação', valor: () => '', texto: () => '' }]} />
+          { titulo: 'Observação', valor: () => '', texto: () => '' }]} />`}>
+      <${MultiEscolha} todos="Todas as categorias" rotulo="Categorias" valor=${cats} aoMudar=${setCats}
+        opcoes=${Object.entries(CATEGORIAS).map(([k, v]) => ({ valor: k, rotulo: v }))} />
       <label class="check"><input type="checkbox" checked=${so} onChange=${(e) => setSo(e.target.checked)} /> Só os já contados</label>
-    </div>
+    </${Filtros}>
     <div class="lista-conferencia">
       ${itens.map((p) => { const c = cont[p.id] || {}; const d = dif(p);
         return html`<div class=${'conf-item' + (d === 0 ? ' ok' : d ? ' dif' : '')} key=${p.id}>

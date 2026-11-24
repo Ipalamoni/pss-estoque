@@ -1,5 +1,5 @@
 // Pedidos de compra: lista, cadastro, detalhe, divergências, PDF / Excel / impressão
-import { html, useRascunho, confirmarDescarte, useState, useMemo, useEffect, useApp, Tabela, Modal, Campo, Numero, Escolher, QtdUnidade, Busca, Etiqueta, Cabecalho, useAcao, confirmar, avisar, n, useHistorico, Filtros } from '../ui.js';
+import { html, useRascunho, confirmarDescarte, useState, useMemo, useEffect, useApp, Tabela, Modal, Campo, Numero, Escolher, QtdUnidade, Busca, Etiqueta, Cabecalho, useAcao, confirmar, avisar, n, useHistorico, Filtros, MultiEscolha, casaVarios } from '../ui.js';
 import { STATUS_PEDIDO, numeroPedido, data, dataHora, hojeISO, somarDias, diasEntre, moeda, qtd, num, contem, fator, qu, pl, plural, nomeUsuario, mensagemErro } from '../util.js';
 import { pdfPedido, pdfTabela, salvarPDF, imprimirPDF, excel, pdfBlob, compartilhar } from '../export.js';
 import { Exportar } from '../exportar.js';
@@ -43,7 +43,9 @@ export function SituacaoPedido({ pedido, r }) {
 export function TelaPedidos() {
   const { dados, podeFazer, estadoRota, setEstadoRota } = useApp();
   const [busca, setBusca] = useState('');
-  const [filtro, setFiltro] = useState(estadoRota?.filtro || 'pendentes');
+  // visão rápida (uma) + situações (várias, vazio = todas)
+  const [filtro, setFiltro] = useState(STATUS_PEDIDO[estadoRota?.filtro] ? 'todos' : estadoRota?.filtro || 'pendentes');
+  const [situacoes, setSituacoes] = useState(STATUS_PEDIDO[estadoRota?.filtro] ? [estadoRota.filtro] : []);
   const [de, setDe] = useState('');
   useHistorico(de);
   const [ate, setAte] = useState('');
@@ -63,12 +65,12 @@ export function TelaPedidos() {
     if (filtro === 'semana' && !(p.r.pendente && p.previsao_entrega && p.previsao_entrega >= hojeISO() && p.previsao_entrega <= somarDias(hojeISO(), 7))) return false;
     if (filtro === 'divergencia' && !p.r.divPendente) return false;
     if (filtro === 'divergentes' && !p.r.divergencia) return false;
-    if (STATUS_PEDIDO[filtro] && p.status !== filtro) return false;
+    if (!casaVarios(situacoes, p.status)) return false;
     if (de && p.data_pedido < de) return false;
     if (ate && p.data_pedido > ate) return false;
     if (forn && p.fornecedor_id !== forn) return false;
     return contem(`${numeroPedido(p.id)} ${p.id} ${p.r.fornecedor?.nome} ${p.observacao}`, busca);
-  }), [todos, busca, filtro, de, ate, forn]);
+  }), [todos, busca, filtro, situacoes, de, ate, forn]);
   const total = linhas.reduce((s, p) => s + p.r.valor, 0);
   const pedidoAberto = aberto && dados.pedidos.find((p) => p.id === aberto);
 
@@ -96,8 +98,6 @@ export function TelaPedidos() {
 
   return html`
     <${Cabecalho} titulo="Pedidos de compra" sub="Pedidos feitos, o que falta chegar e o que já chegou">
-      <${Exportar} tabela="pedidos.telapedidos" titulo="Pedidos de compra" filtros=${pl(linhas.length, 'pedido', 'pedidos')} arquivo=${`pedidos-${hojeISO()}`} colunas=${colExp} linhas=${linhas}
-        abas=${abasPedidos} totais=${['', '', '', '', '', '', 'TOTAL', moeda(total), '', '', '', '']} />
       <button class="btn btn-sec" onClick=${() => setUltimas(true)}>Últimas compras</button>
       ${podeFazer('pedido') && html`<button class="btn btn-pri" onClick=${() => setEditando({})}><${Icone} nome="mais" tam=${18} /> Novo pedido</button>`}
     </${Cabecalho}>
@@ -106,7 +106,9 @@ export function TelaPedidos() {
       <span>⚠ <b>${pl(pendRec.length, 'recebimento', 'recebimentos')} aguardando a ciência do comprador</b>${' '}
         (${[qtdDivPend && pl(qtdDivPend, 'pedido com divergência', 'pedidos com divergência'), pendRec.filter((r) => !r.pedido_id).length && pl(pendRec.filter((r) => !r.pedido_id).length, 'sem pedido', 'sem pedido')].filter(Boolean).join(' · ')}).</span>
       <button class="btn btn-destaque btn-peq" onClick=${() => setPendencias(true)}>Ver e dar ciência</button></div>`}
-    <${Filtros} ativos=${[filtro !== 'pendentes', de, ate, forn].filter(Boolean).length} fixo=${html`<${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Nº do pedido ou fornecedor" />`}>
+    <${Filtros} acoes=${html`<span class="nota">${pl(linhas.length, 'pedido', 'pedidos')}</span>
+      <${Exportar} tabela="pedidos.telapedidos" titulo="Pedidos de compra" filtros=${pl(linhas.length, 'pedido', 'pedidos')} arquivo=${`pedidos-${hojeISO()}`} colunas=${colExp} linhas=${linhas}
+        abas=${abasPedidos} totais=${['', '', '', '', '', '', 'TOTAL', moeda(total), '', '', '', '']} />`} ativos=${[filtro !== 'pendentes', situacoes.length, de, ate, forn].filter(Boolean).length} fixo=${html`<${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Nº do pedido ou fornecedor" />`}>
       <select class="entrada" value=${filtro} onChange=${(e) => setFiltro(e.target.value)}>
         <option value="pendentes">Pendentes de entrega</option>
         <option value="atrasados">Atrasados</option>
@@ -114,8 +116,9 @@ export function TelaPedidos() {
         <option value="divergencia">Divergência aguardando ciência</option>
         <option value="divergentes">Recebidos com divergência (todos)</option>
         <option value="todos">Todos</option>
-        ${Object.entries(STATUS_PEDIDO).map(([k, v]) => html`<option value=${k}>${v}</option>`)}
       </select>
+      <${MultiEscolha} todos="Todas as situações" rotulo="Situações do pedido" valor=${situacoes} aoMudar=${setSituacoes}
+        opcoes=${Object.entries(STATUS_PEDIDO).map(([k, v]) => ({ valor: k, rotulo: v }))} />
       <label class="campo-inline">Pedido de <input class="entrada" type="date" value=${de} onChange=${(e) => setDe(e.target.value)} /></label>
       <label class="campo-inline">até <input class="entrada" type="date" value=${ate} onChange=${(e) => setAte(e.target.value)} /></label>
       <div class="filtro-escolher"><${Escolher} itens=${dados.fornecedores} valor=${forn} aoMudar=${setForn} rotuloDe=${(f) => f.nome} placeholder="Fornecedor (todos)" /></div>

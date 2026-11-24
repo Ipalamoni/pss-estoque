@@ -133,18 +133,16 @@ export function TelaPrevisao() {
   ];
 
   return html`
-    <${Cabecalho} titulo="Programado × produzido" sub=${reduzido ? 'O que está programado e quanto já foi produzido, hoje e amanhã' : 'Receitas programadas × rendimento de cada receita, e o que já foi produzido (bateladas finalizadas)'}>
-      <${Exportar} tabela="previsao.telaprevisao" titulo="Previsão de produção" filtros=${periodoTxt} arquivo=${`previsao-producao-${de}${umDia ? '' : '-a-' + ate}`}
-        colunas=${aba === 'dia' ? colDia : colProd} linhas=${aba === 'dia' ? linhas : porProduto}
-        abas=${() => [{ nome: 'Dia a dia', colunas: colDia, linhas }, { nome: 'Por produto', colunas: colProd, linhas: porProduto }]} />
-    </${Cabecalho}>
-    <div class="chips">
+    <${Cabecalho} titulo="Programado × produzido" sub=${reduzido ? 'O que está programado e quanto já foi produzido, hoje e amanhã' : 'Receitas programadas × rendimento de cada receita, e o que já foi produzido (bateladas finalizadas)'} />
+    <div class="filtros filtros-com-acoes"><div class="chips" role="group" aria-label="Período">
       ${PERIODOS.filter((p) => !reduzido || ['hoje', 'amanha'].includes(p.id)).map((p) => html`<button class=${'chip' + (per === p.id ? ' ativo' : '')} aria-pressed=${!!(per === p.id)} onClick=${() => escolher(p.id)}>${p.t}</button>`)}
     </div>
-    ${per === 'livre' && html`<div class="filtros">
+    ${per === 'livre' && html`
       <label class="campo-inline">De <input class="entrada" type="date" value=${de} onChange=${(e) => { setDe(e.target.value); if (e.target.value > ate) setAte(e.target.value); }} /></label>
-      <label class="campo-inline">até <input class="entrada" type="date" value=${ate} onChange=${(e) => setAte(e.target.value < de ? de : e.target.value)} /></label>
-    </div>`}
+      <label class="campo-inline">até <input class="entrada" type="date" value=${ate} onChange=${(e) => setAte(e.target.value < de ? de : e.target.value)} /></label>`}
+    <div class="filtros-acoes"><${Exportar} tabela=${aba === 'dia' ? 'previsao.telaprevisao' : 'previsao.telaprevisao-2'} titulo="Previsão de produção" filtros=${periodoTxt} arquivo=${`previsao-producao-${de}${umDia ? '' : '-a-' + ate}`}
+        colunas=${aba === 'dia' ? colDia : colProd} linhas=${aba === 'dia' ? linhas : porProduto}
+        abas=${() => [{ nome: 'Dia a dia', colunas: colDia, linhas }, { nome: 'Por produto', colunas: colProd, linhas: porProduto }]} /></div></div>
     ${!lista ? html`<${Carregando} />` : html`
       <div class="cartoes">
         <${Cartao} titulo=${umDia ? `Previsto · ${rotuloDiaPrev(de)}` : 'Previsto no período'} valor=${totalPorUnidade(linhas)} />

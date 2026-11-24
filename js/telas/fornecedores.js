@@ -19,18 +19,18 @@ export function TelaFornecedores() {
 
   return html`
     <${Cabecalho} titulo="Fornecedores">
+      ${pode && html`<button class="btn btn-pri" onClick=${() => setEditando({})}><${Icone} nome="mais" tam=${18} /> Novo fornecedor</button>`}
+    </${Cabecalho}>
+    ${pre.length > 0 && html`<div class="alerta alerta-pre"><b>${pre.length === 1 ? '1 fornecedor pré-cadastrado' : `${pre.length} fornecedores pré-cadastrados`} no recebimento.</b> ${pode ? 'Abra, complete e salve:' : 'O comprador vai completar:'}
+      <span class="pre-lista">${pre.map((f) => html`<button type="button" class="chip" key=${f.id} onClick=${() => setEditando(f)}>${f.nome}</button>`)}</span></div>`}
+    <${Filtros} acoes=${html`<span class="nota">${pl(linhas.length, 'fornecedor', 'fornecedores')}</span>
       <${Exportar} tabela="fornecedores.telafornecedores" titulo="Cadastro de fornecedores" filtros=${pl(linhas.length, 'fornecedor', 'fornecedores')} arquivo=${`fornecedores-${hojeISO()}`} linhas=${linhas} colunas=${[
         { titulo: 'Nome fantasia', valor: (f) => f.nome, largura: 28 }, { titulo: 'Razão social', valor: (f) => f.razao_social, largura: 32 }, { titulo: 'Tipo', valor: (f) => (f.tipo_pessoa === 'PF' ? 'Pessoa física' : 'Pessoa jurídica') }, { titulo: 'CNPJ / CPF', valor: (f) => formatarDoc(f.cnpj, f.tipo_pessoa), largura: 20 },
         { titulo: 'Inscr. estadual', valor: (f) => f.inscricao_estadual }, { titulo: 'Contato', valor: (f) => f.contato }, { titulo: 'Telefone', valor: (f) => f.telefone },
         { titulo: 'WhatsApp', valor: (f) => f.whatsapp }, { titulo: 'E-mail', valor: (f) => f.email, largura: 28 }, { titulo: 'Endereço', valor: (f) => f.endereco, largura: 30 },
         { titulo: 'Bairro', valor: (f) => f.bairro }, { titulo: 'Cidade', valor: (f) => f.cidade }, { titulo: 'UF', valor: (f) => f.uf }, { titulo: 'CEP', valor: (f) => f.cep },
         { titulo: 'Condição de pagamento', valor: (f) => f.condicao_pagamento }, { titulo: 'Prazo (dias)', valor: (f) => f.prazo_entrega_dias, num: true },
-        { titulo: 'Ativo', valor: (f) => (f.ativo ? 'sim' : 'não') }]} />
-      ${pode && html`<button class="btn btn-pri" onClick=${() => setEditando({})}><${Icone} nome="mais" tam=${18} /> Novo fornecedor</button>`}
-    </${Cabecalho}>
-    ${pre.length > 0 && html`<div class="alerta alerta-pre"><b>${pre.length === 1 ? '1 fornecedor pré-cadastrado' : `${pre.length} fornecedores pré-cadastrados`} no recebimento.</b> ${pode ? 'Abra, complete e salve:' : 'O comprador vai completar:'}
-      <span class="pre-lista">${pre.map((f) => html`<button type="button" class="chip" key=${f.id} onClick=${() => setEditando(f)}>${f.nome}</button>`)}</span></div>`}
-    <${Filtros} ativos=${inativos ? 1 : 0} fixo=${html`<${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Buscar por nome, CNPJ, CPF ou contato" />`}>
+        { titulo: 'Ativo', valor: (f) => (f.ativo ? 'sim' : 'não') }]} />`} ativos=${inativos ? 1 : 0} fixo=${html`<${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Buscar por nome, CNPJ, CPF ou contato" />`}>
       <label class="check"><input type="checkbox" checked=${inativos} onChange=${(e) => setInativos(e.target.checked)} /> Mostrar inativos</label>
     </${Filtros}>
     <${Tabela} id="fornecedores.telafornecedores" linhas=${linhas} aoClicar=${setEditando} ordemInicial=${{ chave: 'nome', dir: 1 }}

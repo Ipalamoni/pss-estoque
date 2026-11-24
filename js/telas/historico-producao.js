@@ -4,8 +4,8 @@
 // devolveu, perda, saída avulsa, avisos de mudança (e quem ficou ciente) e correções.
 // Só consulta: ninguém altera nada por aqui. (engenharia, gestor da produção, diretoria, admin)
 // =====================================================================
-import { html, useState, useEffect, useMemo, useApp, Cabecalho, Tabela, Etiqueta, Cartao, Carregando, Filtros, Busca, avisar, useFiltroMudou } from '../ui.js';
-import { num, data, dataHora, hojeISO, somarDias, contem, mensagemErro } from '../util.js';
+import { html, useState, useEffect, useMemo, useApp, Cabecalho, Tabela, Etiqueta, Cartao, Carregando, Filtros, Busca, avisar, useFiltroMudou, MultiEscolha, casaVarios } from '../ui.js';
+import { num, data, dataHora, hojeISO, somarDias, contem, mensagemErro, pl } from '../util.js';
 import { Exportar } from '../exportar.js';
 import { localTipo } from '../producao-util.js';
 
@@ -42,9 +42,9 @@ export function TelaHistoricoProducao() {
   const [per, setPer] = useState('hoje');
   const [de, setDe] = useState(h);
   const [ate, setAte] = useState(h);
-  const [fPad, setFPad] = useState('');
-  const [fMac, setFMac] = useState('');
-  const [fAcao, setFAcao] = useState('');
+  const [fPad, setFPad] = useState([]);   // vários (vazio = todos)
+  const [fMac, setFMac] = useState([]);
+  const [fAcao, setFAcao] = useState([]);
   const [busca, setBusca] = useState('');
   const [bruto, setBruto] = useState(null);
   const mudou = useFiltroMudou([de, ate]);
@@ -115,21 +115,16 @@ export function TelaHistoricoProducao() {
     return L.sort((a, b) => String(b.quando).localeCompare(String(a.quando)));
   }, [bruto, dados, de, ate]);
 
-  const filtradas = (linhas || []).filter((l) => (!fAcao || l.acao === fAcao) && (!fPad || l.padeiro === fPad) && (!fMac || l.masseira === fMac)
+  const filtradas = (linhas || []).filter((l) => casaVarios(fAcao, l.acao) && casaVarios(fPad, l.padeiro) && casaVarios(fMac, l.masseira)
     && contem(`${l.receita || ''} ${l.obs || ''} ${l.usuario || ''} ${l.padeiro || ''}`, busca));
   const conta = (a) => (linhas || []).filter((l) => l.acao === a).length;
   const padeiros = dados.operadores.map((o) => o.nome).sort((a, b) => a.localeCompare(b, 'pt-BR'));
   const masseiras = dados.maceiras.map((m) => m.nome);
-  const ativos = [fPad, fMac, fAcao].filter(Boolean).length;
+  const ativos = [fPad.length, fMac.length, fAcao.length].filter(Boolean).length;
   const periodo = de === ate ? data(de) : `${data(de)} a ${data(ate)}`;
 
   return html`
-    <${Cabecalho} titulo="Histórico da produção" sub=${`Tudo o que foi feito na produção, com data, hora e quem fez · ${periodo}`}>
-      ${linhas && html`<${Exportar} tabela="historico-producao.telahistoricoproducao" titulo="Histórico da produção" filtros=${periodo} arquivo=${`historico-producao-${de}-a-${ate}`} paisagem=${true}
-        linhas=${filtradas} colunas=${[{ titulo: 'Data e hora', valor: (l) => dataHora(l.quando), largura: 16 }, { titulo: 'Ação', valor: (l) => ACOES[l.acao][0] + (l.fora ? ' (fora da ordem)' : ''), largura: 22 },
-          { titulo: 'Padeiro', valor: (l) => l.padeiro || '' }, { titulo: 'Usuário / tablet', valor: (l) => l.usuario || '' }, { titulo: 'Masseira', valor: (l) => l.masseira || '' },
-          { titulo: 'Receita / produto', valor: (l) => l.receita || '', largura: 26 }, { titulo: 'Quantidade', valor: (l) => l.qtd || '' }, { titulo: 'Detalhe', valor: (l) => l.obs || '', largura: 40 }]} />`}
-    </${Cabecalho}>
+    <${Cabecalho} titulo="Histórico da produção" sub=${`Tudo o que foi feito na produção, com data, hora e quem fez · ${periodo}`} />
     <div class="periodo-barra">
       <span class="periodo-rotulo">Período</span>
       <span class="chips" role="group" aria-label="Período">${PERIODOS.map(([id, t]) => html`<button class=${'chip' + (per === id ? ' ativo' : '')} aria-pressed=${per === id} onClick=${() => escolherPeriodo(id)}>${t}</button>`)}</span>
@@ -138,18 +133,19 @@ export function TelaHistoricoProducao() {
     </div>
     ${!linhas ? html`<${Carregando} texto="Montando o histórico…" />` : html`
     <div class="cartoes">
-      <${Cartao} titulo="Bateladas iniciadas" valor=${conta('iniciou')} aoClicar=${() => setFAcao('iniciou')} />
+      <${Cartao} titulo="Bateladas iniciadas" valor=${conta('iniciou')} aoClicar=${() => setFAcao(['iniciou'])} />
       <${Cartao} titulo="Fora da ordem" valor=${linhas.filter((l) => l.fora).length} cor=${linhas.some((l) => l.fora) ? 'c-laranja' : ''} sub="iniciadas antes da 1ª da fila" />
-      <${Cartao} titulo="Mudanças na programação" valor=${conta('aviso')} sub=${`${conta('ciente')} confirmadas no tablet`} aoClicar=${() => setFAcao('aviso')} />
-      <${Cartao} titulo="Correções" valor=${conta('correcao') + conta('cancelou')} cor=${conta('correcao') + conta('cancelou') ? 'c-laranja' : ''} sub="pelo engenheiro / gestor" aoClicar=${() => setFAcao('correcao')} />
+      <${Cartao} titulo="Mudanças na programação" valor=${conta('aviso')} sub=${`${conta('ciente')} confirmadas no tablet`} aoClicar=${() => setFAcao(['aviso', 'ciente'])} />
+      <${Cartao} titulo="Correções" valor=${conta('correcao') + conta('cancelou')} cor=${conta('correcao') + conta('cancelou') ? 'c-laranja' : ''} sub="pelo engenheiro / gestor" aoClicar=${() => setFAcao(['correcao', 'cancelou'])} />
     </div>
-    <${Filtros} ativos=${ativos} fixo=${html`<${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Receita, produto, nome ou detalhe" />`}>
-      <select class="entrada" aria-label="Ação" value=${fAcao} onChange=${(e) => setFAcao(e.target.value)}><option value="">Todas as ações</option>
-        ${Object.entries(ACOES).map(([k, [t]]) => html`<option value=${k}>${t}</option>`)}</select>
-      <select class="entrada" aria-label="Padeiro" value=${fPad} onChange=${(e) => setFPad(e.target.value)}><option value="">Todos os padeiros</option>
-        ${padeiros.map((p) => html`<option value=${p}>${p}</option>`)}</select>
-      <select class="entrada" aria-label="Masseira" value=${fMac} onChange=${(e) => setFMac(e.target.value)}><option value="">Todas as masseiras</option>
-        ${masseiras.map((m) => html`<option value=${m}>${m}</option>`)}</select>
+    <${Filtros} acoes=${linhas && html`<span class="nota">${pl(filtradas.length, 'registro', 'registros')}</span>
+      <${Exportar} tabela="historico-producao.telahistoricoproducao" titulo="Histórico da produção" filtros=${periodo} arquivo=${`historico-producao-${de}-a-${ate}`} paisagem=${true}
+        linhas=${filtradas} colunas=${[{ titulo: 'Data e hora', valor: (l) => dataHora(l.quando), largura: 16 }, { titulo: 'Ação', valor: (l) => ACOES[l.acao][0] + (l.fora ? ' (fora da ordem)' : ''), largura: 22 },
+          { titulo: 'Padeiro', valor: (l) => l.padeiro || '' }, { titulo: 'Usuário / tablet', valor: (l) => l.usuario || '' }, { titulo: 'Masseira', valor: (l) => l.masseira || '' },
+          { titulo: 'Receita / produto', valor: (l) => l.receita || '', largura: 26 }, { titulo: 'Quantidade', valor: (l) => l.qtd || '' }, { titulo: 'Detalhe', valor: (l) => l.obs || '', largura: 40 }]} />`} ativos=${ativos} fixo=${html`<${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Receita, produto, nome ou detalhe" />`}>
+      <${MultiEscolha} todos="Todas as ações" rotulo="Ações" valor=${fAcao} aoMudar=${setFAcao} opcoes=${Object.entries(ACOES).map(([k, [t]]) => ({ valor: k, rotulo: t }))} />
+      <${MultiEscolha} todos="Todos os padeiros" rotulo="Padeiros" valor=${fPad} aoMudar=${setFPad} opcoes=${padeiros.map((p) => ({ valor: p, rotulo: p }))} />
+      <${MultiEscolha} todos="Todas as masseiras" rotulo="Masseiras" valor=${fMac} aoMudar=${setFMac} opcoes=${masseiras.map((m) => ({ valor: m, rotulo: m }))} />
     </${Filtros}>
     <${Tabela} id="historico-producao.telahistoricoproducao" linhas=${filtradas} chave="k" max=${500} vazio="Nada registrado neste período com esses filtros." colunas=${[
       { chave: 'quando', titulo: 'Data e hora', render: (l) => html`<b>${dataHora(l.quando).slice(9)}</b> <small>${dataHora(l.quando).slice(0, 8)}</small>` },

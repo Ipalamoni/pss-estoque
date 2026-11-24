@@ -1,6 +1,6 @@
 // Relatórios: pedidos, compras por produto, consumo do período, ajustes e correções
-import { html, useState, useMemo, useEffect, useApp, Escolher, Busca, Etiqueta, Cabecalho, Abas, Tabela, Cartao, Carregando, Modal, avisar, useHistorico, Filtros, useFiltroMudou } from '../ui.js';
-import { MP_EMB, casaCategoria, CATEGORIAS, STATUS_PEDIDO, TIPOS_MOV, MOTIVOS_INVENTARIO, qtd, num, moeda, data, dataHora, hojeISO, somarDias, diasEntre, numeroPedido, contem, fator, qu, pl, plural, nomeUsuario, mensagemErro } from '../util.js';
+import { html, useState, useMemo, useEffect, useApp, Escolher, Busca, Etiqueta, Cabecalho, Abas, Tabela, Cartao, Carregando, Modal, avisar, useHistorico, Filtros, useFiltroMudou, MultiEscolha, casaVarios } from '../ui.js';
+import { MP_EMB_LISTA, casaCategoria, textoVarios, CATEGORIAS, STATUS_PEDIDO, TIPOS_MOV, MOTIVOS_INVENTARIO, qtd, num, moeda, data, dataHora, hojeISO, somarDias, diasEntre, numeroPedido, contem, fator, qu, pl, plural, nomeUsuario, mensagemErro } from '../util.js';
 import { Exportar } from '../exportar.js';
 import { resumoPedido, PrazoEtiqueta, PedidoDetalhe, COR_STATUS } from './pedidos.js';
 import { Icone } from '../icones.js';
@@ -13,21 +13,12 @@ export function TelaRelatorios() {
   const [de, setDe] = useState(somarDias(hojeISO(), -30));
   useHistorico(de);
   const [ate, setAte] = useState(hojeISO());
-  const periodo = { de, ate };
+  const periodo = { de, ate, setDe, setAte };
   return html`
     <${Cabecalho} titulo="Relatórios" />
     <${Abas} abas=${[{ id: 'pedidos', titulo: 'Pedidos de compra' }, { id: 'produtos', titulo: 'Compras por produto' },
       { id: 'recebimentos', titulo: 'Recebimentos' }, { id: 'producoes', titulo: 'Produções (pesagem)' },
       { id: 'consumo', titulo: 'Consumo do período' }, { id: 'ajustes', titulo: 'Ajustes e correções' }]} ativa=${aba} aoMudar=${setAba} />
-    <${Filtros} resumo=${`Período: ${data(de)} a ${data(ate)}`}>
-      <label class="campo-inline">De <input class="entrada" type="date" value=${de} onChange=${(e) => setDe(e.target.value)} /></label>
-      <label class="campo-inline">até <input class="entrada" type="date" value=${ate} onChange=${(e) => setAte(e.target.value)} /></label>
-      <span class="chips">
-        <button class="chip" onClick=${() => { setDe(primeiroDoMes()); setAte(hojeISO()); }}>Este mês</button>
-        <button class="chip" onClick=${() => { setDe(somarDias(hojeISO(), -30)); setAte(hojeISO()); }}>30 dias</button>
-        <button class="chip" onClick=${() => { setDe(somarDias(hojeISO(), -90)); setAte(hojeISO()); }}>90 dias</button>
-      </span>
-    </${Filtros}>
     ${aba === 'pedidos' && html`<${RelPedidos} ...${periodo} />`}
     ${aba === 'produtos' && html`<${RelComprasProduto} ...${periodo} />`}
     ${aba === 'recebimentos' && html`<${RelRecebimentos} ...${periodo} />`}
@@ -36,15 +27,30 @@ export function TelaRelatorios() {
     ${aba === 'ajustes' && html`<${RelAjustes} ...${periodo} />`}`;
 }
 
+// faixa única de cada aba: período + filtros da aba + (Exportar e Colunas)
+function Barra({ de, ate, setDe, setAte, acoes, ativos = 0, children }) {
+  return html`<${Filtros} resumo=${`Período: ${data(de)} a ${data(ate)}`} ativos=${ativos} acoes=${acoes}>
+      <label class="campo-inline">De <input class="entrada" type="date" value=${de} onChange=${(e) => setDe(e.target.value)} /></label>
+      <label class="campo-inline">até <input class="entrada" type="date" value=${ate} onChange=${(e) => setAte(e.target.value)} /></label>
+      <span class="chips">
+        <button class="chip" onClick=${() => { setDe(primeiroDoMes()); setAte(hojeISO()); }}>Este mês</button>
+        <button class="chip" onClick=${() => { setDe(somarDias(hojeISO(), -30)); setAte(hojeISO()); }}>30 dias</button>
+        <button class="chip" onClick=${() => { setDe(somarDias(hojeISO(), -90)); setAte(hojeISO()); }}>90 dias</button>
+      </span>
+      ${children}
+    </${Filtros}>`;
+}
+
 // ---------------------------- PEDIDOS -------------------------------
-function RelPedidos({ de, ate }) {
+function RelPedidos({ de, ate, setDe, setAte }) {
+  const per = { de, ate, setDe, setAte };
   const { dados } = useApp();
-  const [status, setStatus] = useState('');
+  const [status, setStatus] = useState([]);   // vários (vazio = todas)
   const [forn, setForn] = useState(null);
   const [aberto, setAberto] = useState(null);
   const linhas = useMemo(() => dados.pedidos.filter((p) => p.data_pedido >= de && p.data_pedido <= ate && (!forn || p.fornecedor_id === forn)
-    && (!status || (status === 'pendentes' ? ['aberto', 'parcial'].includes(p.status) : p.status === status)))
-    .map((p) => ({ ...p, r: resumoPedido(p, dados) })), [dados, de, ate, status, forn]);
+    && casaVarios(status, p.status))
+    .map((p) => ({ ...p, r: resumoPedido(p, dados) })), [dados, de, ate, status.join(), forn]);
   const soma = (f) => linhas.filter(f).reduce((s, p) => s + p.r.valor, 0);
   const total = soma(() => true);
   const pend = soma((p) => p.r.pendente);
@@ -56,15 +62,13 @@ function RelPedidos({ de, ate }) {
     { titulo: '% recebido', valor: (p) => Math.round(p.r.perc), num: true }, { titulo: 'Situação', valor: (p) => STATUS_PEDIDO[p.status] },
   ];
   return html`
-    <div class="filtros">
-      <select class="entrada" value=${status} onChange=${(e) => setStatus(e.target.value)}>
-        <option value="">Todas as situações</option><option value="pendentes">Pendentes de entrega</option>
-        ${Object.entries(STATUS_PEDIDO).map(([k, t]) => html`<option value=${k}>${t}</option>`)}</select>
+    <${Barra} ...${per} ativos=${[status.length, forn].filter(Boolean).length} acoes=${html`<${Exportar} tabela="relatorios.relpedidos" titulo="Pedidos de compra" arquivo=${`rel-pedidos-${de}-a-${ate}`} colunas=${cols} linhas=${linhas}
+        filtros=${`Pedidos de ${data(de)} a ${data(ate)}`} totais=${['TOTAL', '', '', '', '', moeda(total), '', '']} />`}>
+      <${MultiEscolha} todos="Todas as situações" rotulo="Situações do pedido" valor=${status} aoMudar=${setStatus}
+        opcoes=${Object.entries(STATUS_PEDIDO).map(([k, t]) => ({ valor: k, rotulo: t }))} />
       <div class="filtro-escolher"><${Escolher} itens=${dados.fornecedores} valor=${forn} aoMudar=${setForn} rotuloDe=${(f) => f.nome} placeholder="Fornecedor (todos)" /></div>
       ${forn && html`<button class="btn-link" onClick=${() => setForn(null)}>limpar</button>`}
-      <${Exportar} tabela="relatorios.relpedidos" titulo="Pedidos de compra" arquivo=${`rel-pedidos-${de}-a-${ate}`} colunas=${cols} linhas=${linhas}
-        filtros=${`Pedidos de ${data(de)} a ${data(ate)}`} totais=${['TOTAL', '', '', '', '', moeda(total), '', '']} />
-    </div>
+    </${Barra}>
     <div class="cartoes">
       <${Cartao} titulo="Pedidos no período" valor=${linhas.length} sub=${moeda(total)} />
       <${Cartao} titulo="Pendente de entrega" valor=${moeda(pend)} sub=${pl(linhas.filter((p) => p.r.pendente).length, 'pedido', 'pedidos')} />
@@ -85,10 +89,11 @@ function RelPedidos({ de, ate }) {
 }
 
 // ---------------------------- COMPRAS POR PRODUTO -------------------
-function RelComprasProduto({ de, ate }) {
+function RelComprasProduto({ de, ate, setDe, setAte }) {
+  const per = { de, ate, setDe, setAte };
   const { dados } = useApp();
   const [busca, setBusca] = useState('');
-  const [cat, setCat] = useState(MP_EMB);
+  const [cat, setCat] = useState(MP_EMB_LISTA);   // vários (vazio = todas)
   const [aberto, setAberto] = useState(null);
   const ped = dados.mapa;
   const linhas = useMemo(() => dados.pedidoItens.map((i) => {
@@ -118,13 +123,12 @@ function RelComprasProduto({ de, ate }) {
     { titulo: 'Situação', valor: (x) => STATUS_PEDIDO[x.p.status] },
   ];
   return html`
-    <div class="filtros">
-      <${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Produto ou fornecedor" />
-      <select class="entrada" value=${cat} onChange=${(e) => setCat(e.target.value)}><option value="">Todas as categorias</option><option value=${MP_EMB}>Matéria-prima e embalagem</option>
-        ${Object.entries(CATEGORIAS).map(([k, t]) => html`<option value=${k}>${t}</option>`)}</select>
-      <${Exportar} tabela="relatorios.relcomprasproduto" titulo="Compras por produto" arquivo=${`rel-compras-produto-${de}-a-${ate}`} colunas=${cols} linhas=${linhas}
-        filtros=${`Pedidos de ${data(de)} a ${data(ate)}`} totais=${['TOTAL', '', '', '', '', '', '', '', '', moeda(total), '', '', '']} />
-    </div>
+    <${Barra} ...${per} ativos=${cat.length ? 1 : 0} acoes=${html`<${Exportar} tabela="relatorios.relcomprasproduto-2" titulo="Compras por produto" arquivo=${`rel-compras-produto-${de}-a-${ate}`} colunas=${cols} linhas=${linhas}
+        filtros=${`Pedidos de ${data(de)} a ${data(ate)} · ${textoVarios(cat, CATEGORIAS, 'todas as categorias')}`} totais=${['TOTAL', '', '', '', '', '', '', '', '', moeda(total), '', '', '']} />`}>
+      <div class="busca"><${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Produto ou fornecedor" /></div>
+      <${MultiEscolha} todos="Todas as categorias" rotulo="Categorias" valor=${cat} aoMudar=${setCat}
+        opcoes=${Object.entries(CATEGORIAS).map(([k, t]) => ({ valor: k, rotulo: t }))} />
+    </${Barra}>
     <h3>Resumo por produto</h3>
     <${Tabela} id="relatorios.relcomprasproduto" linhas=${porProduto} ordemInicial=${{ chave: 'valor', dir: -1 }} colunas=${[
       { chave: 'cod', titulo: 'Código', valor: (a) => a.pr?.codigo, render: (a) => a.pr?.codigo }, { chave: 'p', titulo: 'Produto', valor: (a) => a.pr?.descricao, render: (a) => html`<b>${a.pr?.descricao}</b>` },
@@ -163,10 +167,11 @@ function useMovimentos(de, ate, tipos) {
 }
 
 // ---------------------------- CONSUMO -------------------------------
-function RelConsumo({ de, ate }) {
+function RelConsumo({ de, ate, setDe, setAte }) {
+  const per = { de, ate, setDe, setAte };
   const { dados } = useApp();
   const movs = useMovimentos(de, ate, ['saida_receita', 'saida_avulsa', 'saida_almox', 'correcao']);
-  const [cat, setCat] = useState(MP_EMB);
+  const [cat, setCat] = useState(MP_EMB_LISTA);   // vários (vazio = todas)
   const dias = Math.max(diasEntre(de, ate) + 1, 1);
   const linhas = useMemo(() => {
     if (!movs) return [];
@@ -189,14 +194,14 @@ function RelConsumo({ de, ate }) {
     { titulo: 'Almoxarifado', valor: (a) => Math.round(a.saida_almox * 1000) / 1000, num: true }, { titulo: 'Total', valor: (a) => Math.round(a.total * 1000) / 1000, num: true },
     { titulo: 'Média/dia', valor: (a) => Math.round(a.media * 1000) / 1000, num: true }, { titulo: 'Valor', valor: (a) => Math.round(a.valor * 100) / 100, texto: (a) => moeda(a.valor), num: true },
   ];
-  if (!movs) return html`<${Carregando} />`;
+  const barra = html`<${Barra} ...${per} ativos=${cat.length ? 1 : 0} acoes=${movs && html`<${Exportar} tabela="relatorios.relconsumo" titulo="Consumo do período" arquivo=${`rel-consumo-${de}-a-${ate}`} colunas=${cols} linhas=${linhas}
+        filtros=${`${data(de)} a ${data(ate)} (${pl(dias, 'dia', 'dias')}) · ${textoVarios(cat, CATEGORIAS, 'todas as categorias')}`} totais=${['TOTAL', '', '', '', '', '', '', '', moeda(totalValor)]} />`}>
+      <${MultiEscolha} todos="Todas as categorias" rotulo="Categorias" valor=${cat} aoMudar=${setCat}
+        opcoes=${Object.entries(CATEGORIAS).map(([k, t]) => ({ valor: k, rotulo: t }))} />
+    </${Barra}>`;
+  if (!movs) return html`${barra}<${Carregando} />`;
   return html`
-    <div class="filtros">
-      <select class="entrada" value=${cat} onChange=${(e) => setCat(e.target.value)}><option value="">Todas as categorias</option><option value=${MP_EMB}>Matéria-prima e embalagem</option>
-        ${Object.entries(CATEGORIAS).map(([k, t]) => html`<option value=${k}>${t}</option>`)}</select>
-      <${Exportar} tabela="relatorios.relconsumo" titulo="Consumo do período" arquivo=${`rel-consumo-${de}-a-${ate}`} colunas=${cols} linhas=${linhas}
-        filtros=${`${data(de)} a ${data(ate)} (${pl(dias, 'dia', 'dias')})`} totais=${['TOTAL', '', '', '', '', '', '', '', moeda(totalValor)]} />
-    </div>
+    ${barra}
     <p class="nota">Saídas de ${data(de)} a ${data(ate)} (${pl(dias, 'dia', 'dias')}), já considerando as correções. Valor pelo custo médio do momento da saída.</p>
     <${Tabela} id="relatorios.relconsumo" linhas=${linhas} ordemInicial=${{ chave: 'valor', dir: -1 }} colunas=${[
       { chave: 'cod', titulo: 'Código', valor: (a) => a.pr?.codigo, render: (a) => a.pr?.codigo }, { chave: 'p', titulo: 'Produto', valor: (a) => a.pr?.descricao, render: (a) => html`<b>${a.pr?.descricao}</b>` },
@@ -210,11 +215,12 @@ function RelConsumo({ de, ate }) {
 }
 
 // ---------------------------- AJUSTES E CORREÇÕES -------------------
-function RelAjustes({ de, ate }) {
+function RelAjustes({ de, ate, setDe, setAte }) {
+  const per = { de, ate, setDe, setAte };
   const { dados } = useApp();
   const movs = useMovimentos(de, ate, ['inventario', 'correcao', 'saida_avulsa']);
-  const [tipo, setTipo] = useState('');
-  const lista = useMemo(() => (movs || []).filter((m) => !tipo || m.tipo === tipo), [movs, tipo]);
+  const [tipo, setTipo] = useState([]);   // vários (vazio = todos)
+  const lista = useMemo(() => (movs || []).filter((m) => casaVarios(tipo, m.tipo)), [movs, tipo]);
   const p = (m) => dados.mapa.produto.get(m.produto_id);
   const total = lista.reduce((s, m) => s + Number(m.valor), 0);
   const cols = [
@@ -223,15 +229,14 @@ function RelAjustes({ de, ate }) {
     { titulo: 'Valor', valor: (m) => Number(m.valor), texto: (m) => moeda(m.valor), num: true }, { titulo: 'Motivo', valor: (m) => MOTIVOS_INVENTARIO[m.motivo] || m.motivo },
     { titulo: 'Observação', valor: (m) => m.observacao, largura: 40 }, { titulo: 'Usuário', valor: (m) => dados.mapa.perfil.get(m.usuario_id)?.nome },
   ];
-  if (!movs) return html`<${Carregando} />`;
+  const barra = html`<${Barra} ...${per} ativos=${tipo.length ? 1 : 0} acoes=${movs && html`<${Exportar} tabela="relatorios.relajustes" titulo="Ajustes e correções" arquivo=${`rel-ajustes-${de}-a-${ate}`} colunas=${cols} linhas=${lista}
+        filtros=${`${data(de)} a ${data(ate)}`} totais=${['TOTAL', '', '', '', '', '', moeda(total), '', '', '']} />`}>
+      <${MultiEscolha} todos="Inventário, correções e saídas avulsas" rotulo="Tipos de ajuste" valor=${tipo} aoMudar=${setTipo}
+        opcoes=${[['inventario', 'Ajustes de inventário'], ['correcao', 'Correções'], ['saida_avulsa', 'Saídas avulsas']].map(([k, t]) => ({ valor: k, rotulo: t }))} />
+    </${Barra}>`;
+  if (!movs) return html`${barra}<${Carregando} />`;
   return html`
-    <div class="filtros">
-      <select class="entrada" value=${tipo} onChange=${(e) => setTipo(e.target.value)}>
-        <option value="">Inventário, correções e saídas avulsas</option>
-        <option value="inventario">Só ajustes de inventário</option><option value="correcao">Só correções</option><option value="saida_avulsa">Só saídas avulsas</option></select>
-      <${Exportar} tabela="relatorios.relajustes" titulo="Ajustes e correções" arquivo=${`rel-ajustes-${de}-a-${ate}`} colunas=${cols} linhas=${lista}
-        filtros=${`${data(de)} a ${data(ate)}`} totais=${['TOTAL', '', '', '', '', '', moeda(total), '', '', '']} />
-    </div>
+    ${barra}
     <p class="nota">Tudo o que mexeu no estoque fora do fluxo normal: diferenças de inventário, correções de lançamento e saídas avulsas (com justificativa).</p>
     <div class="cartoes">
       <${Cartao} titulo="Lançamentos" valor=${lista.length} />
@@ -250,19 +255,18 @@ function RelAjustes({ de, ate }) {
 }
 
 // ---------------------------- RECEBIMENTOS --------------------------
-function RelRecebimentos({ de, ate }) {
+function RelRecebimentos({ de, ate, setDe, setAte }) {
+  const per = { de, ate, setDe, setAte };
   const { dados } = useApp();
-  const [filtro, setFiltro] = useState('');
+  const [filtro, setFiltro] = useState([]);   // vários (vazio = todos)
   const [aberto, setAberto] = useState(null);
   const perfil = (id) => dados.mapa.perfil.get(id);
   const lista = useMemo(() => (dados.recebimentos || []).filter((r) => {
     const t = new Date(r.data_hora);
     if (t < new Date(de + 'T00:00:00') || t >= new Date(somarDias(ate, 1) + 'T00:00:00')) return false;
-    if (filtro === 'div' && !r.divergencia) return false;
-    if (filtro === 'pend' && !(r.divergencia && !r.ciente_por)) return false;
-    if (filtro === 'sem' && r.pedido_id) return false;
-    return true;
-  }), [dados, de, ate, filtro]);
+    if (!filtro.length) return true;
+    return (filtro.includes('div') && r.divergencia) || (filtro.includes('pend') && r.divergencia && !r.ciente_por) || (filtro.includes('sem') && !r.pedido_id);
+  }), [dados, de, ate, filtro.join()]);
   const forn = (r) => dados.mapa.fornecedor.get(r.fornecedor_id)?.nome;
   const cols = [
     { titulo: 'Data/hora', valor: (r) => dataHora(r.data_hora) }, { titulo: 'Pedido', valor: (r) => (r.pedido_id ? numeroPedido(r.pedido_id) : 'sem pedido') },
@@ -272,12 +276,10 @@ function RelRecebimentos({ de, ate }) {
     { titulo: 'Ciência do comprador', valor: (r) => (r.divergencia ? (r.ciente_por ? `${nomeUsuario(perfil(r.ciente_por))} em ${dataHora(r.ciente_em)}` : 'pendente') : ''), largura: 34 },
   ];
   return html`
-    <div class="filtros">
-      <select class="entrada" value=${filtro} onChange=${(e) => setFiltro(e.target.value)}>
-        <option value="">Todos os recebimentos</option><option value="div">Com divergência</option>
-        <option value="pend">Divergência aguardando ciência</option><option value="sem">Sem pedido</option></select>
-      <${Exportar} tabela="relatorios.relrecebimentos" titulo="Recebimentos" arquivo=${`rel-recebimentos-${de}-a-${ate}`} colunas=${cols} linhas=${lista} filtros=${`${data(de)} a ${data(ate)}`} />
-    </div>
+    <${Barra} ...${per} ativos=${filtro.length ? 1 : 0} acoes=${html`<${Exportar} tabela="relatorios.relrecebimentos" titulo="Recebimentos" arquivo=${`rel-recebimentos-${de}-a-${ate}`} colunas=${cols} linhas=${lista} filtros=${`${data(de)} a ${data(ate)}`} />`}>
+      <${MultiEscolha} todos="Todos os recebimentos" rotulo="Recebimentos" valor=${filtro} aoMudar=${setFiltro}
+        opcoes=${[['div', 'Com divergência'], ['pend', 'Divergência aguardando ciência'], ['sem', 'Sem pedido']].map(([k, t]) => ({ valor: k, rotulo: t }))} />
+    </${Barra}>
     <div class="cartoes">
       <${Cartao} titulo="Recebimentos" valor=${lista.length} />
       <${Cartao} titulo="Com divergência" valor=${lista.filter((r) => r.divergencia).length} />
@@ -297,7 +299,8 @@ function RelRecebimentos({ de, ate }) {
 }
 
 // ---------------------------- PRODUÇÕES (PESAGEM) -------------------
-function RelProducoes({ de, ate }) {
+function RelProducoes({ de, ate, setDe, setAte }) {
+  const per = { de, ate, setDe, setAte };
   const { dados, api } = useApp();
   const [prods, setProds] = useState(null);
   const [aberta, setAberta] = useState(null);
@@ -307,7 +310,7 @@ function RelProducoes({ de, ate }) {
     if (mudou()) setProds(null);
     api.listar('producoes', { desde: inicioDia(de), ate: inicioDia(somarDias(ate, 1)) }).then(setProds).catch((e) => { avisar(mensagemErro(e), 'erro'); setProds([]); });
   }, [de, ate, dados.carregadoEm]);
-  if (!prods || !movs) return html`<${Carregando} />`;
+  if (!prods || !movs) return html`<${Barra} ...${per} /><${Carregando} />`;
   const perfil = (id) => dados.mapa.perfil.get(id);
   const ficha = (pr) => dados.mapa.ficha.get(pr.ficha_id)?.nome;
   const itensDe = (id) => movs.filter((m) => m.producao_id === id);
@@ -321,7 +324,7 @@ function RelProducoes({ de, ate }) {
   ];
   const porUsuario = new Map(); prods.forEach((p) => porUsuario.set(p.usuario_id, (porUsuario.get(p.usuario_id) || 0) + 1));
   return html`
-    <div class="filtros"><${Exportar} titulo="Produções (saídas por receita)" arquivo=${`rel-producoes-${de}-a-${ate}`} colunas=${cols} linhas=${prods} filtros=${`${data(de)} a ${data(ate)}`} /></div>
+    <${Barra} ...${per} acoes=${html`<${Exportar} titulo="Produções (saídas por receita)" arquivo=${`rel-producoes-${de}-a-${ate}`} colunas=${cols} linhas=${prods} filtros=${`${data(de)} a ${data(ate)}`} />`} />
     <div class="cartoes">
       <${Cartao} titulo="Lançamentos de produção" valor=${prods.length} sub=${pl(prods.reduce((s, p) => s + Number(p.multiplicador), 0), 'receita', 'receitas')} />
       <${Cartao} titulo="Com receita alterada" valor=${prods.filter((p) => p.alterada).length} />

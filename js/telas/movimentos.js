@@ -1,5 +1,5 @@
 // Movimentações (extrato do estoque) e correção de lançamentos
-import { html, useState, useMemo, useEffect, useApp, Modal, Campo, Escolher, QtdUnidade, Etiqueta, Cabecalho, Tabela, Carregando, Cartao, useAcao, avisar, n, Filtros, useFiltroMudou } from '../ui.js';
+import { html, useState, useMemo, useEffect, useApp, Modal, Campo, Escolher, QtdUnidade, Etiqueta, Cabecalho, Tabela, Carregando, Cartao, useAcao, avisar, n, Filtros, useFiltroMudou, MultiEscolha, casaVarios } from '../ui.js';
 import { veValores, TIPOS_MOV, ETAPAS_TRANSF, MOTIVOS_INVENTARIO, qtd, moeda, data, dataHora, hojeISO, somarDias, fator, numeroPedido, mensagemErro, diaLocal, qu, plural, pl, nomeUsuario } from '../util.js';
 import { Exportar } from '../exportar.js';
 import { Icone } from '../icones.js';
@@ -18,8 +18,8 @@ export function TelaMovimentos() {
   const [ate, setAte] = useState(hojeISO());
   const [prod, setProd] = useState(estadoRota?.produto || null);
   useEffect(() => { if (estadoRota) setEstadoRota(null); }, []);
-  const [tipo, setTipo] = useState('');
-  const [usu, setUsu] = useState('');
+  const [tipo, setTipo] = useState([]);   // vários (vazio = todos)
+  const [usu, setUsu] = useState([]);
   const [loc, setLoc] = useState(estadoRota?.local || '');
   const [semTransf, setSemTransf] = useState(false);
   const [movs, setMovs] = useState(null);
@@ -33,7 +33,7 @@ export function TelaMovimentos() {
   }
   useEffect(() => { carregar(); }, [de, ate, prod, loc, dados.carregadoEm]);
 
-  const lista = useMemo(() => (movs || []).filter((m) => (!tipo || m.tipo === tipo) && (!usu || m.usuario_id === usu) && !(semTransf && ehTransf(m))), [movs, tipo, usu, semTransf]);
+  const lista = useMemo(() => (movs || []).filter((m) => casaVarios(tipo, m.tipo) && casaVarios(usu, m.usuario_id) && !(semTransf && ehTransf(m))), [movs, tipo, usu, semTransf]);
   const corrigidos = useMemo(() => new Set((movs || []).filter((m) => m.corrige_id).map((m) => m.corrige_id)), [movs]);
   const p = (m) => dados.mapa.produto.get(m.produto_id);
   const ref = (m) => m.transferencia_id ? `transferência nº ${m.transferencia_id}${m.etapa ? ' · ' + (ETAPAS_TRANSF[m.etapa] || m.etapa) : ''}`
@@ -75,22 +75,23 @@ export function TelaMovimentos() {
     return { ini, fim, ent, sai };
   }, [movs, lista, prod, loc]);
   const titulo = (pr ? `Kardex · ${pr.codigo} ${pr.descricao}` : 'Movimentações do estoque') + (loc ? ` · ${nomeLocal(dados, Number(loc))}` : '');
-  const filtrosTxt = `${data(de)} a ${data(ate)}${tipo ? ' · ' + TIPOS_MOV[tipo] : ''}${kardex ? ` · saldo inicial ${qu(kardex.ini, pr.unidade_estoque)} · saldo final ${qu(kardex.fim, pr.unidade_estoque)}` : ''}`;
+  const filtrosTxt = `${data(de)} a ${data(ate)}${tipo.length ? ' · ' + tipo.map((t) => TIPOS_MOV[t] || t).join(', ') : ''}${kardex ? ` · saldo inicial ${qu(kardex.ini, pr.unidade_estoque)} · saldo final ${qu(kardex.fim, pr.unidade_estoque)}` : ''}`;
   const linhasExp = [...lista].sort((a, b) => a.id - b.id);
 
   return html`
-    <${Cabecalho} titulo="Movimentações (kardex)" sub="Extrato de tudo que entrou e saiu, com o saldo depois de cada lançamento. Escolha um produto para ver a ficha dele. Nenhuma linha é apagada: erro se corrige com nova linha.">
-      ${movs && html`<${Exportar} tabela="movimentos.telamovimentos" titulo=${titulo} filtros=${filtrosTxt} arquivo=${`${pr ? 'kardex-' + pr.codigo : 'movimentacoes'}-${de}-a-${ate}`} colunas=${colExp} linhas=${linhasExp} />`}
-    </${Cabecalho}>
-    <${Filtros} ativos=${[tipo, usu, loc, semTransf].filter(Boolean).length} fixo=${html`<div class="filtro-escolher"><${Escolher} itens=${dados.produtos} valor=${prod} aoMudar=${setProd} rotuloDe=${(x) => `${x.codigo} · ${x.descricao}`} placeholder="Produto (todos)" /></div>
+    <${Cabecalho} titulo="Movimentações (kardex)" sub="Extrato de tudo que entrou e saiu, com o saldo depois de cada lançamento. Escolha um produto para ver a ficha dele. Nenhuma linha é apagada: erro se corrige com nova linha." />
+    <${Filtros} ativos=${[tipo.length, usu.length, loc, semTransf].filter(Boolean).length}
+      acoes=${movs && html`<span class="nota">${lista.length} lançamento${lista.length === 1 ? '' : 's'}</span>
+        <${Exportar} tabela="movimentos.telamovimentos" titulo=${titulo} filtros=${filtrosTxt} arquivo=${`${pr ? 'kardex-' + pr.codigo : 'movimentacoes'}-${de}-a-${ate}`} colunas=${colExp} linhas=${linhasExp} />`}
+      fixo=${html`<div class="filtro-escolher"><${Escolher} itens=${dados.produtos} valor=${prod} aoMudar=${setProd} rotuloDe=${(x) => `${x.codigo} · ${x.descricao}`} placeholder="Produto (todos)" /></div>
       ${prod && html`<button class="btn-link" onClick=${() => setProd(null)}>limpar</button>`}`}>
       <label class="campo-inline">De <input class="entrada" type="date" value=${de} onChange=${(e) => setDe(e.target.value)} /></label>
       <label class="campo-inline">até <input class="entrada" type="date" value=${ate} onChange=${(e) => setAte(e.target.value)} /></label>
-      <select class="entrada" value=${tipo} onChange=${(e) => setTipo(e.target.value)}><option value="">Todos os tipos</option>
-        ${Object.entries(TIPOS_MOV).map(([k, v]) => html`<option value=${k}>${v}</option>`)}</select>
-      <select class="entrada" value=${usu} onChange=${(e) => setUsu(e.target.value)}><option value="">Todos os usuários</option>
-        ${dados.perfis.map((u) => html`<option value=${u.user_id}>${u.nome}</option>`)}</select>
-      ${dados.locais.length > 1 && html`<select class="entrada" value=${loc} onChange=${(e) => setLoc(e.target.value)}><option value="">Empresa toda (todos os locais)</option>
+      <${MultiEscolha} todos="Todos os tipos" rotulo="Tipos de lançamento" valor=${tipo} aoMudar=${setTipo}
+        opcoes=${Object.entries(TIPOS_MOV).map(([k, v]) => ({ valor: k, rotulo: v }))} />
+      <${MultiEscolha} todos="Todos os usuários" rotulo="Usuários" valor=${usu} aoMudar=${setUsu}
+        opcoes=${dados.perfis.map((u) => ({ valor: u.user_id, rotulo: u.nome }))} />
+      ${dados.locais.length > 1 && html`<select class="entrada" aria-label="Local (um só: o saldo é do local escolhido)" value=${loc} onChange=${(e) => setLoc(e.target.value)}><option value="">Empresa toda (todos os locais)</option>
         ${dados.locais.map((l) => html`<option value=${l.id}>${nomeLocal(dados, l.id)}</option>`)}</select>`}
       <label class="check"><input type="checkbox" checked=${semTransf} onChange=${(e) => setSemTransf(e.target.checked)} /> Esconder transferências</label>
     </${Filtros}>
