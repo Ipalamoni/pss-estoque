@@ -143,6 +143,8 @@ function DetalheMovimento({ mov, podeCorrigir, aoFechar }) {
       ${linha('Usuário', nomeUsuario(dados.mapa.perfil.get(mov.usuario_id)))}${linha('Destino', mov.destino)}${linha('Motivo', MOTIVOS_INVENTARIO[mov.motivo] || mov.motivo)}
     </div>
     ${mov.observacao && html`<p class="nota"><b>Observação:</b> ${mov.observacao}</p>`}
+    ${mov.tipo === 'transferencia' && html`<p class="nota"><b>Transferência não se corrige.</b> Se o destino ainda não recebeu, quem enviou pode cancelar na tela
+      Transferências (a mercadoria volta para a origem). Depois de recebida e conferida pelo destino, não pode mais ser alterada: diferenças se acertam por inventário.</p>`}
     ${original && html`<p class="nota">Esta linha corrige o lançamento <b>#${original.id}</b> (${TIPOS_MOV[original.tipo]}, ${qu(original.quantidade, p?.unidade_estoque)}, ${dataHora(original.data_hora)}).</p>`}
     ${corr && corr.length > 0 && html`<h3>Correções deste lançamento</h3><ul class="lista-simples">${corr.map((c) => html`<li>#${c.id} · ${dataHora(c.data_hora)} · ${c.quantidade > 0 ? '+' : ''}${qu(c.quantidade, p?.unidade_estoque)}
       · ${dados.mapa.perfil.get(c.usuario_id)?.nome}<br /><small>${c.observacao} — Motivo: ${c.motivo}</small></li>`)}</ul>`}
@@ -150,17 +152,23 @@ function DetalheMovimento({ mov, podeCorrigir, aoFechar }) {
 }
 
 // Modal de correção (usado aqui e na tela de saídas)
-// Prazo para corrigir: só o ADMINISTRADOR corrige a qualquer momento; os demais só no MESMO DIA do lançamento
-// (erro de digitação com a nota na mão). Depois disso, o acerto é por inventário. O banco confere de novo.
-export const correcaoNoPrazo = (mov, papeis) => (papeis || []).includes('admin') || diaLocal(mov.data_hora) === hojeISO();
+// Prazo para corrigir: só o ADMINISTRADOR corrige a qualquer momento. Os demais: CONSUMO (no setor e pela receita)
+// até 1 hora depois do lançamento; o resto só no MESMO DIA (erro de digitação com a nota na mão).
+// Depois disso, o acerto é por inventário. O banco confere de novo (corrigir_movimento).
+const CONSUMO = ['consumo', 'saida_receita'];
+const prazoConsumoVencido = (mov) => Date.now() - new Date(mov.data_hora).getTime() > 3600000;
+export const correcaoNoPrazo = (mov, papeis) => (papeis || []).includes('admin')
+  || (diaLocal(mov.data_hora) === hojeISO() && !(CONSUMO.includes(mov.tipo) && prazoConsumoVencido(mov)));
 
 function AvisoPrazoCorrecao({ mov, aoFechar }) {
   const { ir, podeFazer } = useApp();
   return html`<${Modal} titulo="Prazo para correção encerrado" aoFechar=${() => aoFechar(false)} semProtecao
     rodape=${html`<button class="btn btn-sec" onClick=${() => aoFechar(false)}>Entendi</button>
       ${podeFazer('inventario') && html`<button class="btn btn-pri" onClick=${() => { aoFechar(false); ir('inventario'); }}>Ir para o Inventário</button>`}`}>
-    <div class="aviso-faixa aviso-prazo" role="alert"><span><${Icone} nome="aviso" tam=${22} /> <b>Este lançamento é de ${data(diaLocal(mov.data_hora))} e só podia ser corrigido no mesmo dia.</b></span></div>
-    <p>A correção serve para <b>erro de digitação no próprio dia</b> (por exemplo, com a nota fiscal na mão no fim do expediente).</p>
+    <div class="aviso-faixa aviso-prazo" role="alert"><span><${Icone} nome="aviso" tam=${22} /> <b>${CONSUMO.includes(mov.tipo)
+      ? `Consumo só pode ser corrigido em até 1 hora depois do lançamento (este foi em ${dataHora(mov.data_hora)}).`
+      : `Este lançamento é de ${data(diaLocal(mov.data_hora))} e só podia ser corrigido no mesmo dia.`}</b></span></div>
+    <p>A correção serve para <b>erro de digitação logo depois de lançar</b>${CONSUMO.includes(mov.tipo) ? '' : ' (por exemplo, com a nota fiscal na mão no fim do expediente)'}.</p>
     <p>Passado o dia, a diferença no estoque é acertada por <b>inventário</b>: conte o que existe no local e registre a contagem. O sistema lança o ajuste e guarda o motivo.</p>
     <p class="nota">Dúvidas? Fale com o administrador do sistema.</p>
   </${Modal}>`;

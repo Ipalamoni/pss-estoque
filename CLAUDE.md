@@ -76,9 +76,11 @@ não técnico), GUIA_DO_DONO.md (tela a tela), ESPECIFICACAO_DO_SISTEMA.md e CON
 - Textos curtos, diretos, em português simples; números grandes; cores com significado fixo (verde = pode seguir, laranja = atenção, vermelho = parar) e sempre com ícone + texto (nunca só cor).
 - Avisos importantes (ex.: mudança na programação) são faixas grandes e chamativas que só somem com "Entendi" + nome e senha do padeiro (fica registrado quem viu e quando).
 - Nunca travar a produção em andamento: avisar e pedir confirmação simples, registrar e deixar o engenheiro corrigir depois.
-- Correção de lançamento (Kardex/Saídas): administrador a qualquer momento; os demais (almoxarifado e quem lançou)
-  só no MESMO DIA (horário de Brasília). Depois disso, aviso "Prazo para correção encerrado" e o acerto é por
-  inventário. A regra vale no banco (`corrigir_movimento`, v2.18).
+- Correção de lançamento (Kardex/Saídas): administrador a qualquer momento; os demais (almoxarifado e quem lançou):
+  CONSUMO (no setor e pela receita) até 1 HORA depois; o resto só no MESMO DIA (horário de Brasília). Fora do prazo,
+  aviso "Prazo para correção encerrado" e o acerto é por inventário. Transferência NUNCA se corrige: antes de
+  recebida, a origem cancela (volta para a origem); depois de recebida/conferida, não muda. Regra no banco
+  (`corrigir_movimento`, `cancelar_transferencia`; v2.18/v2.19).
 - Toda ação do padeiro registra data, hora, padeiro (pela senha) e tablet; correções são feitas só por engenheiro/gestor da produção/admin, com motivo, sem apagar o original.
 - Quem pode mudar ordem/masseira da produção e corrigir: admin, engenharia e "Gestor da produção".
 
