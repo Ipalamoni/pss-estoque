@@ -1491,3 +1491,23 @@ small { font-size: .9rem; }
 @media (max-width: 640px) { .faixa-secao { font-size: 1.15rem; padding: 7px 12px; } }
 /* nomes dos padeiros no quadrado da masseira: maiores e com a cor do texto (não o cinza) */
 .mac-ops { font-size: 1.15rem; font-weight: 700; color: var(--texto); }
+
+/* v2.12.2 — CELULAR: quadrados das masseiras "deitados", 1 por linha (ícone à esquerda, informações ao lado).
+   Tablet e computador continuam com a grade de quadrados centralizados. */
+@media (max-width: 640px) {
+  .mac-grade { grid-template-columns: 1fr; gap: 10px; }
+  .mac-tile { display: grid; grid-template-columns: 52px minmax(0, 1fr); column-gap: 12px; row-gap: 3px; align-items: start;
+    text-align: left; min-height: 0; padding: 12px 12px 12px 12px; }
+  .mac-tile > * { grid-column: 2; }
+  .mac-tile-topo { display: contents; }
+  .mac-tile .mac-ico { grid-column: 1; grid-row: 1 / span 8; width: 52px; height: 52px; border-radius: 14px; }
+  .mac-tile .mac-ico .icone { width: 32px; height: 32px; }
+  .mac-tile .mac-nome { font-size: 1.2rem; padding-right: 72px; }          /* espaço para a capacidade no canto */
+  .mac-tile .mac-cap { position: absolute; top: 12px; right: 12px; font-size: .9rem; padding: 0 8px; }
+  .mac-tile .mac-mudou { justify-self: start; }
+  .mac-tile .mac-linhas, .mac-tile .mac-ops { font-size: 1rem; }
+  .mac-tile .mac-status { align-items: flex-start; margin-top: 4px; }
+  .mac-tile .mac-batendo { font-size: 1rem; }
+  .mac-tile .mac-prox { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 6px; }
+  .mac-tile .mac-num { align-self: auto; }
+}
