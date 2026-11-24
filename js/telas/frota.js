@@ -9,7 +9,7 @@ import { data, dataHora, pl, num, contem, hojeISO, mensagemErro, nomeUsuario } f
 import { Exportar } from '../exportar.js';
 import { Icone } from '../icones.js';
 import { ColunasEmpilhadas, BarrasH } from '../graficos.js';
-import { useFrota, GRUPOS, MESES, FROTAS, frotaDe, placaBonita, nomeVeiculo, sugestoesPlaca, linhasDoPeriodo, serieMensal, somaLinhas, valorItem, mesDoItem, USOS_VEICULO, moeda } from '../frota-dados.js';
+import { useFrota, GRUPOS, MESES, FROTAS, CATEGORIAS_CAMINHAO, frotaDe, placaBonita, nomeVeiculo, sugestoesPlaca, linhasDoPeriodo, serieMensal, somaLinhas, valorItem, mesDoItem, USOS_VEICULO, moeda } from '../frota-dados.js';
 import { linhasFrota, decodificar, pareceTexto } from '../frota-csv.js';
 import { Placa, SeletorBase, TagsLidas, EtqGrupo, ModalApontar, ModalApontarVarios, AvisosLinha, fmtK } from './frota-comum.js';
 import { FormVeiculo } from './frota-veiculos.js';
@@ -30,7 +30,8 @@ export function TelaFrotaPainel() {
   const [mes, setMes] = useState(null);
   const [grupos, setGrupos] = useState([]); const [usos, setUsos] = useState(['empresa']);
   const [gerais, setGerais] = useState(true);
-  const [ver, setVer] = useState('todas');   // gráficos/ranking/mapa: todas, caminhoes, carros
+  const [ver, setVer] = useState('todas');   // gráficos/ranking/mapa: todas, caminhoes, utilitarios, carros
+  const [tiposCam, setTiposCam] = useState([]);   // tipos de caminhão (só quando ver = caminhões)
   if (!f) return carregandoOuErro('Painel da frota', erro);
   const anoV = ano || f.anos[0] || Number(hojeISO().slice(0, 4));
   const filtro = (it) => casaVarios(grupos, it.grupo) && (it.veiculo ? casaVarios(usos, it.veiculo.uso) : gerais);
@@ -55,7 +56,17 @@ export function TelaFrotaPainel() {
     return { ...fr, n, total, porGrupo, comGasto, media: n ? total / n : 0 };
   });
   // gráficos, ranking, tipos e mapa: todas as frotas ou uma
-  const doVer = (lista) => (ver === 'todas' ? lista : lista.filter((it) => it.frota === ver));
+  const doVer = (lista) => (ver === 'todas' ? lista : lista.filter((it) => it.frota === ver && (ver !== 'caminhoes' || casaVarios(tiposCam, it.veiculo?.categoria))));
+  // CAMINHÕES POR TIPO (Daily, 3/4, toco, truck, cavalo, carreta…): quem gasta mais por veículo
+  const tiposPresentes = CATEGORIAS_CAMINHAO.filter((c) => f.veiculos.some((v) => v.categoria === c && v.situacao !== 'vendido' && casaVarios(usos, v.uso)));
+  const porTipo = tiposPresentes.map((c) => {
+    const n = f.veiculos.filter((v) => v.categoria === c && v.situacao !== 'vendido' && casaVarios(usos, v.uso)).length;
+    const its = itens.filter((it) => it.frota === 'caminhoes' && it.veiculo?.categoria === c);
+    const total = somaLinhas(its, base);
+    const g = Object.fromEntries(GRUPOS.map((x) => [x.id, somaLinhas(its.filter((it) => it.grupo === x.id), base)]));
+    return { c, n, total, media: n ? total / n : 0, mediaMes: n ? total / n / (mes === null ? mesesComGasto : 1) : 0, g };
+  });
+  const escolherTipo = (c) => { setVer('caminhoes'); setTiposCam(tiposCam.length === 1 && tiposCam[0] === c ? [] : [c]); };
   const itensVerAno = doVer(itensAno); const itensVer = doMes(itensVerAno);
   const serie = serieMensal(itensVerAno, base);
   const porVeic = new Map();
@@ -78,7 +89,7 @@ export function TelaFrotaPainel() {
   const placasPend = new Set(f.servicos.filter((x) => x.desconhecida).map((x) => x.placa_arquivo)).size;
   const ultImp = f.importacoes[0];
   const abrir = (vid) => ir('frota-veiculos', { abrir: vid });
-  const rotVer = ver === 'todas' ? 'toda a frota' : FROTAS.find((x) => x.id === ver).rotulo.toLowerCase();
+  const rotVer = ver === 'todas' ? 'toda a frota' : ver === 'caminhoes' && tiposCam.length ? tiposCam.join(', ').toLowerCase() : FROTAS.find((x) => x.id === ver).rotulo.toLowerCase();
   const exp = [{ titulo: 'Placa', valor: (x) => placaBonita(x.v.placa) }, { titulo: 'Veículo', valor: (x) => nomeVeiculo(x.v), largura: 26 }, { titulo: 'Categoria', valor: (x) => x.v.categoria },
     ...MESES.map((m, i) => ({ titulo: m, valor: (x) => Math.round(x.meses[i] * 100) / 100, texto: (x) => (x.meses[i] ? moeda(x.meses[i]) : ''), num: true })),
     { titulo: 'Total', valor: (x) => Math.round(x.total * 100) / 100, texto: (x) => moeda(x.total), num: true }];
@@ -115,9 +126,27 @@ export function TelaFrotaPainel() {
       <${DivisaoContas} partes=${GRUPOS.map((g) => ({ ...g, valor: b.porGrupo[g.id], media: b.n ? b.porGrupo[g.id] / b.n : 0 }))} />
       <button type="button" class="btn-link" onClick=${() => setVer(ver === b.id ? 'todas' : b.id)}>${ver === b.id ? 'Ver toda a frota nos gráficos' : `Ver só ${b.rotulo.toLowerCase()} nos gráficos ›`}</button>
     </section>`)}</div>
+    ${porTipo.length > 1 && (ver === 'todas' || ver === 'caminhoes') && html`<section class="painel fr-tipos">
+      <div class="painel-topo"><h2><${Icone} nome="frota" tam=${20} /> Caminhões por tipo · ${rotMes}</h2><span class="nota">média por veículo: compara tipos com quantidades diferentes</span></div>
+      <div class="duas-colunas fr-tipos-corpo">
+        <div><${BarrasH} itens=${[...porTipo].sort((a, b) => b.media - a.media).map((t) => ({ id: t.c, rotulo: t.c, sub: pl(t.n, 'veículo', 'veículos'), valor: t.media, texto: `${moeda(t.media)} por veículo` }))}
+          aoClicar=${(x) => escolherTipo(x.id)} vazio="Sem gastos de caminhões neste período." /></div>
+        <div class="tabela-rolagem"><table class="tabela fr-tipos-tab">
+          <thead><tr><th scope="col">Tipo</th><th scope="col" class="n">Veíc.</th><th scope="col" class="n">Gasto</th><th scope="col" class="n">Por veículo</th>
+            <th scope="col" class="n">Por veíc./mês</th>${GRUPOS.map((g) => html`<th scope="col" class="n" title=${`${g.rotulo} por veículo`}>${g.rotulo}/veíc.</th>`)}</tr></thead>
+          <tbody>${[...porTipo].sort((a, b) => b.media - a.media).map((t) => html`<tr key=${t.c} class=${'clicavel' + (tiposCam.length === 1 && tiposCam[0] === t.c ? ' linha-sel' : '')} tabindex="0"
+              onClick=${() => escolherTipo(t.c)} onKeyDown=${(e) => { if (e.key === 'Enter') escolherTipo(t.c); }}>
+            <td data-rotulo="Tipo"><b>${t.c}</b></td><td class="n" data-rotulo="Veículos">${t.n}</td><td class="n" data-rotulo="Gasto">${moeda(t.total)}</td>
+            <td class="n" data-rotulo="Por veículo"><b>${moeda(t.media)}</b></td><td class="n" data-rotulo="Por veículo/mês">${moeda(t.mediaMes)}</td>
+            ${GRUPOS.map((g) => html`<td class="n" data-rotulo=${`${g.rotulo}/veículo`}>${moeda(t.n ? t.g[g.id] / t.n : 0)}</td>`)}</tr>`)}</tbody></table></div>
+      </div>
+      <p class="nota">Toque num tipo para ver só ele nos gráficos abaixo.</p>
+    </section>`}
     <div class="fr-ver"><span>Gráficos e tabela de:</span>
       <div class="seg" role="group" aria-label="Frota nos gráficos">${[{ id: 'todas', rotulo: 'Toda a frota' }, ...FROTAS].map((x) => html`<button type="button"
         class=${ver === x.id ? 'ativo' : ''} aria-pressed=${ver === x.id} onClick=${() => setVer(x.id)}>${x.rotulo}</button>`)}</div>
+      ${ver === 'caminhoes' && tiposPresentes.length > 1 && html`<${MultiEscolha} todos="Todos os tipos de caminhão" rotulo="Tipos de caminhão" valor=${tiposCam} aoMudar=${setTiposCam}
+        opcoes=${tiposPresentes.map((c) => ({ valor: c, rotulo: c }))} />`}
       ${mes !== null && html`<button class="chip ativo" onClick=${() => setMes(null)} aria-label="Ver o ano todo">${MESES[mes]}/${anoV} ✕</button>`}</div>
     <section class="painel"><h2>Gasto mês a mês · ${anoV} · ${rotVer}</h2>
       <${ColunasEmpilhadas} categorias=${MESES} series=${GRUPOS.filter((g) => casaVarios(grupos, g.id)).map((g) => ({ nome: g.rotulo, cor: g.cor, valores: serie[g.id] }))}

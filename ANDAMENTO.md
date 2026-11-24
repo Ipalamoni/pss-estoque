@@ -3,9 +3,12 @@
 Arquivo público: sem nomes de pessoas, senhas, tokens ou dados da empresa.
 
 ## Situação atual (24/11/2026)
-- Sistema publicado: https://ipalamoni.github.io/pss-estoque/ (versão do app 2.21.3).
+- Sistema publicado: https://ipalamoni.github.io/pss-estoque/ (versão do app 2.22.0).
 - Banco de produção (Supabase `kuttfnmjvzgzebjpjvvy`, "estoque-pss"): versão **2.21.0**, todas as
   conferências OK. Não mexer no projeto Supabase `pss-vendas`.
+- v2.22.0 (24/11/2026, só tela): Painel da frota com "Caminhões por tipo" (média por veículo, por mês e por conta de
+  cada tipo: Daily/"Caminhão", 3/4, toco, truck, bitruck, cavalo, carreta) e filtro de tipos de caminhão nos gráficos.
+  Categoria nova "Caminhão toco" no cadastro.
 - v2.21.3 (24/11/2026, só tela): placa nunca encolhe (estava cortada ao lado de fornecedor de nome comprido);
   ficha aberta pelo Painel volta para o Painel.
 - v2.21.2 (24/11/2026, só tela): histórico do veículo com valor em vermelho, conta e dados da nota em azul e placa

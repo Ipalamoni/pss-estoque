@@ -1779,3 +1779,9 @@ table.so-leitor { display: block; left: 0; top: 0; }   /* tabela só para leitor
 .lt-nf { margin: 0; color: var(--azul); font-size: .88rem; }
 .lt-nf-rot { font-weight: 700; }
 .placa-no-texto { font-size: 1.08em; font-weight: 800; letter-spacing: .03em; color: var(--texto); }
+/* caminhões por tipo */
+.fr-tipos-corpo { align-items: start; grid-template-columns: 1fr !important; gap: 10px; }
+.fr-tipos-corpo .barras-h { max-width: 760px; }
+.fr-tipos-tab td, .fr-tipos-tab th { white-space: nowrap; }
+.tabela tbody tr.linha-sel td { background: var(--cor-clara); }
+html[data-tema="escuro"] .tabela tbody tr.linha-sel td { background: #1d3328; }
