@@ -1483,3 +1483,11 @@ small { font-size: .9rem; }
 .fila-espera { font-size: 1rem; }
 .batida { font-size: .98rem; padding: 6px 12px; }
 .mac-faixa { font-size: 1.1rem; flex-wrap: wrap; }
+
+/* v2.12.1 — faixas de título das seções do tablet ("Masseiras em produção" / "Masseiras e programação") */
+.faixa-secao { margin: 4px 0 2px; padding: 8px 16px; border-radius: 12px; text-align: center; font-size: 1.3rem; font-weight: 800; line-height: 1.25;
+  letter-spacing: .01em; background: color-mix(in srgb, var(--cor) 14%, var(--cartao)); color: var(--texto); border: 1px solid color-mix(in srgb, var(--cor) 35%, transparent); }
+.em-producao .faixa-secao { margin-bottom: 10px; }
+@media (max-width: 640px) { .faixa-secao { font-size: 1.15rem; padding: 7px 12px; } }
+/* nomes dos padeiros no quadrado da masseira: maiores e com a cor do texto (não o cinza) */
+.mac-ops { font-size: 1.15rem; font-weight: 700; color: var(--texto); }

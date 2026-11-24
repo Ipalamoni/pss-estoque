@@ -60,8 +60,8 @@ export function TelaMaceiras() {
         <ul>${resumoChegando.map(([d, q]) => html`<li key=${d}><b>${num(q, 0)}</b> × ${d.replace(/^Base – /, '')}</li>`)}</ul></div></div>
       <button class="fr-botao" onClick=${exigir(() => setReceber(true))}><${Icone} nome="finalizar" tam=${30} /> RECEBER BASE</button>
     </section>`}
-    ${emProd.length > 0 && html`<section class="em-producao" aria-label="Batendo agora">
-      <h3>Batendo agora</h3>
+    ${emProd.length > 0 && html`<section class="em-producao" aria-labelledby="tit-em-producao">
+      <h2 class="faixa-secao" id="tit-em-producao">Masseiras em produção</h2>
       <div class="ep-lista">${emProd.map((b) => {
         const m = dados.mapa.maceira.get(b.maceira_id); const min = duracaoBatelada(b, agora);
         return html`<div class="ep-item" key=${b.id}>
@@ -90,6 +90,7 @@ export function TelaMaceiras() {
     </div>
 
 
+    <h2 class="faixa-secao">Masseiras e programação</h2>
     <div class="mac-grade">
       ${maceiras.map((m) => {
         const s = semaforo(dados, m, fluxo.fluxo, fluxo.bateladas, agora);
@@ -100,7 +101,7 @@ export function TelaMaceiras() {
           <div class="mac-tile-topo"><span class="mac-ico" aria-hidden="true"><${Icone} nome="masseira" tam=${38} /></span><b class="mac-nome">${m.nome}</b></div>
           ${m.capacidade_kg && html`<span class="mac-cap">${num(m.capacidade_kg, 0)} kg</span>`}
           <div class="mac-linhas">${(m.linhas || []).map((id) => dados.mapa.linha.get(id)?.nome).filter(Boolean).join(' · ') || 'sem linha definida'}</div>
-          ${nomesOp.length > 0 && html`<div class="mac-ops">👤 ${nomesOp.join(' · ')}</div>`}
+          ${nomesOp.length > 0 && html`<div class="mac-ops"><span aria-hidden="true">👤</span> ${nomesOp.join(' · ')}</div>`}
           <div class="mac-status"><b><span class="mac-luz"></span>${s.rotulo}</b>${s.min !== null && s.cor !== 'cinza' && !s.batendo ? html`<small>${tempoTexto(s.min)} sem iniciar</small>` : ''}</div>
           ${s.batendo && html`<div class="mac-batendo">${dados.mapa.ficha.get(s.batendo.ficha_id)?.nome}</div>`}
           <div class="mac-prox">${prox ? html`<span>Próxima: <b>${dados.mapa.ficha.get(prox.ficha_id)?.nome}</b></span>
