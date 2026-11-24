@@ -15,6 +15,9 @@ Valem para TODA alteração neste projeto, sem precisar o dono pedir de novo.
   LINHA/BLOCO SEPARADO para copiar e colar (nome, validade, projeto, permissões). Nunca em bloco único.
   O token só é colado no formulário seguro, nunca no chat.
 
+- Toda conversa nova: ler o `ANDAMENTO.md` antes de começar. Ao fim de cada entrega, atualizar o
+  `ANDAMENTO.md` (situação, versões, pendências) e fazer commit junto.
+
 ## BACKUP · quando o dono disser "executar backup da versão atual"
 1. Conferir que tudo está commitado e publicado (git status limpo, push feito).
 2. Rodar: `python3 ferramentas/gerar_backup.py --saida <pasta de rascunho> --usuarios <lista privada>` (ele monta o banco completo, gera o
