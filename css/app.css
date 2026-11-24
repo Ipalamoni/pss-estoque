@@ -1511,3 +1511,15 @@ small { font-size: .9rem; }
   .mac-tile .mac-prox { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 6px; }
   .mac-tile .mac-num { align-self: auto; }
 }
+
+/* v2.12.3 — fila da masseira: Finalizadas (sem "Iniciadas"), última iniciada/finalizada e "N a finalizar" */
+.fila-nums .n-fin { color: #1f5fa8; font-weight: 700; } .fila-nums .n-fin b { color: inherit; }
+.fila-nums .n-perda { color: var(--laranja); font-weight: 700; } .fila-nums .n-perda b { color: inherit; }
+[data-tema="escuro"] .fila-nums .n-fin { color: #8fd3ff; }
+.fila-ult { display: flex; flex-wrap: wrap; gap: 2px 16px; font-size: .95rem; color: var(--texto-2); margin-top: 4px; }
+.fila-ult b { color: var(--texto); }
+.fila-acoes2 { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px 10px; }
+.btn-afinalizar { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 4px 14px; border-radius: 999px; cursor: pointer;
+  background: #ffd84d; color: #3a2a00; border: 2px solid #b88a00; font: inherit; font-weight: 800; font-size: .95rem; }
+.btn-afinalizar:disabled { opacity: .6; cursor: not-allowed; }
+.btn-afinalizar:focus-visible { outline: 3px solid var(--foco, #0b5cad); outline-offset: 2px; }

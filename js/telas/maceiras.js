@@ -8,7 +8,7 @@ import { html, useState, useEffect, useRef, useApp, Cabecalho, Modal, Campo, Num
 import { qtd, num, qu, hojeISO, pl, mensagemErro } from '../util.js';
 import { Icone } from '../icones.js';
 import { FaixaAviso, useAlertaSonoro, avisosPendentes } from '../aviso-producao.js';
-import { prazoBatelada, duracaoBatelada, estadoTempo, SeloTempo, useFluxo, semaforo, saldoLocal, localTipo, misturaDaFicha, tempoTexto, useRelogio, somar, minutos, useEventos, LinhaTempo, hora, diaDe } from '../producao-util.js';
+import { prazoBatelada, duracaoBatelada, estadoTempo, SeloTempo, useFluxo, semaforo, saldoLocal, localTipo, misturaDaFicha, tempoTexto, useRelogio, somar, minutos, hora, diaDe } from '../producao-util.js';
 
 const ehFermento = (p) => /ferment/i.test(`${p?.grupo || ''} ${p?.descricao || ''}`);
 const ehFarinha = (p) => /farinha/i.test(`${p?.grupo || ''} ${p?.descricao || ''}`);
@@ -117,7 +117,8 @@ export function TelaMaceiras() {
         const abertas = emProd.filter((b) => b.maceira_id === aberta.id);
         if (abertas.length) setFinalizar({ bs: abertas, depois: () => setIniciar({ prog: p, maceira: aberta }) });
         else setIniciar({ prog: p, maceira: aberta });
-      }, pendente)} operador=${operador} />`}
+      }, pendente)}
+      aoFinalizar=${exigir2(opera, operador, setTrocar, (bs) => setFinalizar({ bs }), pendente)} operador=${operador} />`}
     ${finalizar && html`<${FinalizarBatelada} bs=${finalizar.bs} operador=${operador} antes=${!!finalizar.depois}
       aoFechar=${(ok) => { const d = finalizar.depois; setFinalizar(null); if (ok && d) d(); }} />`}
     ${iniciar && html`<${IniciarBatelada} prog=${iniciar.prog} maceira=${iniciar.maceira} operador=${operador} fluxo=${fluxo} agora=${agora}
@@ -180,8 +181,9 @@ function EntrarOperador({ aoFechar, aoEntrar, titulo }) {
 }
 
 // ------------------------- maceira aberta: fila por prioridade -------------------------
-function MaceiraAberta({ m, fluxo, agora, opera, aoFechar, aoIniciar, operador }) {
+function MaceiraAberta({ m, fluxo, agora, opera, aoFechar, aoIniciar, aoFinalizar, operador }) {
   const { dados } = useApp();
+  const nomeOp = (id) => dados.mapa.operador.get(id)?.nome || '';
   const [acao, setAcao] = useState(null);
   const [foraOrdem, setForaOrdem] = useState(null);   // produção escolhida que não é a 1ª da fila
   const s = semaforo(dados, m, fluxo.fluxo, fluxo.bateladas, agora);
@@ -193,7 +195,6 @@ function MaceiraAberta({ m, fluxo, agora, opera, aoFechar, aoIniciar, operador }
   const naOrdem = (l) => !primeira || l.programacao_id === primeira.programacao_id || (etapaFila(l) === 1 && pri(l) < pri(primeira));
   const iniciar = (l, extra) => (naOrdem(l) ? aoIniciar({ ...l, maceira_destino: m.id, ...extra }) : setForaOrdem({ l, extra }));
   const batidas = fluxo.bateladas.filter((b) => b.maceira_id === m.id && b.situacao !== 'cancelada' && diaDe(b.iniciada_em) === hoje).sort((a, b) => String(b.iniciada_em).localeCompare(String(a.iniciada_em)));
-  const eventos = useEventos(fila.map((l) => l.programacao_id));
   return html`<${Modal} titulo=${m.nome} icone=${html`<${Icone} nome="masseira" tam=${28} />`} aoFechar=${aoFechar} largo>
     <div class=${'mac-faixa s-' + s.cor}><span class="mac-luz"></span><b>${s.rotulo}</b>
       <span>${!s.batendo && s.min !== null && s.cor !== 'cinza' ? `${tempoTexto(s.min)} sem iniciar · ` : ''}tempo médio ${s.T} min</span></div>
@@ -204,6 +205,10 @@ function MaceiraAberta({ m, fluxo, agora, opera, aoFechar, aoIniciar, operador }
         const f = dados.mapa.ficha.get(l.ficha_id);
         const podeIniciar = l.pronto > 0;
         const agora = primeira && l.programacao_id === primeira.programacao_id;
+        const bsP = fluxo.bateladas.filter((b) => b.programacao_id === l.programacao_id && b.situacao !== 'cancelada');
+        const ultIni = bsP.reduce((u, b) => (!u || String(b.iniciada_em) > String(u.iniciada_em) ? b : u), null);
+        const ultFin = bsP.filter((b) => b.finalizada_em).reduce((u, b) => (!u || String(b.finalizada_em) > String(u.finalizada_em) ? b : u), null);
+        const batendoAqui = bsP.filter((b) => b.situacao === 'em_producao' && b.maceira_id === m.id);
         const passaNaFrente = !!primeira && etapaFila(l) > 0 && etapaFila(l) < 3 && pri(l) < pri(primeira);
         return html`<div class=${'fila-item' + (podeIniciar ? ' pronto' : '') + (agora ? ' agora' : '')} key=${l.programacao_id}>
           <div class="fila-pos">${i + 1}º</div>
@@ -214,16 +219,24 @@ function MaceiraAberta({ m, fluxo, agora, opera, aoFechar, aoIniciar, operador }
               <span class="n-pronto">Pronto p/ iniciar <b>${num(l.pronto, 0)}</b></span>
               <span>A caminho <b>${num(l.a_caminho, 0)}</b></span>
               <span>Na pesagem <b>${num(l.a_pesar + l.na_pesagem, 0)}</b></span>
-              <span>Iniciadas <b>${num(l.iniciado, 0)}</b></span>
+              <span class="n-fin">Finalizadas <b>${num(l.finalizado, 0)}</b></span>
+              ${l.devolvido + l.perdido > 0 && html`<span class="n-perda">Devolv./perdas <b>${num(l.devolvido + l.perdido, 0)}</b></span>`}
             </div>
-            <small class="fila-horas"><${LinhaTempo} p=${{ id: l.programacao_id, quantidade: l.programado }} ev=${eventos.get(l.programacao_id)} bateladas=${fluxo.bateladas} curta /></small>
+            ${(ultIni || ultFin) && html`<div class="fila-ult">
+              ${ultIni && html`<span>Últ. iniciada <b>${hora(ultIni.iniciada_em)}</b> · ${nomeOp(ultIni.operador_id)}</span>`}
+              ${ultFin && html`<span>Últ. finalizada <b>${hora(ultFin.finalizada_em)}</b> · ${nomeOp(ultFin.finalizada_operador_id || ultFin.operador_id)}</span>`}
+            </div>`}
             ${l.operador_id && html`<small>Padeiro sugerido: ${dados.mapa.operador.get(l.operador_id)?.nome}</small>`}
           </div>
           <div class="fila-acoes">
             ${podeIniciar ? html`<button class="btn btn-pri btn-gigante" disabled=${!opera} onClick=${() => iniciar(l, {})}><${Icone} nome="play" tam=${18} /> Iniciar 1 batelada</button>`
               : l.a_caminho > 0 ? html`<button class="btn btn-destaque btn-gigante" disabled=${!opera} onClick=${() => iniciar(l, { receber: true })}>Receber e iniciar</button>`
               : html`<span class="fila-espera">${l.iniciado >= l.programado ? 'Tudo iniciado ✔' : 'Aguardando a pesagem'}</span>`}
-            ${opera && l.pronto > 0 && html`<button class="btn-link" onClick=${() => setAcao(l)}>devolver / perda</button>`}
+            ${(batendoAqui.length > 0 || (opera && l.pronto > 0)) && html`<div class="fila-acoes2">
+              ${batendoAqui.length > 0 && html`<button class="btn-afinalizar" disabled=${!opera} onClick=${() => aoFinalizar(batendoAqui)}
+                title="Bateladas desta receita que começaram e ainda não foram finalizadas"><${Icone} nome="aviso" tam=${15} /> ${batendoAqui.length} a finalizar</button>`}
+              ${opera && l.pronto > 0 && html`<button class="btn-link" onClick=${() => setAcao(l)}>devolver / perda</button>`}
+            </div>`}
           </div>
         </div>`;
       })}</div>`}
