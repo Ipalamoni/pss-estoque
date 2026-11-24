@@ -66,3 +66,5 @@ Valem para TODA alteração neste projeto, sem precisar o dono pedir de novo.
 - Evitar buscas repetidas em listas grandes: usar os índices de `dados.mapa` (`itensPedido`, `recPedido`, `saldoLocal`).
 - Antes de publicar: `node --check` em todos os arquivos, ESLint sem erros e teste das telas com o banco de demonstração.
 - Subir a versão em `versao.js` e `sw.js` a cada publicação.
+- PUBLICAR = commit e push direto na branch `main` (o GitHub Pages publica da `main`). Se a sessão estiver em outra
+  branch, levar as mudanças para a `main` e fazer push nela. O dono não é técnico: nunca pedir a ele para fazer commit/push.
