@@ -524,6 +524,14 @@ function App() {
     if (p) api.rpc('registrar_acesso', { p_evento: 'ver_como', p_detalhe: `${p.usuario} (${p.nome})`, p_agente: navigator.userAgent }).catch(() => {});
   }
 
+  // Saiu em outra janela do sistema: esta também volta para a tela de entrada (segurança)
+  useEffect(() => {
+    if (!usuario) return;
+    const f = (e) => { if (e.key === 'pss-estoque-saida' && e.newValue) location.reload(); };
+    window.addEventListener('storage', f);
+    return () => window.removeEventListener('storage', f);
+  }, [usuario?.user_id]);
+
   // Sai sozinho depois de muito tempo sem uso (computador compartilhado)
   useEffect(() => {
     if (!usuario) return;
@@ -532,12 +540,17 @@ function App() {
     const gestao = (usuario.papeis || []).some((p) => ['admin', 'diretoria', 'financeiro'].includes(p));
     const longo = (CFG.SAIR_APOS_MINUTOS_SEM_USO || 480) * 60000;
     const curto = Math.min(longo, (CFG.SAIR_APOS_MINUTOS_SEM_USO_GESTAO || 120) * 60000);
-    let ultimo = Date.now();
-    const marcar = () => { ultimo = Date.now(); };
+    // várias janelas abertas: o uso em QUALQUER uma conta (uma janela esquecida não derruba a que está em uso)
+    const CHAVE_USO = 'pss-estoque-ultimo-uso';
+    const lerUso = () => { try { return Number(localStorage.getItem(CHAVE_USO)) || 0; } catch { return 0; } };
+    let ultimo = Date.now(); let gravado = 0;
+    const marcar = () => { ultimo = Date.now();
+      if (ultimo - gravado > 15000) { gravado = ultimo; try { localStorage.setItem(CHAVE_USO, String(ultimo)); } catch { /* ignora */ } } };
+    marcar();
     ['click', 'keydown', 'touchstart'].forEach((ev) => document.addEventListener(ev, marcar, { passive: true }));
     const t = setInterval(() => {
       const limite = gestao && !haEdicao() ? curto : longo;
-      if (Date.now() - ultimo > limite) { sair(); avisar('Sessão encerrada por falta de uso (segurança). Entre de novo para continuar.', 'aviso'); }
+      if (Date.now() - Math.max(ultimo, lerUso()) > limite) { sair(); avisar('Sessão encerrada por falta de uso (segurança). Entre de novo para continuar.', 'aviso'); }
     }, 60000);
     return () => { clearInterval(t); ['click', 'keydown', 'touchstart'].forEach((ev) => document.removeEventListener(ev, marcar)); };
   }, [usuario?.user_id]);
@@ -627,9 +640,16 @@ function App() {
       window.removeEventListener('focus', voltou); window.removeEventListener('online', voltou); };
   }, [usuario?.user_id]);
   async function sair() {
+    try { localStorage.setItem('pss-estoque-saida', String(Date.now())); } catch { /* ignora */ }   // avisa as outras janelas
     await api.rpc('registrar_acesso', { p_evento: 'saida', p_detalhe: null, p_agente: navigator.userAgent }).catch(() => {});
     await api.sair(); setUsuario(null); setVisao(null); setDados(null); location.hash = '#inicio';
     try { Object.keys(localStorage).filter((k) => k.startsWith('pss-estoque-visao')).forEach((k) => localStorage.removeItem(k)); } catch { /* ignora */ }
+  }
+  // Nova janela do sistema (no app instalado no computador abre outra janela do próprio app). Mesmo login.
+  function abrirNovaJanela(hash) {
+    const url = location.href.split('#')[0] + hash;
+    const j = window.open(url, '_blank');
+    if (!j) avisar('O computador bloqueou a nova janela. Libere as janelas pop-up para este sistema e tente de novo.', 'aviso');
   }
   function voltar() {
     const ant = pilha.current.pop() || 'inicio';
@@ -685,6 +705,8 @@ function App() {
         ${dados && html`<${Sininho} dados=${dados} papeis=${papeis} ir=${ir} usuario=${atual} recarregar=${recarregar} />`}
         ${(real.papeis || []).includes('admin') && html`<button class="btn-icone so-tela" title="Entrar como / ver como outra pessoa" aria-label="Ver como outra pessoa" onClick=${() => setEscolher(true)}><${Icone} nome="usuarios" /></button>`}
         ${api.modo !== 'demo' && html`<button class="btn-icone so-tela" title="Trocar senha" aria-label="Trocar senha" onClick=${() => setSenha(true)}><${Icone} nome="chave" /></button>`}
+        <button class="btn-icone so-tela so-mouse" title="Abrir esta tela em uma nova janela (Ctrl + clique num item do menu também abre em nova janela)"
+          aria-label="Abrir em nova janela" onClick=${() => abrirNovaJanela(location.hash || '#inicio')}><${Icone} nome="novaJanela" /></button>
         <button class="btn-icone so-tela" title="Sair" aria-label="Sair" onClick=${protegido(sair)}><${Icone} nome="sair" /></button>
       </div>
     </header>
@@ -705,7 +727,8 @@ function App() {
             return html`<button class=${'menu-grupo' + (fechado ? ' fechado' : '')} aria-expanded=${!fechado} onClick=${() => alternarGrupo(m.grupo)}>
               <span>${m.grupo}</span><span class="mg-seta" aria-hidden="true">▾</span></button>`; }
           if (g && gruposFechados.includes(g) && g !== grupoAtual) return null;
-          return html`<a href=${'#' + m.id} title=${m.titulo} class=${'menu-item' + (m.id === itemAtual.id ? ' ativo' : '')} aria-current=${m.id === itemAtual.id ? 'page' : null} onClick=${() => { setEstadoRota(null); setMenuAberto(false); }}>
+          return html`<a href=${'#' + m.id} title=${m.titulo} class=${'menu-item' + (m.id === itemAtual.id ? ' ativo' : '')} aria-current=${m.id === itemAtual.id ? 'page' : null} onClick=${(e) => { if (e.ctrlKey || e.metaKey || e.shiftKey) { e.preventDefault(); abrirNovaJanela('#' + m.id); return; } setEstadoRota(null); setMenuAberto(false); }}
+            onAuxClick=${(e) => { if (e.button === 1) { e.preventDefault(); abrirNovaJanela('#' + m.id); } }}>
               <${Icone} nome=${m.id} /> <span>${m.titulo}</span></a>`; }); })()}
         <div class="menu-rodape">
           <small>Desenvolvido por</small>

@@ -1591,3 +1591,6 @@ html[data-tema="escuro"] { --zebra: #272a2e; --zebra-hover: #2c3532; }
 @media print { .filtros-acoes { display: none !important; } }
 .filtros .chips { margin-bottom: 0; }
 .filtros-cel.com-fixo > .filtros-acoes { grid-column: 1 / -1; }
+
+/* "Abrir em nova janela": só com mouse (computador); no tablet/celular não aparece */
+@media (pointer: coarse) { .so-mouse { display: none !important; } }

@@ -3,9 +3,12 @@
 Arquivo público: sem nomes de pessoas, senhas, tokens ou dados da empresa.
 
 ## Situação atual (24/11/2026)
-- Sistema publicado: https://ipalamoni.github.io/pss-estoque/ (versão do app 2.14.0).
+- Sistema publicado: https://ipalamoni.github.io/pss-estoque/ (versão do app 2.15.0).
 - Banco de produção (Supabase `kuttfnmjvzgzebjpjvvy`, "estoque-pss"): versão **2.13.0**, todas as
   conferências OK. Não mexer no projeto Supabase `pss-vendas`.
+- v2.15.0 (24/11/2026, só tela): no computador, botão "Abrir em nova janela" no topo e Ctrl+clique (ou botão do
+  meio) no menu abre a tela em outra janela do app. O tempo sem uso é contado junto por todas as janelas e sair
+  numa janela tira todas.
 - v2.14.0 (24/11/2026, só tela; banco continua 2.13.0): relatórios com filtros + contagem + Excel/PDF/Imprimir/
   WhatsApp/Colunas numa faixa só, e filtros de vários itens com caixinhas (locais, tipos, categorias, situações,
   grupos, usuários, padeiros...) em Estoque por local, Posição de estoque, Kardex, Produtos, Fornecedores, Pedidos,
