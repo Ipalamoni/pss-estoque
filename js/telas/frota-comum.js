@@ -4,8 +4,8 @@
 // =====================================================================
 import { html, useState, useApp, Modal, Campo, Numero, Escolher, Etiqueta, useAcao, avisar } from '../ui.js';
 import { Icone } from '../icones.js';
-import { moeda, data, pl, num } from '../util.js';
-import { BASES, NOME_GRUPO, placaBonita, nomeVeiculo } from '../frota-dados.js';
+import { data, pl, num } from '../util.js';
+import { BASES, NOME_GRUPO, placaBonita, nomeVeiculo, moeda } from '../frota-dados.js';
 
 const COR_GRUPO = { corretiva: 'laranja', preventiva: 'verde', pneus: 'azul' };
 export const EtqGrupo = ({ grupo }) => html`<${Etiqueta} cor=${COR_GRUPO[grupo] || 'cinza'}>${NOME_GRUPO[grupo] || grupo}</${Etiqueta}>`;

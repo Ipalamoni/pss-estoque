@@ -5,6 +5,11 @@
 // pela COMPETÊNCIA (data de entrada da nota), VENCIMENTO ou PAGAMENTO.
 // =====================================================================
 import { useState, useEffect, useApp } from './ui.js';
+import { moeda as moedaComCentavos } from './util.js';
+
+// valores da frota SEM centavos (arredondados): mais fácil de ler nos painéis e relatórios.
+// (no Excel o número continua exato; só a tela/PDF arredonda)
+export const moeda = (v) => { const t = moedaComCentavos(v); return v === null || v === undefined || Number.isNaN(Number(v)) || !t.includes(',') ? t : moedaComCentavos(Math.round(Number(v))).replace(/,00$/, ''); };
 
 // contas do contas a pagar → grupo (cores fixas: corretiva laranja, preventiva verde, pneus azul; validadas p/ daltonismo)
 export const GRUPOS = [

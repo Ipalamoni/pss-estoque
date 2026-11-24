@@ -5,11 +5,11 @@
 // =====================================================================
 import { html, useState, useApp, Cabecalho, Busca, Tabela, Cartao, Etiqueta, Carregando, Vazio, Abas,
   Filtros, MultiEscolha, casaVarios, Escolher, useAcao, avisar, confirmar } from '../ui.js';
-import { moeda, data, dataHora, pl, num, contem, hojeISO, mensagemErro, nomeUsuario } from '../util.js';
+import { data, dataHora, pl, num, contem, hojeISO, mensagemErro, nomeUsuario } from '../util.js';
 import { Exportar } from '../exportar.js';
 import { Icone } from '../icones.js';
 import { ColunasEmpilhadas, BarrasH } from '../graficos.js';
-import { useFrota, GRUPOS, MESES, FROTAS, frotaDe, placaBonita, nomeVeiculo, sugestoesPlaca, linhasDoPeriodo, serieMensal, somaLinhas, valorItem, mesDoItem, USOS_VEICULO } from '../frota-dados.js';
+import { useFrota, GRUPOS, MESES, FROTAS, frotaDe, placaBonita, nomeVeiculo, sugestoesPlaca, linhasDoPeriodo, serieMensal, somaLinhas, valorItem, mesDoItem, USOS_VEICULO, moeda } from '../frota-dados.js';
 import { linhasFrota, decodificar, pareceTexto } from '../frota-csv.js';
 import { Placa, SeletorBase, TagsLidas, EtqGrupo, ModalApontar, ModalApontarVarios, AvisosLinha, fmtK } from './frota-comum.js';
 import { FormVeiculo } from './frota-veiculos.js';
@@ -151,7 +151,7 @@ function DivisaoContas({ partes }) {
     <table class="fr-div-tabela"><thead><tr><th scope="col">Conta</th><th scope="col" class="n">Total (R$)</th><th scope="col" class="n">Por veículo (R$)</th></tr></thead>
       <tbody>${partes.map((p) => html`<tr key=${p.id} title=${total > 0 ? `${p.rotulo}: ${num((p.valor / total) * 100, 0)}% do gasto` : ''}><th scope="row"><i style=${{ background: p.cor }} aria-hidden="true"></i>${p.rotulo}
         ${total > 0 && html` <small>${num((p.valor / total) * 100, 0)}%</small>`}</th>
-        <td class="n">${num(p.valor, 2, 2)}</td><td class="n">${num(p.media, 2, 2)}</td></tr>`)}</tbody></table>
+        <td class="n">${num(Math.round(p.valor), 0)}</td><td class="n">${num(Math.round(p.media), 0)}</td></tr>`)}</tbody></table>
   </div>`;
 }
 

@@ -4,12 +4,12 @@
 // =====================================================================
 import { html, useState, useMemo, useEffect, useApp, Cabecalho, Modal, Campo, Numero, Escolher, Busca, Tabela, Cartao, Etiqueta, Carregando,
   Filtros, MultiEscolha, casaVarios, useAcao, Vazio } from '../ui.js';
-import { moeda, data, pl, num, contem, hojeISO, diasEntre } from '../util.js';
+import { data, pl, num, contem, hojeISO, diasEntre } from '../util.js';
 import { Exportar } from '../exportar.js';
 import { Icone } from '../icones.js';
 import { ColunasEmpilhadas, BarrasH } from '../graficos.js';
 import { useFrota, GRUPOS, CATEGORIAS_VEICULO, SITUACOES_VEICULO, USOS_VEICULO, MESES, PLACA_OK, limparPlaca, placaBonita, nomeVeiculo,
-  linhasDoPeriodo, serieMensal, somaLinhas } from '../frota-dados.js';
+  linhasDoPeriodo, serieMensal, somaLinhas, moeda } from '../frota-dados.js';
 import { Placa, SeletorBase, TagsLidas, EtqGrupo, ModalApontar, AvisosLinha, fmtK } from './frota-comum.js';
 
 const COR_SIT = { ativo: 'verde', parado: 'laranja', vendido: 'cinza' };
