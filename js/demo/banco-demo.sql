@@ -6818,7 +6818,7 @@ begin
     ('DMO3C31', 'Iveco', 'S-WAY 480 6X2', 'Cavalo mecânico', 2023, 'ativo', 'empresa', 10, '295/80 R22,5', 60, 250000, current_date - 5, current_date + 300),
     ('DMO4D41', 'Volkswagen', 'POLO TRACK MA', 'Carro', 2024, 'ativo', 'empresa', 4, '185/65 R15', 180, 32000, current_date - 40, current_date + 150),
     ('DMO4D42', 'Fiat', 'UNO MILLE ECONOMY', 'Carro', 2012, 'parado', 'empresa', 4, '175/70 R13', 180, 210000, current_date - 90, null),
-    ('DMO5E51', 'Toyota', 'HILUX SW4', 'Picape', 2020, 'ativo', 'particular', 4, '265/65 R17', 180, 88000, current_date - 60, current_date + 60);
+    ('DMO5E51', 'Toyota', 'HILUX SW4', 'Picape', 2020, 'ativo', 'empresa', 4, '265/65 R17', 180, 88000, current_date - 60, current_date + 60);
   insert into public.frota_placa_apelidos (placa, veiculo_id) select 'DMO1411', id from public.frota_veiculos where placa = 'DMO1A11';
   insert into public.frota_importacoes (arquivo, desde, linhas, novas) values ('demonstracao.csv', date_trunc('year', current_date)::date, 0, 0);
   for v in select * from (values ('DMO1A11'), ('DMO1A12'), ('DMO2B21'), ('DMO2B22'), ('DMO3C31'), ('DMO4D41'), ('DMO4D42'), ('DMO5E51'), ('DMO1411'), ('XYZ9Z99'), ('9999999'), ('')) x(placa) loop

@@ -1738,19 +1738,20 @@ table.so-leitor { display: block; left: 0; top: 0; }   /* tabela só para leitor
 .aviso-chip .btn { border-radius: 999px; min-height: 32px; }
 /* resumo + frotas */
 .fr-resumo { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
-.fr-frotas { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 14px; margin-bottom: 4px; }
+.fr-frotas { display: grid; grid-template-columns: repeat(auto-fit, minmax(310px, 1fr)); gap: 14px; margin-bottom: 4px; }
 .fr-frota h2 { display: flex; align-items: center; gap: 8px; margin: 0; }
 .fr-frota h2 .icone { color: var(--cor); }
-.fr-numeros { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 10px 0 12px; }
-.fr-numeros > div { background: var(--fundo); border: 1px solid var(--borda); border-radius: 8px; padding: 8px; text-align: center; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.fr-numeros { display: grid; grid-template-columns: 1fr; gap: 6px; margin: 10px 0 12px; }
+.fr-numeros > div { background: var(--fundo); border: 1px solid var(--borda); border-radius: 8px; padding: 7px 10px; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; min-width: 0; }
 .fr-numeros small { color: var(--texto-2); font-size: .8rem; font-weight: 600; }
-.fr-numeros b { font-size: 1.12rem; font-variant-numeric: tabular-nums; color: var(--texto); overflow-wrap: anywhere; }
+.fr-numeros b { font-size: 1.1rem; font-variant-numeric: tabular-nums; color: var(--texto); white-space: nowrap; }
 .fr-div-barra { display: flex; height: 12px; border-radius: 6px; overflow: hidden; background: var(--fundo); gap: 2px; margin-bottom: 8px; }
 .fr-div-barra span { display: block; height: 100%; }
-.fr-div-tabela { width: 100%; border-collapse: collapse; font-size: .9rem; margin-bottom: 6px; }
-.fr-div-tabela th, .fr-div-tabela td { padding: 5px 6px; border-bottom: 1px solid var(--borda); text-align: left; font-variant-numeric: tabular-nums; color: var(--texto); }
+.fr-div-tabela { width: 100%; border-collapse: collapse; font-size: .86rem; margin-bottom: 6px; }
+.fr-div-tabela th, .fr-div-tabela td { padding: 5px 4px; border-bottom: 1px solid var(--borda); text-align: left; font-variant-numeric: tabular-nums; color: var(--texto); }
 .fr-div-tabela thead th { font-size: .78rem; color: var(--texto-2); font-weight: 600; }
 .fr-div-tabela .n { text-align: right; white-space: nowrap; } .fr-div-tabela tbody th { font-weight: 600; white-space: nowrap; }
+.fr-div-tabela tbody th small { color: var(--texto-2); font-weight: 600; }
 .fr-div-tabela i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
 .fr-ver { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin: 4px 0 10px; }
 .fr-ver > span { font-weight: 600; color: var(--texto-2); }

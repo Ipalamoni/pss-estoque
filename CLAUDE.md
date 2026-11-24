@@ -79,8 +79,8 @@ não técnico), GUIA_DO_DONO.md (tela a tela), ESPECIFICACAO_DO_SISTEMA.md e CON
   `frota_importar` (CSV hoje; consulta ao Firebird depois, mesma função). Importação INCREMENTAL do ano inteiro:
   linhas novas entram, alteradas atualizam, sumidas saem (removido_em). Apontamento (etiquetas, obs., km) fica em
   `frota_servicos` (nota × veículo) e NUNCA se perde. Placas erradas → `frota_placa_apelidos`.
-- Painéis por Competência (data de entrada, valor total), Vencimento ou Pagamento. Caminhões e carros NUNCA se misturam
-  nas médias (frota pela categoria); sem veículo = despesas gerais. Uma nota pode ser DIVIDIDA entre veículos
+- Painéis por Competência (data de entrada, valor total), Vencimento ou Pagamento. Caminhões, utilitários (vans e picapes)
+  e carros NUNCA se misturam nas médias (frota pela categoria); sem veículo = despesas gerais. Uma nota pode ser DIVIDIDA entre veículos
   (`frota_rateios`, cada parte com suas etiquetas), também preservada nas importações. Placas e despesas da empresa
   NUNCA no repositório (a carga inicial fica fora dele).
 

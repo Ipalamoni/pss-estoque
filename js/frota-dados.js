@@ -32,10 +32,12 @@ export const dataPela = (base, l) => (base === 'vencimento' ? l.vencimento : bas
 export const valorPela = (base, l) => (base === 'pagamento' ? pagoDaLinha(l) : Number(l.valor || 0));
 
 export const CATEGORIAS_VEICULO = ['Caminhão', 'Caminhão 3/4', 'Caminhão truck', 'Caminhão bitruck', 'Cavalo mecânico', 'Carreta', 'Van', 'Picape', 'Carro', 'Moto', 'Outro'];
-// FROTAS: caminhões e carros não se misturam nas médias (a categoria do cadastro decide)
+// FROTAS: caminhões, utilitários (vans e picapes) e carros não se misturam nas médias (a categoria do cadastro decide)
 export const CATEGORIAS_CAMINHAO = ['Caminhão', 'Caminhão 3/4', 'Caminhão truck', 'Caminhão bitruck', 'Cavalo mecânico', 'Carreta'];
-export const FROTAS = [{ id: 'caminhoes', rotulo: 'Caminhões' }, { id: 'carros', rotulo: 'Carros e utilitários' }];
-export const frotaDe = (v) => (!v ? 'geral' : CATEGORIAS_CAMINHAO.includes(v.categoria) ? 'caminhoes' : 'carros');
+export const CATEGORIAS_UTILITARIO = ['Van', 'Picape'];
+export const FROTAS = [{ id: 'caminhoes', rotulo: 'Caminhões', icone: 'frota' }, { id: 'utilitarios', rotulo: 'Utilitários', icone: 'frota' },
+  { id: 'carros', rotulo: 'Carros', icone: 'frota-veiculos' }];
+export const frotaDe = (v) => (!v ? 'geral' : CATEGORIAS_CAMINHAO.includes(v.categoria) ? 'caminhoes' : CATEGORIAS_UTILITARIO.includes(v.categoria) ? 'utilitarios' : 'carros');
 export const SITUACOES_VEICULO = { ativo: 'Ativo', parado: 'Parado', vendido: 'Vendido' };
 export const USOS_VEICULO = { empresa: 'Frota da empresa', particular: 'Particular (sócios)' };
 export const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];

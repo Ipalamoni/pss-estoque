@@ -19,7 +19,7 @@ const carregandoOuErro = (titulo, erro) => html`<${Cabecalho} titulo=${titulo} /
 
 // =====================================================================
 // PAINEL DA FROTA
-// Caminhões e carros NÃO se misturam nas médias (cada frota com o seu bloco);
+// Caminhões, utilitários e carros NÃO se misturam nas médias (cada frota com o seu bloco);
 // o que não tem veículo (peças para estoque, pneus para vários) fica em "despesas gerais".
 // =====================================================================
 export function TelaFrotaPainel() {
@@ -104,8 +104,8 @@ export function TelaFrotaPainel() {
         variacao=${mesAtual > 0 && totMes(mesAtual - 1) > 0 ? varTxt(totMes(mesAtual), totMes(mesAtual - 1)) : null} aoClicar=${() => setMes(mes === mesAtual ? null : mesAtual)} />`}
       ${gerais && html`<${Cartao} titulo=${`Despesas gerais · ${rotMes}`} valor=${moeda(geral)} sub="peças p/ estoque, pneus e serviços sem veículo" />`}
     </div>
-    <div class="fr-frotas">${blocos.map((b) => html`<section class="painel fr-frota" key=${b.id}>
-      <div class="painel-topo"><h2><${Icone} nome=${b.id === 'caminhoes' ? 'frota' : 'frota-veiculos'} tam=${20} /> ${b.rotulo}</h2>
+    <div class="fr-frotas">${blocos.filter((b) => b.n > 0 || b.total > 0).map((b) => html`<section class="painel fr-frota" key=${b.id}>
+      <div class="painel-topo"><h2><${Icone} nome=${b.icone} tam=${20} /> ${b.rotulo}</h2>
         <span class="nota">${pl(b.n, 'veículo', 'veículos')} · ${rotMes}</span></div>
       <div class="fr-numeros">
         <div><small>Gasto</small><b>${moeda(b.total)}</b></div>
@@ -148,9 +148,10 @@ function DivisaoContas({ partes }) {
   const total = partes.reduce((t, p) => t + p.valor, 0);
   return html`<div class="fr-divisao">
     <div class="fr-div-barra" aria-hidden="true">${total > 0 && partes.map((p) => p.valor > 0 && html`<span style=${{ width: `${(p.valor / total) * 100}%`, background: p.cor }}></span>`)}</div>
-    <table class="fr-div-tabela"><thead><tr><th scope="col">Conta</th><th scope="col" class="n">Total</th><th scope="col" class="n">%</th><th scope="col" class="n">Por veículo</th></tr></thead>
-      <tbody>${partes.map((p) => html`<tr key=${p.id}><th scope="row"><i style=${{ background: p.cor }} aria-hidden="true"></i>${p.rotulo}</th>
-        <td class="n">${moeda(p.valor)}</td><td class="n">${total > 0 ? `${num((p.valor / total) * 100, 0)}%` : '–'}</td><td class="n">${moeda(p.media)}</td></tr>`)}</tbody></table>
+    <table class="fr-div-tabela"><thead><tr><th scope="col">Conta</th><th scope="col" class="n">Total (R$)</th><th scope="col" class="n">Por veículo (R$)</th></tr></thead>
+      <tbody>${partes.map((p) => html`<tr key=${p.id} title=${total > 0 ? `${p.rotulo}: ${num((p.valor / total) * 100, 0)}% do gasto` : ''}><th scope="row"><i style=${{ background: p.cor }} aria-hidden="true"></i>${p.rotulo}
+        ${total > 0 && html` <small>${num((p.valor / total) * 100, 0)}%</small>`}</th>
+        <td class="n">${num(p.valor, 2, 2)}</td><td class="n">${num(p.media, 2, 2)}</td></tr>`)}</tbody></table>
   </div>`;
 }
 
