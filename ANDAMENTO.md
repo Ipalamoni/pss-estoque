@@ -10,6 +10,10 @@ Arquivo público: sem nomes de pessoas, senhas, tokens ou dados da empresa.
   receita, sininho por responsabilidade, pré-cadastro no recebimento sem pedido, relatórios em modo
   planilha (cabeçalho e 1ª coluna travados, colunas separadas, botão "Colunas" salvo no perfil).
 
+## Como publicar o site
+- Ao terminar cada alteração: commit + push direto na `main` (o GitHub Pages publica da `main`).
+  Manter também a branch da sessão atualizada.
+
 ## Como aplicar banco em produção
 - Token do Supabase fica nos **Segredos de rede** do ambiente `pss-estoque` (host api.supabase.com,
   cabeçalho Authorization, prefixo Bearer). Para trocar: setinha ↻ "Substituir segredo".
