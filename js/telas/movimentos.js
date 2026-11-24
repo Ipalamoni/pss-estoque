@@ -40,7 +40,7 @@ export function TelaMovimentos() {
     : m.batelada_id ? `batelada nº ${m.batelada_id}` : m.requisicao_id ? `requisição nº ${m.requisicao_id}` : m.corrige_id ? `corrige #${m.corrige_id}` : m.pedido_item_id ? numeroPedido(dados.pedidoItens.find((i) => i.id === m.pedido_item_id)?.pedido_id || '')
     : m.recebimento_id ? 'sem pedido' : m.producao_id ? `produção ${m.producao_id}` : m.inventario_id ? `inventário ${m.inventario_id}` : '';
   const podeCorrigir = (m) => !['correcao', 'transferencia', 'entrada_producao'].includes(m.tipo) && !m.batelada_id && (['implantacao', 'inventario'].includes(m.tipo) ? (usuario.papeis || []).includes('admin')
-    : podeFazer('corrigir') || (m.usuario_id === usuario.user_id && diaLocal(m.data_hora) === hojeISO()));
+    : podeFazer('corrigir') || m.usuario_id === usuario.user_id);   // fora do prazo o botão abre o aviso (a regra vale no banco)
 
   const colExp = [
     { titulo: 'Nº', valor: (m) => m.id }, { titulo: 'Data/hora', valor: (m) => dataHora(m.data_hora) }, { titulo: 'Código', valor: (m) => p(m)?.codigo },
@@ -150,7 +150,29 @@ function DetalheMovimento({ mov, podeCorrigir, aoFechar }) {
 }
 
 // Modal de correção (usado aqui e na tela de saídas)
+// Prazo para corrigir: só o ADMINISTRADOR corrige a qualquer momento; os demais só no MESMO DIA do lançamento
+// (erro de digitação com a nota na mão). Depois disso, o acerto é por inventário. O banco confere de novo.
+export const correcaoNoPrazo = (mov, papeis) => (papeis || []).includes('admin') || diaLocal(mov.data_hora) === hojeISO();
+
+function AvisoPrazoCorrecao({ mov, aoFechar }) {
+  const { ir, podeFazer } = useApp();
+  return html`<${Modal} titulo="Prazo para correção encerrado" aoFechar=${() => aoFechar(false)} semProtecao
+    rodape=${html`<button class="btn btn-sec" onClick=${() => aoFechar(false)}>Entendi</button>
+      ${podeFazer('inventario') && html`<button class="btn btn-pri" onClick=${() => { aoFechar(false); ir('inventario'); }}>Ir para o Inventário</button>`}`}>
+    <div class="aviso-faixa aviso-prazo" role="alert"><span><${Icone} nome="aviso" tam=${22} /> <b>Este lançamento é de ${data(diaLocal(mov.data_hora))} e só podia ser corrigido no mesmo dia.</b></span></div>
+    <p>A correção serve para <b>erro de digitação no próprio dia</b> (por exemplo, com a nota fiscal na mão no fim do expediente).</p>
+    <p>Passado o dia, a diferença no estoque é acertada por <b>inventário</b>: conte o que existe no local e registre a contagem. O sistema lança o ajuste e guarda o motivo.</p>
+    <p class="nota">Dúvidas? Fale com o administrador do sistema.</p>
+  </${Modal}>`;
+}
+
 export function CorrigirMovimento({ mov, aoFechar }) {
+  const { papeis } = useApp();
+  if (!correcaoNoPrazo(mov, papeis) && !['implantacao', 'inventario'].includes(mov.tipo)) return html`<${AvisoPrazoCorrecao} mov=${mov} aoFechar=${aoFechar} />`;
+  return html`<${FormCorrecao} mov=${mov} aoFechar=${aoFechar} />`;
+}
+
+function FormCorrecao({ mov, aoFechar }) {
   const { dados, recarregar, api } = useApp();
   const p = dados.mapa.produto.get(mov.produto_id);
   const [corr, setCorr] = useState(null);

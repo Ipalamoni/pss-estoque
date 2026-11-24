@@ -3,9 +3,12 @@
 Arquivo público: sem nomes de pessoas, senhas, tokens ou dados da empresa.
 
 ## Situação atual (24/11/2026)
-- Sistema publicado: https://ipalamoni.github.io/pss-estoque/ (versão do app 2.17.0).
-- Banco de produção (Supabase `kuttfnmjvzgzebjpjvvy`, "estoque-pss"): versão **2.17.0**, todas as
+- Sistema publicado: https://ipalamoni.github.io/pss-estoque/ (versão do app 2.18.0).
+- Banco de produção (Supabase `kuttfnmjvzgzebjpjvvy`, "estoque-pss"): versão **2.18.0**, todas as
   conferências OK. Não mexer no projeto Supabase `pss-vendas`.
+- v2.18.0 (24/11/2026, banco + tela): prazo para corrigir lançamento. Só o administrador corrige a qualquer momento;
+  almoxarifado e quem lançou, só no mesmo dia. Fora do prazo aparece o aviso "Prazo para correção encerrado" com o
+  botão "Ir para o Inventário". Aplicado em produção.
 - v2.17.0 (24/11/2026, banco): cidades, bairros, endereços, nomes de pessoas e nome fantasia do fornecedor com cada
   palavra maiúscula ("Ribeirão Preto", "Maria da Silva"); produtos/funções/locais/fichas seguem só com a 1ª letra.
   Aplicado em produção.
