@@ -14,6 +14,7 @@ export const PAPEIS = {
   faturamento: 'Faturamento (previsão de produção)',
   padeiro: 'Padeiro (tablet da Produção Masseiras)',
   gestor_producao: 'Gestor da produção (ordem, masseiras e correções)',
+  frota: 'Manutenção de veículos (frota)',
 };
 
 export const CATEGORIAS = {
@@ -120,6 +121,7 @@ export const PERMISSOES = {
   finalizar_batelada: ['admin', 'engenharia', 'gestor_producao'],
   consumo: ['admin', 'engenharia', 'almoxarifado', 'padeiro', 'pesagem', 'gestor_producao'],
   locais: ['admin'],
+  frota: ['admin', 'frota'],
 };
 // o usuário opera este local? (administrador opera todos)
 // Quem RECEBE no local (aba "A receber" e sininho). Pesagem e masseiras são setores da produção:

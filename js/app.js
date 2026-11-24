@@ -36,6 +36,12 @@ function preguicosa(carregar, nome) {
   return Tela;
 }
 const TelaReceber = preguicosa(() => import('./telas/receber.js'), 'TelaReceber');
+const TelaFrotaPainel = preguicosa(() => import('./telas/frota.js'), 'TelaFrotaPainel');
+const TelaFrotaApontar = preguicosa(() => import('./telas/frota.js'), 'TelaFrotaApontar');
+const TelaFrotaPlacas = preguicosa(() => import('./telas/frota.js'), 'TelaFrotaPlacas');
+const TelaFrotaImportar = preguicosa(() => import('./telas/frota.js'), 'TelaFrotaImportar');
+const TelaFrotaTipos = preguicosa(() => import('./telas/frota.js'), 'TelaFrotaTipos');
+const TelaFrotaVeiculos = preguicosa(() => import('./telas/frota-veiculos.js'), 'TelaFrotaVeiculos');
 const TelaSaidas = preguicosa(() => import('./telas/saidas.js'), 'TelaSaidas');
 const TelaInventario = preguicosa(() => import('./telas/inventario.js'), 'TelaInventario');
 const TelaPedidos = preguicosa(() => import('./telas/pedidos.js'), 'TelaPedidos');
@@ -65,7 +71,7 @@ const TelaCadastrosProducao = preguicosa(() => import('./telas/cadastros-produca
 const TelaHistoricoProducao = preguicosa(() => import('./telas/historico-producao.js'), 'TelaHistoricoProducao');
 
 const CFG = window.CONFIG || {};
-const TODOS = Object.keys(PAPEIS).filter((p) => !['financeiro', 'faturamento', 'padeiro'].includes(p));   // financeiro: só pedidos/pagamentos e previsão; faturamento: só previsão; padeiro: só a produção
+const TODOS = Object.keys(PAPEIS).filter((p) => !['financeiro', 'faturamento', 'padeiro', 'frota'].includes(p));   // frota: só o módulo de veículos   // financeiro: só pedidos/pagamentos e previsão; faturamento: só previsão; padeiro: só a produção
 const GESTAO = ['admin', 'diretoria', 'engenharia', 'gestor_producao'];
 
 // Menu: quem vê cada tela (as gravações são conferidas de novo no banco)
@@ -101,6 +107,13 @@ const MENU = [
   { id: 'fornecedores', titulo: 'Fornecedores', papeis: ['admin', 'comprador', 'almoxarifado', 'recebimento', 'diretoria'], tela: TelaFornecedores },
   { id: 'fichas', titulo: 'Fichas técnicas', papeis: ['admin', 'engenharia', 'pesagem', 'almoxarifado', 'diretoria'], tela: TelaFichas },
   { id: 'cadastros-producao', titulo: 'Masseiras e padeiros', papeis: ['admin', 'engenharia', 'diretoria', 'gestor_producao'], tela: TelaCadastrosProducao },
+  { grupo: 'Manutenção de veículos', papeis: ['admin', 'frota'] },
+  { id: 'frota', titulo: 'Painel da frota', papeis: ['admin', 'frota'], tela: TelaFrotaPainel },
+  { id: 'frota-apontar', titulo: 'Apontar despesas', papeis: ['admin', 'frota'], tela: TelaFrotaApontar },
+  { id: 'frota-veiculos', titulo: 'Veículos', papeis: ['admin', 'frota'], tela: TelaFrotaVeiculos },
+  { id: 'frota-placas', titulo: 'Placas a resolver', papeis: ['admin', 'frota'], tela: TelaFrotaPlacas },
+  { id: 'frota-importar', titulo: 'Importar despesas', papeis: ['admin', 'frota'], tela: TelaFrotaImportar },
+  { id: 'frota-tipos', titulo: 'Tipos de manutenção', papeis: ['admin', 'frota'], tela: TelaFrotaTipos },
   { grupo: 'Administração', papeis: ['admin', 'diretoria'] },
   { id: 'usuarios', titulo: 'Usuários e acessos', papeis: ['admin'], tela: TelaUsuarios },
   { id: 'configuracoes', titulo: 'Configurações e locais', papeis: ['admin'], tela: TelaConfiguracoes },
@@ -146,6 +159,8 @@ async function carregarDados(anterior, opcoes = {}) {
     // sininho: bateladas batendo (atraso para engenharia/gestor) e o que esta pessoa já viu
     seguro(api.listar('bateladas', { eq: { situacao: 'em_producao' } })),
     seguro(api.listar('sininho_vistos', { campoData: 'visto_em', desde: new Date(Date.now() - 30 * 864e5).toISOString() })),
+    // manutenção de veículos: quantas notas esperam apontamento e placas a resolver (nulo para quem não tem a frota)
+    api.rpc('frota_pendencias').catch(() => null),
   ]);
   // DESEMPENHO: a parte da operação começa junto com o resto (antes esperava tudo terminar);
   // a carga completa vai em 2 rodadas paralelas (antes eram 4 em sequência)
@@ -174,7 +189,7 @@ async function carregarDados(anterior, opcoes = {}) {
     base = { parametros, params, fornecedores, fichas, fichaItens, pedidos, pedidoItens, perfis, recebimentos, stats, unidades, locais, linhas, maceiras, operadores,
       statsEm: statsVelhas ? anterior.statsEm : Date.now(), completoEm: Date.now() };
   }
-  const [produtos, estoqueLocal, transferencias, requisicoes, programacoes, avisos, bateladasAbertas, vistos] = await opP;
+  const [produtos, estoqueLocal, transferencias, requisicoes, programacoes, avisos, bateladasAbertas, vistos, frotaPend] = await opP;
   const [transfItens, reqItens] = await Promise.all([
     transferencias.length ? porIds('transferencia_itens', 'transferencia_id', transferencias.map((t) => t.id), seguro) : [],
     requisicoes.length ? porIds('requisicao_itens', 'requisicao_id', requisicoes.map((t) => t.id), seguro) : [],
@@ -190,7 +205,7 @@ async function carregarDados(anterior, opcoes = {}) {
     statsEm: base.statsEm, completoEm: base.completoEm,
     produtos, fornecedores, fichas, fichaItens, pedidos, pedidoItens, perfis, recebimentos, programacoes, parametros, params, stats, ind,
     unidades, locais: [...locais].sort((a, b) => a.ordem - b.ordem || a.id - b.id), estoqueLocal, linhas, maceiras: [...maceiras].sort((a, b) => a.ordem - b.ordem || a.id - b.id), operadores,
-    transferencias, transfItens, requisicoes, reqItens, avisos: avisos || [], bateladasAbertas: bateladasAbertas || [], vistos: vistos || [], historicoDesde: desde,
+    transferencias, transfItens, requisicoes, reqItens, avisos: avisos || [], bateladasAbertas: bateladasAbertas || [], vistos: vistos || [], frotaPend: frotaPend || null, historicoDesde: desde,
     mapa: { produto: porId(produtos), fornecedor: porId(fornecedores), ficha: porId(fichas), perfil: porId(perfis), ind: porId(ind),
       local: porId(locais), unidade: porId(unidades), maceira: porId(maceiras), operador: porId(operadores), linha: porId(linhas),
       itensPedido, recPedido, saldoLocal },
@@ -263,6 +278,14 @@ export function pendencias(dados, papeis, eu, agora = Date.now()) {
         texto: `Batelada ATRASADA: ${m?.nome || 'masseira'}${b.operador_id ? ` (${dados.mapa.operador.get(b.operador_id)?.nome || ''})` : ''}`,
         sub: `${dados.mapa.ficha.get(b.ficha_id)?.nome || ''} · ${tempoTexto(min)} (prazo ${pz.tempo} + ${pz.tol} min)`, quando: b.iniciada_em });
     });
+  }
+  // MANUTENÇÃO DE VEÍCULOS: notas novas para apontar e placas para cadastrar/corrigir (quem tem o papel "frota")
+  const fp = dados.frotaPend;
+  if (fp && tem('frota')) {
+    if (fp.apontar > 0) add({ tipo: 'frota', icone: 'frota-apontar', id: 'apontar', rota: 'frota-apontar', estado: {},
+      texto: `${pl(fp.apontar, 'despesa de veículo para apontar', 'despesas de veículos para apontar')}`, sub: 'Marque o tipo de manutenção de cada nota', quando: fp.ultima_importacao });
+    if (fp.placas > 0) add({ tipo: 'frota', icone: 'frota-placas', id: 'placas', rota: 'frota-placas', estado: {},
+      texto: `${pl(fp.placas, 'placa para cadastrar ou corrigir', 'placas para cadastrar ou corrigir')}`, sub: 'Apareceram nas despesas e não estão no cadastro', quando: fp.ultima_importacao });
   }
   return itens.sort((a, b) => String(b.quando || '').localeCompare(String(a.quando || '')));
 }
@@ -394,10 +417,14 @@ function BarraInferior({ papeis, visiveis, atual, dados, abrirMenu, menuAberto }
     { id: um('estoque-local', 'estoque'), t: 'Estoque' },
     { id: papeis.some((p) => ['almoxarifado', 'recebimento'].includes(p)) ? um('requisicoes', 'receber') : papeis.includes('comprador') ? um('pedidos') : um('transferencias', 'custos', 'financeiro'),
       t: null },
+    { id: papeis.includes('frota') ? um('frota-apontar') : null },
+    { id: papeis.includes('frota') ? um('frota') : null },
+    { id: papeis.includes('frota') ? um('frota-veiculos') : null },
   ].filter((x) => x.id).filter((x, i, l) => l.findIndex((y) => y.id === x.id) === i).slice(0, 4);
   const nome = (id) => ({ 'painel-producao': 'Produção', maceiras: 'Masseiras', programacao: 'Pesagem', previsao: 'Produção', 'estoque-local': 'Estoque', estoque: 'Estoque',
-    requisicoes: 'Requisições', receber: 'Receber', pedidos: 'Pedidos', transferencias: 'Transferir', custos: 'Custos', financeiro: 'A pagar', inicio: 'Início' })[id];
-  const conta = (id) => (id === 'requisicoes' ? nReq : id === 'transferencias' ? nTransf : 0);
+    requisicoes: 'Requisições', receber: 'Receber', pedidos: 'Pedidos', transferencias: 'Transferir', custos: 'Custos', financeiro: 'A pagar', inicio: 'Início',
+    frota: 'Frota', 'frota-apontar': 'Apontar', 'frota-veiculos': 'Veículos' })[id];
+  const conta = (id) => (id === 'requisicoes' ? nReq : id === 'transferencias' ? nTransf : id === 'frota-apontar' ? (dados?.frotaPend?.apontar || 0) : 0);
   return html`<nav class="barra-inferior" aria-label="Atalhos">
     ${itens.map((x) => html`<a href=${'#' + x.id} class=${'bi-item' + (atual === x.id && !menuAberto ? ' ativo' : '')} aria-current=${atual === x.id ? 'page' : null}>
       <span class="bi-ico"><${Icone} nome=${x.id} tam=${22} />${conta(x.id) > 0 && html`<b class="bi-num">${conta(x.id)}</b>`}</span><span>${nome(x.id)}</span></a>`)}
@@ -680,7 +707,7 @@ function App() {
   const visiveis = MENU.filter((m) => !m.papeis || m.papeis.some((x) => papeis.includes(x)))
     .filter((m, i, l) => !m.grupo || (l[i + 1] && !l[i + 1].grupo));   // esconde grupo vazio
   const padrao = papeis.length === 1 && papeis[0] === 'padeiro' ? visiveis.find((m) => m.id === 'maceiras') : null;
-  const itemAtual = (rota === 'inicio' && padrao) || visiveis.find((m) => m.id === rota) || visiveis[0];
+  const itemAtual = (rota === 'inicio' && padrao) || visiveis.find((m) => m.id === rota) || visiveis.find((m) => !m.grupo);
   rotaViva.current = !!itemAtual.aoVivo;
   const grupoDe = (g) => g;
   const grupoAtual = (() => { let g = null; for (const m of visiveis) { if (m.grupo) g = m.grupo; else if (m.id === itemAtual.id) return g; } return null; })();

@@ -31,7 +31,8 @@ const PAPEIS = [
   'financeiro',
   'faturamento',
   'padeiro',          // tablet da Produção Masseiras
-  'gestor_producao'   // gerente/gestor da produção: muda ordem e masseira, corrige
+  'gestor_producao',  // gerente/gestor da produção: muda ordem e masseira, corrige
+  'frota'             // manutenção de veículos (frota)
 ];
 function cabecalhos(origem) {
   const ok = origem && ORIGENS.includes(origem) ? origem : ORIGENS[0];

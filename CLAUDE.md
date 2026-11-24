@@ -70,6 +70,14 @@ não técnico), GUIA_DO_DONO.md (tela a tela), ESPECIFICACAO_DO_SISTEMA.md e CON
   (`MultiEscolha` + `casaVarios`; lista vazia = todos). Nada de opções combinadas tipo "Matéria-prima e embalagem":
   a pessoa marca as duas. Exceção: quando o cálculo exige um só (ex.: saldo do Kardex por local).
 
+### 2.0.1 Módulo MANUTENÇÃO DE VEÍCULOS (frota)
+- Acesso: admin + papel `frota`. Dados do contas a pagar (contas Manutenção corretiva/preventiva e Pneus) entram por
+  `frota_importar` (CSV hoje; consulta ao Firebird depois, mesma função). Importação INCREMENTAL do ano inteiro:
+  linhas novas entram, alteradas atualizam, sumidas saem (removido_em). Apontamento (etiquetas, obs., km) fica em
+  `frota_servicos` (nota × veículo) e NUNCA se perde. Placas erradas → `frota_placa_apelidos`.
+- Painéis por Competência (data de entrada, valor total), Vencimento ou Pagamento. Placas e despesas da empresa
+  NUNCA no repositório (a carga inicial fica fora dele).
+
 ### 2.1 Telas da PRODUÇÃO (padeiros, pesagem, operários): simplicidade acima de tudo
 - Quem usa tem pouca familiaridade com informática (muitos não usam computador). Pensar como aplicativo de celular feito para quem tem dificuldade.
 - Botões GRANDES (≥ 56 px de altura no tablet), de apertar com o dedo; uma ação principal por tela; nada de menus escondidos, teclado ou digitação além da senha de 6 números.

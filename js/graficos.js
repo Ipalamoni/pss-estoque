@@ -98,3 +98,60 @@ export function BarraParte({ partes, formatar = String }) {
     <div class="legenda-graf">${partes.map((p, k) => html`<span><i style=${{ background: COR_SERIE[k] }}></i>${p.nome}: <b>${formatar(p.valor)}</b> (${Math.round((p.valor / total) * 100)}%)</span>`)}</div>
   </div>`;
 }
+
+// Colunas EMPILHADAS (até 4 partes, cor fixa de cada parte) com eixo, grade discreta, legenda,
+// dica ao passar o mouse/tocar, total no topo da coluna focada e tabela para leitor de tela.
+// series: [{ nome, cor, valores: [] }] · aoClicar(i): ex. filtrar o mês
+export function ColunasEmpilhadas({ categorias, series, formatar = String, formatarEixo = formatar, altura = 240, aoClicar, selecionada = null }) {
+  const [foco, setFoco] = useState(null);
+  const [larg, setLarg] = useState(640);
+  const caixa = useRef();
+  useEffect(() => {
+    if (!caixa.current || !window.ResizeObserver) return;
+    const ro = new ResizeObserver(([e]) => setLarg(Math.max(280, Math.round(e.contentRect.width))));
+    ro.observe(caixa.current); return () => ro.disconnect();
+  }, []);
+  const W = larg, H = altura, m = { e: 62, d: 6, t: 12, b: 26 };
+  const totais = categorias.map((_, i) => series.reduce((t, s) => t + (Number(s.valores[i]) || 0), 0));
+  const max = Math.max(0, ...totais);
+  if (max <= 0) return html`<p class="nota">Sem despesas neste período.</p>`;
+  const passo = escala(max);
+  const topo = Math.ceil(max / passo) * passo;
+  const gw = (W - m.e - m.d) / categorias.length;
+  const bw = Math.max(8, Math.min(40, gw - 10));
+  const y = (v) => m.t + (H - m.t - m.b) * (1 - v / topo);
+  const marcas = []; for (let v = 0; v <= topo + 1e-9; v += passo) marcas.push(v);
+  const resumo = (i) => `${categorias[i]}: total ${formatar(totais[i])}; ${series.map((s) => `${s.nome} ${formatar(s.valores[i])}`).join(', ')}`;
+  const ver = foco ?? selecionada;
+  return html`<div class="colunas">
+    <div class="legenda-graf">${series.map((s) => html`<span><i style=${{ background: s.cor }}></i>${s.nome}</span>`)}</div>
+    <table class="so-leitor"><caption>${series.map((s) => s.nome).join(', ')} por mês</caption>
+      <thead><tr><th scope="col">Mês</th>${series.map((s) => html`<th scope="col">${s.nome}</th>`)}<th scope="col">Total</th></tr></thead>
+      <tbody>${categorias.map((c, i) => html`<tr><th scope="row">${c}</th>${series.map((s) => html`<td>${formatar(s.valores[i])}</td>`)}<td>${formatar(totais[i])}</td></tr>`)}</tbody></table>
+    <div class="colunas-area" ref=${caixa}>
+      <svg viewBox=${`0 0 ${W} ${H}`} width=${W} height=${H} onMouseLeave=${() => setFoco(null)} aria-hidden="true">
+        ${marcas.map((v) => html`<g><line x1=${m.e} x2=${W - m.d} y1=${y(v)} y2=${y(v)} class=${v === 0 ? 'eixo' : 'grade'} />
+          <text x=${m.e - 6} y=${y(v) + 4} text-anchor="end" class="rot-eixo">${formatarEixo(v)}</text></g>`)}
+        ${categorias.map((c, i) => {
+          const x0 = m.e + gw * i + (gw - bw) / 2;
+          let acum = 0;
+          const partes = series.map((s) => { const v = Number(s.valores[i]) || 0; const ini = acum; acum += v; return { s, v, ini }; }).filter((p) => p.v > 0);
+          return html`<g onMouseEnter=${() => setFoco(i)} onClick=${() => { setFoco(i); if (aoClicar) aoClicar(i); }}>
+            <rect x=${m.e + gw * i} y=${m.t} width=${gw} height=${H - m.t - m.b} class=${'alvo' + (ver === i ? ' ativo' : '')} />
+            ${partes.map((p, k) => {
+              const yTopo = y(p.ini + p.v); const yBase = y(p.ini); const h = Math.max(0, yBase - yTopo - (k > 0 ? 2 : 0));   // 2px de respiro entre as partes
+              return k === partes.length - 1 ? html`<path d=${coluna(x0, yBase - (k > 0 ? 2 : 0), bw, h)} style=${{ fill: p.s.cor }} />`
+                : html`<rect x=${x0} y=${yBase - (k > 0 ? 2 : 0) - h} width=${bw} height=${h} style=${{ fill: p.s.cor }} />`;
+            })}
+            <text x=${m.e + gw * i + gw / 2} y=${H - 8} text-anchor="middle" class=${'rot-eixo' + (selecionada === i ? ' rot-ativo' : '')}>${c}</text>
+          </g>`;
+        })}
+      </svg>
+      ${ver !== null && totais[ver] > 0 && html`<div class="dica-grafico" style=${{ left: `${((m.e + gw * (ver + 0.5)) / W) * 100}%` }}>
+        <b>${categorias[ver]} · ${formatar(totais[ver])}</b>${series.map((s) => html`<span><i style=${{ background: s.cor }}></i>${s.nome}: <b>${formatar(s.valores[ver])}</b></span>`)}
+      </div>`}
+    </div>
+    ${aoClicar && html`<div class="botoes-mes" role="group" aria-label="Escolher o mês">${categorias.map((c, i) => totais[i] > 0 && html`<button type="button"
+      class=${'chip' + (selecionada === i ? ' ativo' : '')} aria-pressed=${selecionada === i} title=${resumo(i)} onClick=${() => aoClicar(i)}>${c}</button>`)}</div>`}
+  </div>`;
+}

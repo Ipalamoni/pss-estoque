@@ -1594,3 +1594,135 @@ html[data-tema="escuro"] { --zebra: #272a2e; --zebra-hover: #2c3532; }
 
 /* "Abrir em nova janela": só com mouse (computador); no tablet/celular não aparece */
 @media (pointer: coarse) { .so-mouse { display: none !important; } }
+
+/* =====================================================================
+   MANUTENÇÃO DE VEÍCULOS (frota) · v2.20
+   Cores das contas validadas para daltonismo e contraste (claro e escuro):
+   corretiva laranja · preventiva verde · pneus azul — sempre com o nome escrito ao lado.
+   ===================================================================== */
+:root { --fr-corretiva: #d17800; --fr-preventiva: #1f8a6a; --fr-pneus: #2f6db5; --fr-calor: 31, 138, 106; }
+html[data-tema="escuro"] { --fr-corretiva: #c97a18; --fr-preventiva: #34a07c; --fr-pneus: #5a8ad8; --fr-calor: 52, 160, 124; }
+
+/* placa no estilo Mercosul */
+.placa { display: inline-flex; align-items: center; gap: 0; font-weight: 800; letter-spacing: .06em; font-variant-numeric: tabular-nums;
+  border: 1.5px solid #2b3440; border-radius: 5px; background: #fff; color: #111; font-size: .86rem; line-height: 1; overflow: hidden; white-space: nowrap; }
+.placa i { align-self: stretch; width: 6px; background: #1f4fa3; margin-right: 6px; }
+.placa { padding-right: 6px; min-height: 24px; }
+.placa-g { font-size: 1.25rem; min-height: 38px; border-width: 2px; padding-right: 10px; }
+.placa-g i { width: 9px; margin-right: 9px; }
+.placa-desconhecida { border-style: dashed; border-color: var(--laranja); }
+.placa-geral { padding: 3px 8px; letter-spacing: 0; font-weight: 700; background: var(--cinza-f); color: var(--texto); border-color: var(--borda); }
+html[data-tema="escuro"] .placa:not(.placa-geral) { border-color: #9aa4ae; }
+
+.seg-base button { min-height: 36px; }
+.botoes-mes { display: none; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.rot-ativo { font-weight: 800; fill: var(--texto) !important; }
+.tags-lidas { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.tag-lida { font-size: .78rem; padding: 2px 8px; border-radius: 999px; background: var(--fundo); border: 1px solid var(--borda); color: var(--texto); }
+.tags-escolha { display: flex; flex-wrap: wrap; gap: 8px; }
+.tag-btn { min-height: 44px; padding: 8px 14px; border-radius: 999px; border: 1.5px solid var(--borda-entrada); background: var(--cartao); color: var(--texto);
+  font: inherit; font-weight: 600; cursor: pointer; }
+.tag-btn:hover { border-color: var(--cor); }
+.tag-btn.ativo { background: var(--cor); border-color: var(--cor); color: var(--sobre-cor); }
+.tag-btn:focus-visible { outline: 3px solid var(--foco); outline-offset: 2px; }
+
+/* janela Apontar */
+.apontar-cab { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; margin-bottom: 8px; }
+.apontar-veic { display: flex; flex-direction: column; min-width: 0; } .apontar-veic small, .apontar-valor small { color: var(--texto-2); }
+.apontar-valor { text-align: right; display: flex; flex-direction: column; } .apontar-valor b { font-size: 1.35rem; font-variant-numeric: tabular-nums; }
+.apontar-info { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; margin-bottom: 6px; }
+.apontar-obs { margin: 6px 0; padding: 8px 10px; background: var(--fundo); border-left: 3px solid var(--borda); border-radius: 6px; font-size: .9rem; color: var(--texto-2); }
+.apontar-pos { margin-right: auto; }
+.parcelas-nota { margin: 6px 0 12px; } .parcelas-nota summary { cursor: pointer; color: var(--cor-escura, var(--cor)); font-weight: 600; min-height: 32px; display: flex; align-items: center; }
+.tabela-mini { font-size: .86rem; } .tabela-mini td, .tabela-mini th { padding: 4px 8px; }
+
+/* lista de notas para apontar */
+.lista-notas { list-style: none; padding: 0; margin: 0 0 12px; display: flex; flex-direction: column; gap: 8px; }
+.nota-item { display: flex; align-items: stretch; gap: 8px; background: var(--cartao); border: 1px solid var(--borda); border-radius: var(--raio); box-shadow: var(--sombra); }
+.nota-item.marcada { border-color: var(--cor); box-shadow: 0 0 0 2px var(--cor-clara); }
+.nota-check { width: 22px; height: 22px; margin: 0 0 0 12px; align-self: center; accent-color: var(--cor); }
+.nota-corpo { flex: 1; display: grid; grid-template-columns: minmax(150px, 190px) 1fr auto; gap: 12px; align-items: center; text-align: left;
+  background: none; border: 0; padding: 12px 14px; cursor: pointer; font: inherit; color: inherit; min-height: 64px; border-radius: var(--raio); }
+.nota-corpo:hover { background: var(--fundo); } .nota-corpo:focus-visible { outline: 3px solid var(--foco); outline-offset: -3px; }
+.nota-placa, .nota-meio, .nota-valor { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.nota-placa > .placa, .lt-corpo .placa { align-self: flex-start; }
+.nota-placa small, .nota-meio small, .nota-valor small { color: var(--texto-2); font-size: .82rem; }
+.nota-meio > span { display: flex; flex-wrap: wrap; gap: 4px; }
+.nota-obs { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-style: italic; }
+.nota-valor { text-align: right; } .nota-valor b { font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+.barra-lote { position: sticky; top: calc(var(--topo, 60px) + 4px); z-index: 5; display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; justify-content: space-between;
+  background: var(--cor-clara); border: 1px solid var(--cor); border-radius: var(--raio); padding: 8px 12px; margin-bottom: 10px; }
+
+/* placas a resolver */
+.placas-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 12px; margin-bottom: 14px; }
+.placa-card { background: var(--cartao); border: 1px solid var(--borda); border-left: 4px solid var(--laranja); border-radius: var(--raio); padding: 12px; box-shadow: var(--sombra);
+  display: flex; flex-direction: column; gap: 10px; }
+.pc-topo { display: flex; gap: 12px; align-items: center; } .pc-topo > div { display: flex; flex-direction: column; } .pc-topo small { color: var(--texto-2); }
+.pc-obs { margin: 0; font-size: .85rem; color: var(--texto-2); font-style: italic; }
+.pc-sugestao { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; background: var(--verde-f); border-radius: 8px; padding: 8px 10px; }
+.pc-sugestao small { color: var(--texto-2); }
+.pc-outra { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: start; }
+
+/* importar */
+.btn-arquivo { position: relative; min-height: 48px; font-size: 1rem; cursor: pointer; }
+.btn-arquivo.desab { opacity: .6; pointer-events: none; }
+.btn-arquivo:focus-within { outline: 3px solid var(--foco); outline-offset: 2px; }
+.importar-ok { border-left: 4px solid var(--verde); }
+.importar-previa { border-left: 4px solid var(--azul); }
+.botoes-direita { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+
+/* cadastro do veículo */
+.form-placa { display: grid; grid-template-columns: minmax(200px, 280px) 1fr; gap: 12px; align-items: center; }
+.entrada-placa { font-size: 1.5rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; min-height: 52px; }
+.placa-estado { font-weight: 700; padding-top: 6px; }
+.copiar-de { background: var(--azul-f); border-radius: var(--raio); padding: 10px 12px 2px; margin: 6px 0 12px; }
+.form-grupo { border: 1px solid var(--borda); border-radius: var(--raio); padding: 8px 12px 0; margin: 0 0 12px; }
+.form-grupo legend { font-weight: 700; padding: 0 6px; color: var(--texto-2); font-size: .9rem; }
+
+/* ficha do veículo */
+.aviso-faixa.aviso-vermelho { background: var(--vermelho-f); border-color: var(--vermelho); color: var(--texto); }
+.fr-tempo { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; }
+.fr-tempo li { display: grid; grid-template-columns: 130px 1fr auto; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--borda); align-items: start; }
+.fr-tempo li:last-child { border-bottom: 0; }
+.fr-tempo li.lt-pendente { background: linear-gradient(90deg, var(--laranja-f), transparent 60%); border-radius: 6px; padding-left: 8px; }
+.lt-data { display: flex; flex-direction: column; gap: 4px; } .lt-corpo { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.lt-topo b { font-variant-numeric: tabular-nums; } .lt-obs { margin: 0; font-size: .92rem; }
+.ficha-dados { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px 18px; margin: 0; }
+.ficha-dados dt { font-size: .8rem; color: var(--texto-2); } .ficha-dados dd { margin: 0; font-weight: 600; }
+
+/* mapa de calor (veículo × mês): uma cor, do claro ao escuro; valor sempre escrito */
+.tabela.calor td.n { min-width: 56px; font-size: .84rem; padding-left: 6px; padding-right: 6px; }
+/* (mais específico que o zebrado/realce das linhas da tabela) */
+.tabela.calor tbody tr td.calor-1 { background: rgba(var(--fr-calor), .10); } .tabela.calor tbody tr td.calor-2 { background: rgba(var(--fr-calor), .22); }
+.tabela.calor tbody tr td.calor-3 { background: rgba(var(--fr-calor), .38); } .tabela.calor tbody tr td.calor-4 { background: rgba(var(--fr-calor), .55); }
+.tabela.calor tbody tr td.calor-5 { background: #17694f; color: #fff; font-weight: 700; }
+html[data-tema="escuro"] .tabela.calor tbody tr td.calor-5 { background: #4fbf98; color: #0b1d16; }
+.tabela.calor th.col-sel { box-shadow: inset 0 -3px 0 var(--cor); }
+
+@media (max-width: 860px) {
+  .nota-corpo { grid-template-columns: 1fr auto; } .nota-meio { grid-column: 1 / -1; grid-row: 2; }
+  .apontar-cab { grid-template-columns: auto 1fr; } .apontar-valor { grid-column: 1 / -1; text-align: left; flex-direction: row; gap: 8px; align-items: baseline; }
+  .linha-tempo li { grid-template-columns: 1fr; gap: 6px; } .linha-tempo li > .btn { justify-self: start; }
+  .form-placa { grid-template-columns: 1fr; gap: 0; }
+  .botoes-mes { display: flex; }
+}
+@media (max-width: 640px) {
+  .placas-grade { grid-template-columns: 1fr; }
+  .pc-outra { grid-template-columns: 1fr; }
+  .tag-btn { flex: 1 1 calc(50% - 8px); text-align: center; }
+  .barra-lote { top: auto; bottom: calc(64px + env(safe-area-inset-bottom, 0px)); position: sticky; }
+}
+/* cartões nunca mais largos que a tela (valores grandes, ex.: R$ 129.562,00, no celular) */
+.cartoes > .cartao { min-width: 0; }
+.cartao-valor { overflow-wrap: anywhere; }
+@media (max-width: 400px) { .cartoes .cartao-valor { font-size: 1.02rem; } }
+table.so-leitor { display: block; left: 0; top: 0; }   /* tabela só para leitor de tela: não alarga a página */
+/* mapa de calor da frota: no celular continua TABELA (desliza para o lado; veículo fixo à esquerda) */
+@media (max-width: 860px) {
+  .tabela.calor { display: table; min-width: 760px; }
+  .tabela.calor thead { display: table-header-group; } .tabela.calor tbody { display: table-row-group; }
+  .tabela.calor tr { display: table-row; padding: 0; } .tabela.calor td, .tabela.calor th { display: table-cell; padding: 4px 6px; text-align: right; }
+  .tabela.calor td::before { content: none; }
+  .tabela.calor td:first-child, .tabela.calor th:first-child { position: sticky; left: 0; z-index: 1; background: var(--cartao); text-align: left; font-size: .9rem; }
+  .tabela.calor td:first-child small { display: none; }
+}
