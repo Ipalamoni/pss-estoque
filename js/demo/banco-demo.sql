@@ -6837,7 +6837,7 @@ begin
              valor_titulo, valor_pago, centro_custo, conta, valor, observacao, status, placa_original, tipo_documento, assinatura, importacao_id)
       select concat_ws('|', 'D' || (1 + n % 5), 5000 + n, p, g, v.placa, 1), s, 'D' || (1 + n % 5), forn[1 + n % 5], (5000 + n)::text, p, d, d, d + (30 * k), case when d + (30 * k) < current_date then d + (30 * k) end,
              round(val / 2, 2), case when d + (30 * k) < current_date then round(val / 2, 2) end, 'VEICULOS', g, round(val / 2, 2),
-             'REF. NF ' || (5000 + n) || ' - SERVIÇO DE DEMONSTRAÇÃO', 'A', v.placa, 'BOLETO BANCARIO', md5(n::text || p), 1
+             'REF. NF ' || (5000 + n) || ' - SERVIÇO DE DEMONSTRAÇÃO - PLACA ' || v.placa, 'A', v.placa, 'BOLETO BANCARIO', md5(n::text || p), 1
         from (values ('A', 1), ('B', 2)) z(p, k);
     end loop;
   end loop;

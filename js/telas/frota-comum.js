@@ -155,4 +155,11 @@ export function AvisosLinha({ itens }) {
     ${a.botao && html`<button type="button" class="btn btn-destaque btn-peq" onClick=${a.acao}>${a.botao}</button>`}</div>`)}</div>`;
 }
 
+// texto do financeiro com a PLACA destacada (negrito e maior): "... KIT EMBREAGEM - PLACA FPG3B53"
+const RE_PLACA = /\b([A-Z]{3}-?[0-9][A-Z0-9][0-9]{2})\b/g;
+export function TextoComPlaca({ texto }) {
+  const partes = String(texto || '').split(RE_PLACA);
+  return html`${partes.map((t, k) => (k % 2 ? html`<b class="placa-no-texto">${t}</b>` : t))}`;
+}
+
 export const fmtK = (v) => (Math.abs(v) >= 1000 ? `${num(v / 1000, v >= 100000 ? 0 : 1)} mil` : num(v, 0));

@@ -3,9 +3,11 @@
 Arquivo público: sem nomes de pessoas, senhas, tokens ou dados da empresa.
 
 ## Situação atual (24/11/2026)
-- Sistema publicado: https://ipalamoni.github.io/pss-estoque/ (versão do app 2.21.1).
+- Sistema publicado: https://ipalamoni.github.io/pss-estoque/ (versão do app 2.21.2).
 - Banco de produção (Supabase `kuttfnmjvzgzebjpjvvy`, "estoque-pss"): versão **2.21.0**, todas as
   conferências OK. Não mexer no projeto Supabase `pss-vendas`.
+- v2.21.2 (24/11/2026, só tela): histórico do veículo com valor em vermelho, conta e dados da nota em azul e placa
+  em negrito maior dentro do texto da nota.
 - v2.21.1 (24/11/2026, só tela): módulo da frota sem centavos (valores arredondados na tela e no PDF; Excel exato).
 - v2.21.0 (24/11/2026): corrigida a importação da frota ("UPDATE requires a WHERE clause": o Supabase recusa UPDATE
   sem WHERE); importar despesas só para o administrador (menu e banco); verificador ferramentas/checar_sql.py.

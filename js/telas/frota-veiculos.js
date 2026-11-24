@@ -10,7 +10,7 @@ import { Icone } from '../icones.js';
 import { ColunasEmpilhadas, BarrasH } from '../graficos.js';
 import { useFrota, GRUPOS, CATEGORIAS_VEICULO, SITUACOES_VEICULO, USOS_VEICULO, MESES, PLACA_OK, limparPlaca, placaBonita, nomeVeiculo,
   linhasDoPeriodo, serieMensal, somaLinhas, moeda } from '../frota-dados.js';
-import { Placa, SeletorBase, TagsLidas, EtqGrupo, ModalApontar, AvisosLinha, fmtK } from './frota-comum.js';
+import { Placa, SeletorBase, TagsLidas, ModalApontar, AvisosLinha, TextoComPlaca, fmtK } from './frota-comum.js';
 
 const COR_SIT = { ativo: 'verde', parado: 'laranja', vendido: 'cinza' };
 
@@ -220,12 +220,12 @@ function FichaVeiculo({ f, v, aoVoltar, aoEditar }) {
     <section class="painel"><h2>Histórico de manutenções</h2>
       ${!servicos.length ? html`<${Vazio} texto="Nenhuma despesa deste veículo ainda." />` : html`<ol class="fr-tempo">
         ${servicos.map((s) => html`<li key=${s.id} class=${s.apontado ? '' : 'lt-pendente'}>
-          <div class="lt-data"><b>${data(s.entrada)}</b><small>${s.grupos.map((g) => html`<${EtqGrupo} grupo=${g} /> `)}</small></div>
-          <div class="lt-corpo"><div class="lt-topo"><b>${moeda(s.total)}</b> <span>${s.fornecedor}</span>${s.hodometro ? html` <small>· ${num(s.hodometro, 0)} km</small>` : ''}
+          <div class="lt-data"><b>${data(s.entrada)}</b><span class="lt-conta">${s.grupos.map((g) => NOME_CONTA[g]).join(' · ')}</span></div>
+          <div class="lt-corpo"><div class="lt-topo"><b class="lt-valor">${moeda(s.total)}</b> <span>${s.fornecedor}</span>${s.hodometro ? html` <small>· ${num(s.hodometro, 0)} km</small>` : ''}
             ${s.dividida && html` <${Etiqueta} cor="roxo">${s.principal ? `nota dividida · total ${moeda(s.notaInteira.total)}` : `parte de nota de ${moeda(s.notaInteira.total)} (${placaBonita(s.notaInteira.veiculo?.placa || s.placa_arquivo)})`}</${Etiqueta}>`}</div>
             ${s.apontado ? html`<${TagsLidas} ids=${s.tags} f=${f} />` : html`<${Etiqueta} cor="laranja">sem tipo de manutenção</${Etiqueta}>`}
             ${s.observacao && html`<p class="lt-obs">${s.observacao}</p>`}
-            <small class="texto-cinza">${s.obsFinanceiro}</small></div>
+            ${s.obsFinanceiro && html`<p class="lt-nf"><span class="lt-nf-rot">Nota:</span> <${TextoComPlaca} texto=${s.obsFinanceiro} /></p>`}</div>
           <button class="btn btn-sec btn-peq" onClick=${() => setApontar({ lista: [s.notaInteira], i: 0 })}>${s.apontado ? 'Editar' : 'Apontar'}</button>
         </li>`)}</ol>`}
     </section>
@@ -238,4 +238,5 @@ function FichaVeiculo({ f, v, aoVoltar, aoEditar }) {
     </dl></section>
     ${apontar && html`<${ModalApontar} f=${f} fila=${apontar.lista} inicio=${apontar.i} aoFechar=${() => setApontar(null)} />`}`;
 }
+const NOME_CONTA = { corretiva: 'Manutenção corretiva', preventiva: 'Manutenção preventiva', pneus: 'Pneus' };
 const BASES_TXT = { competencia: 'pela data da nota (competência)', vencimento: 'pelo vencimento das parcelas', pagamento: 'pelo que foi pago' };

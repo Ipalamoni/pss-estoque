@@ -1702,7 +1702,8 @@ html[data-tema="escuro"] .tabela.calor tbody tr td.calor-5 { background: #4fbf98
 @media (max-width: 860px) {
   .nota-corpo { grid-template-columns: 1fr auto; } .nota-meio { grid-column: 1 / -1; grid-row: 2; }
   .apontar-cab { grid-template-columns: auto 1fr; } .apontar-valor { grid-column: 1 / -1; text-align: left; flex-direction: row; gap: 8px; align-items: baseline; }
-  .linha-tempo li { grid-template-columns: 1fr; gap: 6px; } .linha-tempo li > .btn { justify-self: start; }
+  .fr-tempo li { grid-template-columns: 1fr; gap: 6px; } .fr-tempo li > .btn { justify-self: start; }
+  .lt-data { flex-direction: row; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
   .form-placa { grid-template-columns: 1fr; gap: 0; }
   .botoes-mes { display: flex; }
 }
@@ -1771,3 +1772,9 @@ table.so-leitor { display: block; left: 0; top: 0; }   /* tabela só para leitor
   .aviso-chip { flex: 1 1 100%; justify-content: space-between; border-radius: 12px; }
   .aviso-chip > span { flex: 1; }
 }
+/* histórico do veículo: valor em vermelho, conta e dados da nota em azul, placa em negrito maior */
+.lt-valor { color: var(--vermelho); font-size: 1.08rem; }
+.lt-conta { color: var(--azul); font-weight: 600; font-size: .86rem; }
+.lt-nf { margin: 0; color: var(--azul); font-size: .88rem; }
+.lt-nf-rot { font-weight: 700; }
+.placa-no-texto { font-size: 1.08em; font-weight: 800; letter-spacing: .03em; color: var(--texto); }
