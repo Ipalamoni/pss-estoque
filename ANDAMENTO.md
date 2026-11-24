@@ -3,9 +3,11 @@
 Arquivo público: sem nomes de pessoas, senhas, tokens ou dados da empresa.
 
 ## Situação atual (24/11/2026)
-- Sistema publicado: https://ipalamoni.github.io/pss-estoque/ (versão do app 2.22.0).
-- Banco de produção (Supabase `kuttfnmjvzgzebjpjvvy`, "estoque-pss"): versão **2.21.0**, todas as
+- Sistema publicado: https://ipalamoni.github.io/pss-estoque/ (versão do app 2.23.0).
+- Banco de produção (Supabase `kuttfnmjvzgzebjpjvvy`, "estoque-pss"): versão **2.23.0**, todas as
   conferências OK. Não mexer no projeto Supabase `pss-vendas`.
+- v2.23.0 (24/11/2026, banco + tela): frota com data de início do apontamento 01/11/2026 (notas e placas anteriores
+  não pedem ação; placa antiga desconhecida = despesa geral) e dados da frota protegidos contra a limpeza de testes.
 - v2.22.0 (24/11/2026, só tela): Painel da frota com "Caminhões por tipo" (média por veículo, por mês e por conta de
   cada tipo: Daily/"Caminhão", 3/4, toco, truck, bitruck, cavalo, carreta) e filtro de tipos de caminhão nos gráficos.
   Categoria nova "Caminhão toco" no cadastro.
@@ -60,6 +62,8 @@ Arquivo público: sem nomes de pessoas, senhas, tokens ou dados da empresa.
 ## Pendências do sistema
 - [ ] **Limpeza dos dados de teste**: só quando o dono disser "finalizei os testes". Os dados atuais
       são de teste (códigos com prefixo "T"); manter os cadastros reais sem "T" feitos pelo dono.
+      ⚠ NÃO APAGAR NADA DA MANUTENÇÃO DE VEÍCULOS (tabelas frota_*): veículos, despesas importadas, apontamentos,
+      divisões, correções de placa e tipos são REAIS e ficam (decisão do dono, 24/11/2026; o banco também bloqueia).
 - [ ] Subtítulo embaixo do nome da masseira: item 4 de um pedido ficou cortado. O dono vai conferir na tela e responder.
 - [ ] (Opcional, fase 2) Esconder custos também no banco para pesagem/padeiro (hoje só a tela esconde).
 - [ ] (Opcional) Refatoração: levar os testes para o repositório e consolidar o CSS; só se o dono aprovar.

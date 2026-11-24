@@ -9,7 +9,7 @@ import { Exportar } from '../exportar.js';
 import { Icone } from '../icones.js';
 import { ColunasEmpilhadas, BarrasH } from '../graficos.js';
 import { useFrota, GRUPOS, CATEGORIAS_VEICULO, SITUACOES_VEICULO, USOS_VEICULO, MESES, PLACA_OK, limparPlaca, placaBonita, nomeVeiculo,
-  linhasDoPeriodo, serieMensal, somaLinhas, moeda } from '../frota-dados.js';
+  linhasDoPeriodo, serieMensal, somaLinhas, moeda, inicioApontamento } from '../frota-dados.js';
 import { Placa, SeletorBase, TagsLidas, ModalApontar, AvisosLinha, TextoComPlaca, fmtK } from './frota-comum.js';
 
 const COR_SIT = { ativo: 'verde', parado: 'laranja', vendido: 'cinza' };
@@ -156,6 +156,8 @@ export function FormVeiculo({ f, veiculo, aoFechar }) {
 // FICHA DO VEÍCULO (raio-x)
 // ---------------------------------------------------------------------
 function FichaVeiculo({ f, v, aoVoltar, aoEditar }) {
+  const { dados } = useApp();
+  const ini = inicioApontamento(dados);
   const [ano, setAno] = useState(f.anos[0] || Number(hojeISO().slice(0, 4)));
   const [base, setBase] = useState('competencia');
   const [apontar, setApontar] = useState(null);
@@ -186,7 +188,7 @@ function FichaVeiculo({ f, v, aoVoltar, aoEditar }) {
   const recentes = servicos.filter((s) => diasEntre(s.entrada, hojeISO()) <= 90);
   const contaTag = new Map(); recentes.forEach((s) => (s.tags || []).forEach((t) => contaTag.set(t, (contaTag.get(t) || 0) + 1)));
   contaTag.forEach((n, t) => { if (n >= 3) alertas.push({ cor: 'laranja', t: `${n} serviços de ${f.mapa.tag.get(t)?.nome?.toLowerCase()} nos últimos 90 dias: verifique a causa ou a garantia` }); });
-  const fila = servicos.filter((s) => !s.apontado).map((s) => s.notaInteira);
+  const fila = servicos.filter((s) => !s.apontado && String(s.entrada) >= ini).map((s) => s.notaInteira);
   const exp = [{ titulo: 'Data da nota', valor: (s) => data(s.entrada) }, { titulo: 'Fornecedor', valor: (s) => s.fornecedor, largura: 30 }, { titulo: 'Título', valor: (s) => s.titulo },
     { titulo: 'Conta', valor: (s) => s.grupos.map((g) => GRUPOS.find((x) => x.id === g)?.rotulo).join(', ') },
     { titulo: 'Tipos de manutenção', valor: (s) => (s.tags || []).map((t) => f.mapa.tag.get(t)?.nome).join(', '), largura: 30 },
@@ -221,14 +223,15 @@ function FichaVeiculo({ f, v, aoVoltar, aoEditar }) {
     </div>
     <section class="painel"><h2>Histórico de manutenções</h2>
       ${!servicos.length ? html`<${Vazio} texto="Nenhuma despesa deste veículo ainda." />` : html`<ol class="fr-tempo">
-        ${servicos.map((s) => html`<li key=${s.id} class=${s.apontado ? '' : 'lt-pendente'}>
+        ${servicos.map((s) => html`<li key=${s.id} class=${s.apontado || String(s.entrada) < ini ? '' : 'lt-pendente'}>
           <div class="lt-data"><b>${data(s.entrada)}</b><span class="lt-conta">${s.grupos.map((g) => NOME_CONTA[g]).join(' · ')}</span></div>
           <div class="lt-corpo"><div class="lt-topo"><b class="lt-valor">${moeda(s.total)}</b> <span>${s.fornecedor}</span>${s.hodometro ? html` <small>· ${num(s.hodometro, 0)} km</small>` : ''}
             ${s.dividida && html` <${Etiqueta} cor="roxo">${s.principal ? `nota dividida · total ${moeda(s.notaInteira.total)}` : `parte de nota de ${moeda(s.notaInteira.total)} (${placaBonita(s.notaInteira.veiculo?.placa || s.placa_arquivo)})`}</${Etiqueta}>`}</div>
-            ${s.apontado ? html`<${TagsLidas} ids=${s.tags} f=${f} />` : html`<${Etiqueta} cor="laranja">sem tipo de manutenção</${Etiqueta}>`}
+            ${s.apontado ? html`<${TagsLidas} ids=${s.tags} f=${f} />` : String(s.entrada) >= ini ? html`<${Etiqueta} cor="laranja">sem tipo de manutenção</${Etiqueta}>`
+              : html`<${Etiqueta} cor="cinza">antes do início do apontamento</${Etiqueta}>`}
             ${s.observacao && html`<p class="lt-obs">${s.observacao}</p>`}
             ${s.obsFinanceiro && html`<p class="lt-nf"><span class="lt-nf-rot">Nota:</span> <${TextoComPlaca} texto=${s.obsFinanceiro} /></p>`}</div>
-          <button class="btn btn-sec btn-peq" onClick=${() => setApontar({ lista: [s.notaInteira], i: 0 })}>${s.apontado ? 'Editar' : 'Apontar'}</button>
+          <button class="btn btn-sec btn-peq" onClick=${() => setApontar({ lista: [s.notaInteira], i: 0 })}>${s.apontado ? 'Editar' : String(s.entrada) >= ini ? 'Apontar' : 'Apontar (opcional)'}</button>
         </li>`)}</ol>`}
     </section>
     <section class="painel"><h2>Dados do cadastro</h2><dl class="ficha-dados">

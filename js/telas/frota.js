@@ -9,7 +9,7 @@ import { data, dataHora, pl, num, contem, hojeISO, mensagemErro, nomeUsuario } f
 import { Exportar } from '../exportar.js';
 import { Icone } from '../icones.js';
 import { ColunasEmpilhadas, BarrasH } from '../graficos.js';
-import { useFrota, GRUPOS, MESES, FROTAS, CATEGORIAS_CAMINHAO, frotaDe, placaBonita, nomeVeiculo, sugestoesPlaca, linhasDoPeriodo, serieMensal, somaLinhas, valorItem, mesDoItem, USOS_VEICULO, moeda } from '../frota-dados.js';
+import { useFrota, inicioApontamento, pedeApontamento, placaPendente, GRUPOS, MESES, FROTAS, CATEGORIAS_CAMINHAO, frotaDe, placaBonita, nomeVeiculo, sugestoesPlaca, linhasDoPeriodo, serieMensal, somaLinhas, valorItem, mesDoItem, USOS_VEICULO, moeda } from '../frota-dados.js';
 import { linhasFrota, decodificar, pareceTexto } from '../frota-csv.js';
 import { Placa, SeletorBase, TagsLidas, EtqGrupo, ModalApontar, ModalApontarVarios, AvisosLinha, fmtK } from './frota-comum.js';
 import { FormVeiculo } from './frota-veiculos.js';
@@ -23,7 +23,8 @@ const carregandoOuErro = (titulo, erro) => html`<${Cabecalho} titulo=${titulo} /
 // o que não tem veículo (peças para estoque, pneus para vários) fica em "despesas gerais".
 // =====================================================================
 export function TelaFrotaPainel() {
-  const { ir } = useApp();
+  const { ir, dados } = useApp();
+  const ini = inicioApontamento(dados);
   const { f, erro } = useFrota();
   const [ano, setAno] = useState(null);
   const [base, setBase] = useState('competencia');
@@ -85,8 +86,8 @@ export function TelaFrotaPainel() {
   })();
   const maxCel = Math.max(1, ...calor.flatMap((x) => x.meses));
   const nivel = (v) => (v <= 0 ? 0 : Math.min(5, Math.ceil((v / maxCel) * 5)));
-  const pend = f.servicos.filter((x) => !x.apontado).length;
-  const placasPend = new Set(f.servicos.filter((x) => x.desconhecida).map((x) => x.placa_arquivo)).size;
+  const pend = f.servicos.filter((x) => pedeApontamento(x, ini)).length;
+  const placasPend = new Set(f.servicos.filter((x) => placaPendente(x, ini)).map((x) => x.placa_arquivo)).size;
   const ultImp = f.importacoes[0];
   const abrir = (vid) => ir('frota-veiculos', { abrir: vid });
   const rotVer = ver === 'todas' ? 'toda a frota' : ver === 'caminhoes' && tiposCam.length ? tiposCam.join(', ').toLowerCase() : FROTAS.find((x) => x.id === ver).rotulo.toLowerCase();
@@ -193,6 +194,7 @@ const varTxt = (a, b) => { const p = ((a - b) / b) * 100; return { texto: `${p >
 // APONTAR DESPESAS (caixa de entrada do responsável)
 // =====================================================================
 export function TelaFrotaApontar() {
+  const { dados } = useApp();
   const { f, erro } = useFrota();
   const [aba, setAba] = useState('pendentes');
   const [busca, setBusca] = useState('');
@@ -201,7 +203,8 @@ export function TelaFrotaApontar() {
   const [apontar, setApontar] = useState(null); const [emLote, setEmLote] = useState(null);
   const [max, setMax] = useState(60);
   if (!f) return carregandoOuErro('Apontar despesas', erro);
-  const pend = f.servicos.filter((s) => !s.apontado);
+  const ini = inicioApontamento(dados);
+  const pend = f.servicos.filter((s) => pedeApontamento(s, ini));
   const base = aba === 'pendentes' ? pend : f.servicos.filter((s) => s.apontado);
   const lista = base.filter((s) => casaVarios(veics, s.veiculoId || (s.geral ? 'geral' : 'desconhecida')) && s.grupos.some((g) => casaVarios(grupos, g))
     && contem(`${s.veiculo?.placa || s.placa_arquivo} ${placaBonita(s.veiculo?.placa || s.placa_arquivo)} ${nomeVeiculo(s.veiculo)} ${s.fornecedor} ${s.titulo} ${s.obsFinanceiro} ${s.observacao || ''}`, busca))
@@ -212,7 +215,7 @@ export function TelaFrotaApontar() {
   const sel = lista.filter((s) => marcados.has(s.id));
   const mostrar = lista.slice(0, max);
   return html`
-    <${Cabecalho} titulo="Apontar despesas" sub="Cada nota de manutenção que chega do financeiro precisa do tipo de manutenção (pelo menos um). Observação e km são opcionais." />
+    <${Cabecalho} titulo="Apontar despesas" sub=${`Notas com entrada a partir de ${data(ini)} precisam do tipo de manutenção (pelo menos um). Observação e km são opcionais.`} />
     <${Abas} abas=${[{ id: 'pendentes', titulo: `Para apontar (${pend.length})` }, { id: 'feitas', titulo: 'Já apontadas' }]} ativa=${aba} aoMudar=${(a) => { setAba(a); setMarcados(new Set()); setMax(60); }} />
     <${Filtros} ativos=${[veics.length, grupos.length].filter(Boolean).length} fixo=${html`<${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Placa, fornecedor, nº da nota ou observação" />`}
       acoes=${html`<span class="nota">${pl(lista.length, 'nota', 'notas')} · ${moeda(lista.reduce((t, s) => t + s.total, 0))}</span>
@@ -251,7 +254,8 @@ export function TelaFrotaPlacas() {
   const [ocupado, executar] = useAcao();
   if (!f) return carregandoOuErro('Placas a resolver', erro);
   const porPlaca = new Map();
-  for (const s of f.servicos.filter((x) => x.desconhecida)) {
+  const ini = inicioApontamento(dados);
+  for (const s of f.servicos.filter((x) => placaPendente(x, ini))) {   // placas de notas antes da data de início: despesa geral
     if (!porPlaca.has(s.placa_arquivo)) porPlaca.set(s.placa_arquivo, { placa: s.placa_arquivo, notas: [], total: 0 });
     const p = porPlaca.get(s.placa_arquivo); p.notas.push(s); p.total += s.total;
   }
@@ -264,7 +268,7 @@ export function TelaFrotaPlacas() {
   const expCorr = [{ titulo: 'Placa digitada no financeiro', valor: (a) => placaBonita(a.placa) }, { titulo: 'Placa certa', valor: (a) => placaBonita(a.v?.placa) },
     { titulo: 'Veículo', valor: (a) => nomeVeiculo(a.v), largura: 28 }, { titulo: 'Corrigido em', valor: (a) => dataHora(a.criado_em) }];
   return html`
-    <${Cabecalho} titulo="Placas a resolver" sub="Placas que apareceram nas despesas e não estão no cadastro. Pode ser veículo novo ou erro de digitação no contas a pagar." />
+    <${Cabecalho} titulo="Placas a resolver" sub=${`Placas de notas a partir de ${data(ini)} que não estão no cadastro (veículo novo ou erro de digitação). As de antes ficam como despesa geral.`} />
     ${!lista.length ? html`<${Vazio} texto="✓ Nenhuma placa para resolver. Todas as despesas estão ligadas a um veículo (ou são despesas gerais)." />`
       : html`<p class="nota">${pl(lista.length, 'placa', 'placas')} · ${pl(lista.reduce((t, p) => t + p.notas.length, 0), 'nota', 'notas')} · ${moeda(lista.reduce((t, p) => t + p.total, 0))}.
         Ao corrigir, o sistema lembra para sempre: as próximas notas com a mesma placa errada já entram no veículo certo.</p>

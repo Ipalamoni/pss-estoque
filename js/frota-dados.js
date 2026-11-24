@@ -177,4 +177,8 @@ export function serieMensal(linhas, base) {
   return s;
 }
 export const somaLinhas = (linhas, base) => linhas.reduce((t, it) => t + valorItem(base, it), 0);
+// DATA DE INÍCIO do apontamento (parâmetro do banco): notas anteriores não pedem apontamento nem resolução de placa
+export const inicioApontamento = (dados) => String(dados?.params?.frota_inicio_apontamento || '2026-11-01').slice(0, 10);
+export const pedeApontamento = (s, ini) => !s.apontado && String(s.entrada) >= ini;
+export const placaPendente = (s, ini) => s.desconhecida && String(s.entrada) >= ini;
 export const nomeVeiculo = (v) => (v ? [v.marca, v.modelo].filter(Boolean).join(' ') : '');

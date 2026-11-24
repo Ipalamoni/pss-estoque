@@ -77,6 +77,10 @@ não técnico), GUIA_DO_DONO.md (tela a tela), ESPECIFICACAO_DO_SISTEMA.md e CON
   a pessoa marca as duas. Exceção: quando o cálculo exige um só (ex.: saldo do Kardex por local).
 
 ### 2.0.1 Módulo MANUTENÇÃO DE VEÍCULOS (frota)
+- ⚠ NUNCA APAGAR os dados da frota (tabelas `frota_*`) na LIMPEZA DOS DADOS DE TESTE: são dados reais (decisão do
+  dono, 24/11/2026). O banco também impede (gatilhos `frota_sem_truncate`/`frota_sem_exclusao`, aviso em cada tabela).
+- Data de início do apontamento: parâmetro `frota_inicio_apontamento` (2026-11-01). Só notas a partir dela pedem
+  apontamento e resolução de placa; placa desconhecida anterior = despesa geral.
 - Acesso: admin + papel `frota`; IMPORTAR despesas é só do administrador. Valores em R$ SEM centavos
   (arredondados: `moeda` de `frota-dados.js`); no Excel o número fica exato. Dados do contas a pagar (contas Manutenção corretiva/preventiva e Pneus) entram por
   `frota_importar` (CSV hoje; consulta ao Firebird depois, mesma função). Importação INCREMENTAL do ano inteiro:
