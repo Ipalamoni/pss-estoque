@@ -10,7 +10,7 @@ import { Icone } from '../icones.js';
 import { ColunasEmpilhadas, BarrasH } from '../graficos.js';
 import { useFrota, GRUPOS, CATEGORIAS_VEICULO, SITUACOES_VEICULO, USOS_VEICULO, MESES, PLACA_OK, limparPlaca, placaBonita, nomeVeiculo,
   linhasDoPeriodo, serieMensal, somaLinhas } from '../frota-dados.js';
-import { Placa, SeletorBase, TagsLidas, EtqGrupo, ModalApontar, fmtK } from './frota-comum.js';
+import { Placa, SeletorBase, TagsLidas, EtqGrupo, ModalApontar, AvisosLinha, fmtK } from './frota-comum.js';
 
 const COR_SIT = { ativo: 'verde', parado: 'laranja', vendido: 'cinza' };
 
@@ -30,10 +30,10 @@ export function TelaFrotaVeiculos() {
 
   const ano = f.anos[0] || Number(hojeISO().slice(0, 4));
   const gastoAno = new Map(); const ultima = new Map(); const notas = new Map();
-  for (const s of f.servicos) {
-    if (!s.veiculoId) continue;
-    if (String(s.entrada).startsWith(`${ano}-`)) { gastoAno.set(s.veiculoId, (gastoAno.get(s.veiculoId) || 0) + s.total); notas.set(s.veiculoId, (notas.get(s.veiculoId) || 0) + 1); }
-    if (!ultima.get(s.veiculoId) || s.entrada > ultima.get(s.veiculoId)) ultima.set(s.veiculoId, s.entrada);
+  for (const s of f.servicos) for (const pt of s.partes) {
+    const vid = pt.veiculoId; if (!vid || pt.valor <= 0) continue;
+    if (String(s.entrada).startsWith(`${ano}-`)) { gastoAno.set(vid, (gastoAno.get(vid) || 0) + pt.valor); notas.set(vid, (notas.get(vid) || 0) + 1); }
+    if (!ultima.get(vid) || s.entrada > ultima.get(vid)) ultima.set(vid, s.entrada);
   }
   const linhas = f.veiculos.filter((x) => casaVarios(cat, x.categoria) && casaVarios(sit, x.situacao) && casaVarios(uso, x.uso)
     && contem(`${x.placa} ${placaBonita(x.placa)} ${x.marca || ''} ${x.modelo || ''} ${x.responsavel || ''}`, busca))
@@ -157,8 +157,12 @@ function FichaVeiculo({ f, v, aoVoltar, aoEditar }) {
   const [ano, setAno] = useState(f.anos[0] || Number(hojeISO().slice(0, 4)));
   const [base, setBase] = useState('competencia');
   const [apontar, setApontar] = useState(null);
-  const servicos = useMemo(() => f.servicos.filter((s) => s.veiculoId === v.id).sort((a, b) => String(b.entrada).localeCompare(String(a.entrada))), [f, v.id]);
-  const linhas = linhasDoPeriodo(f, { ano, base, filtro: (l) => l.servico?.veiculoId === v.id });
+  // cada "serviço" aqui é a PARTE deste veículo numa nota (nota inteira, ou só a parte dividida para ele)
+  const servicos = useMemo(() => f.servicos.flatMap((s) => s.partes.filter((pt) => pt.veiculoId === v.id && pt.valor > 0)
+    .map((pt) => ({ ...s, total: pt.valor, tags: pt.tags, observacao: pt.observacao, hodometro: pt.principal ? s.hodometro : null, apontado: pt.tags.length > 0,
+      dividida: s.partes.length > 1, principal: pt.principal, notaInteira: s })))
+    .sort((a, b) => String(b.entrada).localeCompare(String(a.entrada))), [f, v.id]);
+  const linhas = linhasDoPeriodo(f, { ano, base, filtro: (it) => it.veiculoId === v.id });
   const serie = serieMensal(linhas, base);
   const total = somaLinhas(linhas, base);
   const doAno = servicos.filter((s) => String(s.entrada).startsWith(`${ano}-`));
@@ -180,7 +184,7 @@ function FichaVeiculo({ f, v, aoVoltar, aoEditar }) {
   const recentes = servicos.filter((s) => diasEntre(s.entrada, hojeISO()) <= 90);
   const contaTag = new Map(); recentes.forEach((s) => (s.tags || []).forEach((t) => contaTag.set(t, (contaTag.get(t) || 0) + 1)));
   contaTag.forEach((n, t) => { if (n >= 3) alertas.push({ cor: 'laranja', t: `${n} serviços de ${f.mapa.tag.get(t)?.nome?.toLowerCase()} nos últimos 90 dias: verifique a causa ou a garantia` }); });
-  const fila = servicos.filter((s) => !s.apontado);
+  const fila = servicos.filter((s) => !s.apontado).map((s) => s.notaInteira);
   const exp = [{ titulo: 'Data da nota', valor: (s) => data(s.entrada) }, { titulo: 'Fornecedor', valor: (s) => s.fornecedor, largura: 30 }, { titulo: 'Título', valor: (s) => s.titulo },
     { titulo: 'Conta', valor: (s) => s.grupos.map((g) => GRUPOS.find((x) => x.id === g)?.rotulo).join(', ') },
     { titulo: 'Tipos de manutenção', valor: (s) => (s.tags || []).map((t) => f.mapa.tag.get(t)?.nome).join(', '), largura: 30 },
@@ -196,9 +200,8 @@ function FichaVeiculo({ f, v, aoVoltar, aoEditar }) {
       <div class="filtros-acoes"><${Exportar} titulo=${`Veículo ${placaBonita(v.placa)} · ${nomeVeiculo(v)}`} filtros=${`${ano} · ${pl(doAno.length, 'nota', 'notas')} · ${moeda(doAno.reduce((t, s) => t + s.total, 0))}`}
         arquivo=${`veiculo-${v.placa}-${ano}`} colunas=${exp} linhas=${doAno} /></div>
     </div>
-    ${alertas.map((a) => html`<div class=${'aviso-faixa aviso-' + a.cor} role="status"><span>⚠ ${a.t}</span></div>`)}
-    ${fila.length > 0 && html`<div class="aviso-faixa"><span>📝 <b>${pl(fila.length, 'nota deste veículo', 'notas deste veículo')}</b> sem tipo de manutenção.</span>
-      <button class="btn btn-destaque btn-peq" onClick=${() => setApontar({ lista: fila, i: 0 })}>Apontar agora</button></div>`}
+    <${AvisosLinha} itens=${[...alertas.map((a) => ({ icone: 'aviso', texto: a.t, cor: a.cor })),
+      fila.length > 0 && { icone: 'frota-apontar', texto: html`<b>${fila.length}</b> ${fila.length === 1 ? 'nota' : 'notas'} para apontar`, botao: 'Apontar', acao: () => setApontar({ lista: fila, i: 0 }) }]} />
     <div class="cartoes">
       <${Cartao} titulo=${`Gasto em ${ano}`} valor=${moeda(total)} sub=${BASES_TXT[base]} />
       <${Cartao} titulo="Média por mês" valor=${moeda(mesesComGasto ? total / mesesComGasto : 0)} sub=${`em ${pl(mesesComGasto, 'mês com gasto', 'meses com gasto')}`} />
@@ -218,11 +221,12 @@ function FichaVeiculo({ f, v, aoVoltar, aoEditar }) {
       ${!servicos.length ? html`<${Vazio} texto="Nenhuma despesa deste veículo ainda." />` : html`<ol class="fr-tempo">
         ${servicos.map((s) => html`<li key=${s.id} class=${s.apontado ? '' : 'lt-pendente'}>
           <div class="lt-data"><b>${data(s.entrada)}</b><small>${s.grupos.map((g) => html`<${EtqGrupo} grupo=${g} /> `)}</small></div>
-          <div class="lt-corpo"><div class="lt-topo"><b>${moeda(s.total)}</b> <span>${s.fornecedor}</span>${s.hodometro ? html` <small>· ${num(s.hodometro, 0)} km</small>` : ''}</div>
+          <div class="lt-corpo"><div class="lt-topo"><b>${moeda(s.total)}</b> <span>${s.fornecedor}</span>${s.hodometro ? html` <small>· ${num(s.hodometro, 0)} km</small>` : ''}
+            ${s.dividida && html` <${Etiqueta} cor="roxo">${s.principal ? `nota dividida · total ${moeda(s.notaInteira.total)}` : `parte de nota de ${moeda(s.notaInteira.total)} (${placaBonita(s.notaInteira.veiculo?.placa || s.placa_arquivo)})`}</${Etiqueta}>`}</div>
             ${s.apontado ? html`<${TagsLidas} ids=${s.tags} f=${f} />` : html`<${Etiqueta} cor="laranja">sem tipo de manutenção</${Etiqueta}>`}
             ${s.observacao && html`<p class="lt-obs">${s.observacao}</p>`}
             <small class="texto-cinza">${s.obsFinanceiro}</small></div>
-          <button class="btn btn-sec btn-peq" onClick=${() => setApontar({ lista: [s], i: 0 })}>${s.apontado ? 'Editar' : 'Apontar'}</button>
+          <button class="btn btn-sec btn-peq" onClick=${() => setApontar({ lista: [s.notaInteira], i: 0 })}>${s.apontado ? 'Editar' : 'Apontar'}</button>
         </li>`)}</ol>`}
     </section>
     <section class="painel"><h2>Dados do cadastro</h2><dl class="ficha-dados">

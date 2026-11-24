@@ -7,7 +7,8 @@ Arquivo público: sem nomes de pessoas, senhas, tokens ou dados da empresa.
 - Banco de produção (Supabase `kuttfnmjvzgzebjpjvvy`, "estoque-pss"): versão **2.19.0**, todas as
   conferências OK. Não mexer no projeto Supabase `pss-vendas`.
 - v2.20.0 (24/11/2026, EM ESPERA para publicar): módulo MANUTENÇÃO DE VEÍCULOS (Painel da frota, Apontar despesas,
-  Veículos com ficha/raio-x, Placas a resolver, Importar despesas, Tipos de manutenção). Código pronto e testado
+  Veículos com ficha/raio-x, Placas a resolver, Importar despesas, Tipos de manutenção; caminhões × carros separados,
+  avisos compactos, divisão de nota entre veículos). Código pronto e testado
   (demonstração + cópia dos dados reais). FALTA: aplicar `banco/atualizar-banco-v2.20.sql` em produção, rodar a
   carga inicial privada (58 veículos + 43 correções de placa, fora do repositório), importar o CSV e publicar na main.
   A função admin-usuarios precisa ser republicada para criar usuário já com o papel "frota" (editar usuário funciona).

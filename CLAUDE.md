@@ -61,6 +61,10 @@ não técnico), GUIA_DO_DONO.md (tela a tela), ESPECIFICACAO_DO_SISTEMA.md e CON
   razão social e UF = TUDO MAIÚSCULO (`nome_maiusculo`). Siglas conhecidas (PCP, PSS, LTDA...) ficam maiúsculas.
 - Textos claros e iguais em todo lugar (o nome no menu = título da tela = atalho). Botões dizem a ação ("Salvar pedido", não "OK").
 - Cartões e atalhos levam ao lugar certo já filtrado. Sem informação repetida na mesma tela.
+- AVISOS COMPACTOS: aviso não ocupa a tela. Vários avisos lado a lado numa linha só (texto curto + botão de ação:
+  "20 notas para apontar [Apontar]" · "1 placa sem cadastro [Resolver]"); nada de faixas grandes empilhadas.
+- Cartões e painéis legíveis nos DOIS temas (claro e escuro): texto sempre com cor de texto do tema, centralizado no
+  cartão, valor nunca quebrado no meio; conferir o tema escuro em toda tela nova.
 
 ### 2.0 Relatórios e listas com tabela (para analista: o máximo de tela para os dados)
 - Busca, filtros, contagem e botões de ação (Excel, PDF, Imprimir, WhatsApp, Colunas) numa FAIXA SÓ, lado a lado
@@ -75,7 +79,9 @@ não técnico), GUIA_DO_DONO.md (tela a tela), ESPECIFICACAO_DO_SISTEMA.md e CON
   `frota_importar` (CSV hoje; consulta ao Firebird depois, mesma função). Importação INCREMENTAL do ano inteiro:
   linhas novas entram, alteradas atualizam, sumidas saem (removido_em). Apontamento (etiquetas, obs., km) fica em
   `frota_servicos` (nota × veículo) e NUNCA se perde. Placas erradas → `frota_placa_apelidos`.
-- Painéis por Competência (data de entrada, valor total), Vencimento ou Pagamento. Placas e despesas da empresa
+- Painéis por Competência (data de entrada, valor total), Vencimento ou Pagamento. Caminhões e carros NUNCA se misturam
+  nas médias (frota pela categoria); sem veículo = despesas gerais. Uma nota pode ser DIVIDIDA entre veículos
+  (`frota_rateios`, cada parte com suas etiquetas), também preservada nas importações. Placas e despesas da empresa
   NUNCA no repositório (a carga inicial fica fora dele).
 
 ### 2.1 Telas da PRODUÇÃO (padeiros, pesagem, operários): simplicidade acima de tudo

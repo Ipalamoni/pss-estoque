@@ -3,6 +3,7 @@
 // janela "Apontar despesa" e "Apontar várias")
 // =====================================================================
 import { html, useState, useApp, Modal, Campo, Numero, Escolher, Etiqueta, useAcao, avisar } from '../ui.js';
+import { Icone } from '../icones.js';
 import { moeda, data, pl, num } from '../util.js';
 import { BASES, NOME_GRUPO, placaBonita, nomeVeiculo } from '../frota-dados.js';
 
@@ -56,13 +57,24 @@ export function ModalApontar({ f, fila, inicio = 0, aoFechar }) {
   const [km, setKm] = useState(s?.hodometro ? String(s.hodometro) : '');
   const [veic, setVeic] = useState(s?.veiculo_manual_id || null);
   const [trocar, setTrocar] = useState(false);
+  const partesDe = (n) => (n?.rateios || []).map((r) => ({ veiculo_id: r.veiculo_id, valor: String(r.valor).replace('.', ','), tags: r.tags }));
+  const [partes, setPartes] = useState(() => partesDe(s));
   const [ocupado, executar] = useAcao();
   if (!s) return null;
-  const ir = (k) => { const n = fila[k]; setI(k); setTags(n?.tags || []); setObs(n?.observacao || ''); setKm(n?.hodometro ? String(n.hodometro) : ''); setVeic(n?.veiculo_manual_id || null); setTrocar(false); };
+  const ir = (k) => { const n = fila[k]; setI(k); setTags(n?.tags || []); setObs(n?.observacao || ''); setKm(n?.hodometro ? String(n.hodometro) : ''); setVeic(n?.veiculo_manual_id || null); setTrocar(false); setPartes(partesDe(n)); };
+  const nBr = (x) => { const t = String(x ?? '').trim(); if (!t) return 0; const v = Number(t.includes(',') ? t.replace(/\./g, '').replace(',', '.') : t); return Number.isFinite(v) ? v : 0; };
+  const somaPartes = partes.reduce((t, pt) => t + nBr(pt.valor), 0);
+  const resta = Math.round((s.total - somaPartes) * 100) / 100;
+  const parteOk = (pt) => pt.veiculo_id && nBr(pt.valor) > 0 && pt.tags.length > 0;
+  const divisaoOk = partes.every(parteOk) && resta >= 0;
+  const mudaParte = (k, campo, v) => setPartes((l) => l.map((pt, j) => (j === k ? { ...pt, [campo]: v } : pt)));
+  const placaOrig = s.veiculo ? placaBonita(s.veiculo.placa) : s.geral ? 'nota sem veículo' : placaBonita(s.placa_arquivo);
   const ultimo = i >= fila.length - 1;
   async function salvar(proxima) {
     if (!tags.length) { avisar('Marque pelo menos um tipo de manutenção.', 'aviso'); return; }
+    if (!divisaoOk) { avisar(resta < 0 ? 'A divisão passa do valor da nota.' : 'Complete cada parte da divisão: veículo, valor e tipo de manutenção.', 'aviso'); return; }
     const p = { servico_id: s.id, tags, observacao: obs, hodometro: km ? String(Math.round(Number(km.replace(/\./g, '').replace(',', '.')))) : '' };
+    if (partes.length || (s.rateios || []).length) p.partes = partes.map((pt) => ({ veiculo_id: pt.veiculo_id, valor: String(nBr(pt.valor)), tags: pt.tags }));
     if (trocar || veic !== (s.veiculo_manual_id || null)) p.veiculo_id = veic;
     const ok = await executar(() => api.rpc('frota_apontar', { p }), proxima && !ultimo ? 'Apontado. Próxima nota.' : 'Apontamento salvo.');
     if (!ok) return;
@@ -72,7 +84,7 @@ export function ModalApontar({ f, fila, inicio = 0, aoFechar }) {
   return html`<${Modal} titulo="Apontar despesa" aoFechar=${() => aoFechar(false)} semProtecao
     rodape=${html`<span class="nota apontar-pos">${fila.length > 1 ? `${i + 1} de ${fila.length}` : ''}</span>
       ${fila.length > 1 && !ultimo && html`<button class="btn btn-sec" disabled=${ocupado} onClick=${() => ir(i + 1)}>Pular</button>`}
-      <button class="btn btn-pri" disabled=${ocupado || !tags.length} onClick=${() => salvar(true)}>${ocupado ? 'Salvando…' : fila.length > 1 && !ultimo ? 'Salvar e próxima' : 'Salvar apontamento'}</button>`}>
+      <button class="btn btn-pri" disabled=${ocupado || !tags.length || !divisaoOk} onClick=${() => salvar(true)}>${ocupado ? 'Salvando…' : fila.length > 1 && !ultimo ? 'Salvar e próxima' : 'Salvar apontamento'}</button>`}>
     <div class="apontar-cab">
       <${Placa} s=${s} grande />
       <div class="apontar-veic"><b>${s.veiculo ? nomeVeiculo(s.veiculo) : s.geral ? 'Despesa sem veículo (estoque de peças, vários veículos…)' : `Placa ${placaBonita(s.placa_arquivo)} não está no cadastro`}</b>
@@ -88,7 +100,24 @@ export function ModalApontar({ f, fila, inicio = 0, aoFechar }) {
     ${(s.geral || s.desconhecida || trocar) ? html`<${Campo} rotulo=${s.desconhecida ? 'Qual veículo é? (ou resolva a placa em "Placas a resolver")' : 'Veículo desta nota (opcional)'}>
         <${Escolher} itens=${f.veiculos} valor=${veic} aoMudar=${(id) => setVeic(id)} rotuloDe=${veicNome} placeholder="Digite a placa ou o modelo" /></${Campo}>`
       : html`<button type="button" class="btn-link" onClick=${() => setTrocar(true)}>Esta nota é de outro veículo? Trocar o veículo</button>`}
-    <${Campo} rotulo="O que foi feito? (marque um ou mais)" obrigatorio><${EscolherTags} f=${f} valor=${tags} aoMudar=${setTags} /></${Campo}>
+    <${Campo} rotulo=${partes.length ? `O que foi feito no ${placaOrig}? (marque um ou mais)` : 'O que foi feito? (marque um ou mais)'} obrigatorio>
+      <${EscolherTags} f=${f} valor=${tags} aoMudar=${setTags} /></${Campo}>
+    <div class="fr-dividir">
+      ${partes.length > 0 && html`<div class="fr-div-cab"><b>Nota dividida entre veículos</b>
+        <span class=${resta < 0 ? 'texto-vermelho' : ''}>Fica no ${placaOrig}: <b>${moeda(Math.max(resta, 0))}</b>${resta < 0 ? ` · passou ${moeda(-resta)} do valor da nota` : ''}</span></div>`}
+      ${partes.map((pt, k) => html`<div class="fr-parte" key=${k}>
+        <div class="fr-parte-linha">
+          <${Campo} rotulo=${`Veículo ${k + 2}`} obrigatorio><${Escolher} itens=${f.veiculos} valor=${pt.veiculo_id || null} aoMudar=${(id) => mudaParte(k, 'veiculo_id', id)}
+            rotuloDe=${veicNome} placeholder="Digite a placa ou o modelo" /></${Campo}>
+          <${Campo} rotulo="Valor (R$)" obrigatorio><${Numero} valor=${pt.valor} aoMudar=${(v) => mudaParte(k, 'valor', v)} placeholder="ex.: 10.000,00" /></${Campo}>
+          <button type="button" class="btn btn-sec fr-parte-tirar" aria-label=${`Tirar o veículo ${k + 2} da divisão`} onClick=${() => setPartes((l) => l.filter((_, j) => j !== k))}>Tirar</button>
+        </div>
+        <${Campo} rotulo="O que foi feito neste veículo?" obrigatorio><${EscolherTags} f=${f} valor=${pt.tags} aoMudar=${(v) => mudaParte(k, 'tags', v)} /></${Campo}>
+      </div>`)}
+      <button type="button" class="btn btn-sec" onClick=${() => setPartes((l) => [...l, { veiculo_id: null, valor: '', tags: [] }])}>
+        <${Icone} nome="mais" tam=${16} /> ${partes.length ? 'Dividir com mais um veículo' : 'Dividir esta nota com outro veículo'}</button>
+      ${!partes.length && html`<small class="nota">Use quando a oficina mandou uma nota só para mais de um veículo.</small>`}
+    </div>
     <div class="grade">
       <${Campo} rotulo="Observação (opcional)" classe="larga"><textarea class="entrada" rows="2" maxlength="1000" value=${obs} onInput=${(e) => setObs(e.target.value)}
         placeholder="ex.: troca do kit de embreagem e do platô" /></${Campo}>
@@ -115,6 +144,15 @@ export function ModalApontarVarios({ f, servicos, aoFechar }) {
     <${Campo} rotulo="O que foi feito? (marque um ou mais)" obrigatorio><${EscolherTags} f=${f} valor=${tags} aoMudar=${setTags} /></${Campo}>
     <${Campo} rotulo="Observação (opcional, vale para todas)"><textarea class="entrada" rows="2" maxlength="1000" value=${obs} onInput=${(e) => setObs(e.target.value)} /></${Campo}>
   </${Modal}>`;
+}
+
+// AVISOS COMPACTOS: vários avisos lado a lado numa linha só (espaço da tela é para os dados)
+export function AvisosLinha({ itens }) {
+  const lista = (itens || []).filter(Boolean);
+  if (!lista.length) return null;
+  return html`<div class="avisos-linha" role="status">${lista.map((a, k) => html`<div class=${'aviso-chip' + (a.cor ? ' aviso-chip-' + a.cor : '')} key=${k}>
+    <${Icone} nome=${a.icone || 'aviso'} tam=${18} /><span>${a.texto}</span>
+    ${a.botao && html`<button type="button" class="btn btn-destaque btn-peq" onClick=${a.acao}>${a.botao}</button>`}</div>`)}</div>`;
 }
 
 export const fmtK = (v) => (Math.abs(v) >= 1000 ? `${num(v / 1000, v >= 100000 ? 0 : 1)} mil` : num(v, 0));

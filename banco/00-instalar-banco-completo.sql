@@ -5954,6 +5954,7 @@ select 'Versão do banco', case when exists (select 1 from public.versao_banco w
 --
 --  · Papel novo "frota" (Manutenção de veículos). Por enquanto: administrador + quem tiver esse papel.
 --  · Cadastro de veículos, tipos de manutenção (etiquetas), correção de placas digitadas erradas.
+--  · Uma nota pode ser DIVIDIDA entre veículos (parte de cada um, com as próprias etiquetas).
 --  · Despesas de manutenção vindas do contas a pagar (CSV hoje; banco da empresa depois), com
 --    importação INCREMENTAL: o apontamento (etiquetas, observação, km) fica na NOTA e nunca se perde.
 --  · Sem dados da empresa neste arquivo: placas e despesas entram pelo próprio sistema.
@@ -6106,13 +6107,28 @@ create table if not exists public.frota_lancamentos (
   atualizado_em     timestamptz not null default now()
 );
 create index if not exists frota_lanc_servico on public.frota_lancamentos (servico_id);
+
+-- DIVISÃO de uma nota entre veículos (ex.: o mecânico fez 2 caminhões e mandou uma nota só).
+-- A parte de cada veículo extra fica aqui; o que sobra da nota continua no veículo da placa original.
+-- Ligada ao SERVIÇO: nova importação não apaga.
+create table if not exists public.frota_rateios (
+  id          bigint generated always as identity primary key,
+  servico_id  bigint not null references public.frota_servicos(id),
+  veiculo_id  bigint not null references public.frota_veiculos(id),
+  valor       numeric(14,2) not null check (valor > 0),
+  tags        bigint[] not null check (cardinality(tags) > 0),
+  observacao  text check (length(observacao) <= 1000),
+  criado_em   timestamptz not null default now(),
+  criado_por  uuid default auth.uid()
+);
+create index if not exists frota_rateios_servico on public.frota_rateios (servico_id);
 create index if not exists frota_lanc_entrada on public.frota_lancamentos (entrada);
 
 -- segurança: só quem tem acesso à frota lê; ninguém grava direto (só pelas funções abaixo)
 do $$
 declare t text;
 begin
-  foreach t in array array['frota_veiculos','frota_tags','frota_placa_apelidos','frota_importacoes','frota_servicos','frota_lancamentos'] loop
+  foreach t in array array['frota_veiculos','frota_tags','frota_placa_apelidos','frota_importacoes','frota_servicos','frota_lancamentos','frota_rateios'] loop
     execute format('alter table public.%I enable row level security', t);
     execute format('alter table public.%I force row level security', t);
     execute format('revoke all on public.%I from anon, authenticated', t);
@@ -6129,6 +6145,8 @@ drop trigger if exists aud on public.frota_tags;
 create trigger aud after insert or update or delete on public.frota_tags for each row execute function public.auditar();
 drop trigger if exists aud on public.frota_placa_apelidos;
 create trigger aud after insert or update or delete on public.frota_placa_apelidos for each row execute function public.auditar();
+drop trigger if exists aud on public.frota_rateios;
+create trigger aud after insert or update or delete on public.frota_rateios for each row execute function public.auditar();
 drop trigger if exists aud on public.frota_servicos;
 create trigger aud after insert or update or delete on public.frota_servicos for each row execute function public.auditar();
 -- nada se apaga: veículo e serviço só mudam de situação
@@ -6245,6 +6263,7 @@ end $$;
 create or replace function public.frota_apontar(p jsonb)
 returns void language plpgsql security definer set search_path = public, pg_temp as $$
 declare v_id bigint := (p->>'servico_id')::bigint; v_tags bigint[]; v_veic bigint := nullif(p->>'veiculo_id', '')::bigint;
+        v_total numeric; v_soma numeric := 0; pt jsonb; v_ptags bigint[]; v_pveic bigint; v_pval numeric;
 begin
   perform public._exigir('frota');
   if not exists (select 1 from public.frota_servicos where id = v_id) then raise exception 'Nota não encontrada.'; end if;
@@ -6254,6 +6273,25 @@ begin
     raise exception 'Tipo de manutenção inválido ou desativado.';
   end if;
   if v_veic is not null and not exists (select 1 from public.frota_veiculos where id = v_veic) then raise exception 'Veículo não encontrado.'; end if;
+  -- DIVISÃO entre veículos (p.partes): substitui as partes anteriores desta nota
+  if p ? 'partes' then
+    if jsonb_typeof(p->'partes') <> 'array' or jsonb_array_length(p->'partes') > 20 then raise exception 'Divisão inválida (máximo 20 veículos).'; end if;
+    select coalesce(sum(valor), 0) into v_total from public.frota_lancamentos where servico_id = v_id and removido_em is null;
+    delete from public.frota_rateios where servico_id = v_id;
+    for pt in select * from jsonb_array_elements(p->'partes') loop
+      v_pveic := nullif(pt->>'veiculo_id', '')::bigint; v_pval := round(nullif(pt->>'valor', '')::numeric, 2);
+      if v_pveic is null or not exists (select 1 from public.frota_veiculos where id = v_pveic) then raise exception 'Escolha o veículo de cada parte da divisão.'; end if;
+      if v_pval is null or v_pval <= 0 then raise exception 'Informe o valor de cada parte da divisão.'; end if;
+      select coalesce(array_agg(distinct x::bigint), '{}') into v_ptags from jsonb_array_elements_text(coalesce(pt->'tags', '[]'::jsonb)) x;
+      if cardinality(v_ptags) = 0 then raise exception 'Marque o tipo de manutenção de cada veículo da divisão.'; end if;
+      if exists (select 1 from unnest(v_ptags) t where not exists (select 1 from public.frota_tags g where g.id = t and g.ativo)) then
+        raise exception 'Tipo de manutenção inválido ou desativado.';
+      end if;
+      v_soma := v_soma + v_pval;
+      insert into public.frota_rateios (servico_id, veiculo_id, valor, tags, observacao) values (v_id, v_pveic, v_pval, v_ptags, public._texto(pt, 'observacao'));
+    end loop;
+    if v_soma > v_total then raise exception 'A divisão (R$ %) passa do valor da nota (R$ %).', translate(to_char(v_soma, 'FM999G999G990D00'), ',.', '.,'), translate(to_char(v_total, 'FM999G999G990D00'), ',.', '.,'); end if;
+  end if;
   update public.frota_servicos set tags = v_tags, observacao = public._texto(p, 'observacao'),
          hodometro = nullif(p->>'hodometro', '')::numeric,
          veiculo_manual_id = case when p ? 'veiculo_id' then v_veic else veiculo_manual_id end,
@@ -6370,6 +6408,11 @@ begin
     from public.frota_servicos velho
    where novo.ativo and cardinality(novo.tags) = 0 and not velho.ativo and cardinality(velho.tags) > 0
      and velho.fornecedor_codigo = novo.fornecedor_codigo and velho.titulo = novo.titulo and velho.id <> novo.id;
+  update public.frota_rateios r set servico_id = novo.id
+    from public.frota_servicos velho, public.frota_servicos novo
+   where r.servico_id = velho.id and not velho.ativo and novo.ativo and novo.id <> velho.id
+     and velho.fornecedor_codigo = novo.fornecedor_codigo and velho.titulo = novo.titulo
+     and not exists (select 1 from public.frota_rateios r2 where r2.servico_id = novo.id);
 
   perform public._frota_resolver();
   return jsonb_build_object('importacao_id', v_imp, 'desde', v_desde, 'linhas', v_n, 'novas', v_novas, 'alteradas', v_alt, 'removidas', v_rem,
@@ -6429,8 +6472,8 @@ on conflict (versao) do nothing;
 -- CONFERÊNCIA (todas as linhas devem dizer OK)
 -- ---------------------------------------------------------------------
 select 'Tabelas da frota protegidas (RLS)' as verificacao,
-       case when count(*) = 6 then 'OK (6)' else 'ATENÇÃO: ' || count(*) end as resultado
-  from pg_class where relname in ('frota_veiculos','frota_tags','frota_placa_apelidos','frota_importacoes','frota_servicos','frota_lancamentos')
+       case when count(*) = 7 then 'OK (7)' else 'ATENÇÃO: ' || count(*) end as resultado
+  from pg_class where relname in ('frota_veiculos','frota_tags','frota_placa_apelidos','frota_importacoes','frota_servicos','frota_lancamentos','frota_rateios')
    and relrowsecurity and relforcerowsecurity
 union all
 select 'Ninguém grava direto nas tabelas da frota',

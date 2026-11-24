@@ -9,9 +9,9 @@ import { moeda, data, dataHora, pl, num, contem, hojeISO, mensagemErro, nomeUsua
 import { Exportar } from '../exportar.js';
 import { Icone } from '../icones.js';
 import { ColunasEmpilhadas, BarrasH } from '../graficos.js';
-import { useFrota, GRUPOS, MESES, placaBonita, nomeVeiculo, sugestoesPlaca, linhasDoPeriodo, serieMensal, somaLinhas, valorPela, USOS_VEICULO, CATEGORIAS_VEICULO } from '../frota-dados.js';
+import { useFrota, GRUPOS, MESES, FROTAS, frotaDe, placaBonita, nomeVeiculo, sugestoesPlaca, linhasDoPeriodo, serieMensal, somaLinhas, valorItem, mesDoItem, USOS_VEICULO } from '../frota-dados.js';
 import { linhasFrota, decodificar, pareceTexto } from '../frota-csv.js';
-import { Placa, SeletorBase, TagsLidas, EtqGrupo, ModalApontar, ModalApontarVarios, fmtK } from './frota-comum.js';
+import { Placa, SeletorBase, TagsLidas, EtqGrupo, ModalApontar, ModalApontarVarios, AvisosLinha, fmtK } from './frota-comum.js';
 import { FormVeiculo } from './frota-veiculos.js';
 
 const carregandoOuErro = (titulo, erro) => html`<${Cabecalho} titulo=${titulo} />${erro
@@ -19,6 +19,8 @@ const carregandoOuErro = (titulo, erro) => html`<${Cabecalho} titulo=${titulo} /
 
 // =====================================================================
 // PAINEL DA FROTA
+// Caminhões e carros NÃO se misturam nas médias (cada frota com o seu bloco);
+// o que não tem veículo (peças para estoque, pneus para vários) fica em "despesas gerais".
 // =====================================================================
 export function TelaFrotaPainel() {
   const { ir } = useApp();
@@ -26,98 +28,110 @@ export function TelaFrotaPainel() {
   const [ano, setAno] = useState(null);
   const [base, setBase] = useState('competencia');
   const [mes, setMes] = useState(null);
-  const [cats, setCats] = useState([]); const [grupos, setGrupos] = useState([]); const [usos, setUsos] = useState(['empresa']);
+  const [grupos, setGrupos] = useState([]); const [usos, setUsos] = useState(['empresa']);
   const [gerais, setGerais] = useState(true);
+  const [ver, setVer] = useState('todas');   // gráficos/ranking/mapa: todas, caminhoes, carros
   if (!f) return carregandoOuErro('Painel da frota', erro);
   const anoV = ano || f.anos[0] || Number(hojeISO().slice(0, 4));
-  const filtro = (l) => {
-    const s = l.servico; const v = s?.veiculo;
-    if (!casaVarios(grupos, l.grupo)) return false;
-    if (!v) return gerais && !cats.length;                      // notas sem veículo (gerais/placa desconhecida)
-    return casaVarios(cats, v.categoria) && casaVarios(usos, v.uso);
-  };
-  const linhasAno = linhasDoPeriodo(f, { ano: anoV, base, filtro });
-  const linhas = mes === null ? linhasAno : linhasAno.filter((l) => Number(String(base === 'competencia' ? l.entrada : base === 'vencimento' ? l.vencimento : l.pagamento).slice(5, 7)) - 1 === mes);
-  const serie = serieMensal(linhasAno, base);
-  const totalAno = somaLinhas(linhasAno, base); const total = somaLinhas(linhas, base);
+  const filtro = (it) => casaVarios(grupos, it.grupo) && (it.veiculo ? casaVarios(usos, it.veiculo.uso) : gerais);
+  const itensAno = linhasDoPeriodo(f, { ano: anoV, base, filtro });
+  const doMes = (lista) => (mes === null ? lista : lista.filter((it) => mesDoItem(base, it) === mes));
+  const itens = doMes(itensAno);
   const hoje = hojeISO(); const mesAtual = Number(hoje.slice(5, 7)) - 1; const anoAtual = Number(hoje.slice(0, 4));
-  const totMes = (m) => GRUPOS.reduce((t, g) => t + serie[g.id][m], 0);
-  const mesesComGasto = MESES.filter((_, i) => totMes(i) > 0).length;
-  // por veículo
-  const porVeic = new Map(); let geral = 0;
-  for (const l of linhas) { const v = l.servico?.veiculo; const val = valorPela(base, l); if (v) porVeic.set(v.id, (porVeic.get(v.id) || 0) + val); else geral += val; }
-  const ranking = [...porVeic].sort((a, b) => b[1] - a[1]);
-  const porGrupo = Object.fromEntries(GRUPOS.map((g) => [g.id, linhas.filter((l) => l.grupo === g.id).reduce((t, l) => t + valorPela(base, l), 0)]));
-  // tipos de manutenção: valor das linhas cujas notas têm a etiqueta
-  const porTag = new Map(); let semTag = 0;
-  for (const l of linhas) { const tg = l.servico?.tags || []; const val = valorPela(base, l); if (!tg.length) semTag += val; tg.forEach((t) => porTag.set(t, (porTag.get(t) || 0) + val)); }
-  const pend = f.servicos.filter((s) => !s.apontado);
-  const placasPend = new Set(f.servicos.filter((s) => s.desconhecida).map((s) => s.placa_arquivo));
-  const veicAtivos = f.veiculos.filter((v) => v.situacao !== 'vendido' && casaVarios(cats, v.categoria) && casaVarios(usos, v.uso)).length;
+  const serieTot = serieMensal(itensAno, base);
+  const totMes = (m) => GRUPOS.reduce((t, g) => t + serieTot[g.id][m], 0);
+  const mesesComGasto = MESES.filter((_, i) => totMes(i) > 0).length || 1;
+  const totalAno = somaLinhas(itensAno, base);
+  const geral = somaLinhas(itens.filter((it) => !it.veiculo), base);
   const rotMes = mes === null ? `${anoV}` : `${MESES[mes]}/${anoV}`;
-  const ultImp = f.importacoes[0];
-  const cats2 = [...new Set([...CATEGORIAS_VEICULO, ...f.veiculos.map((v) => v.categoria)])].filter((c) => f.veiculos.some((v) => v.categoria === c));
-  const abrir = (vid) => ir('frota-veiculos', { abrir: vid });
-
-  // mapa de calor (veículo × mês)
+  // por frota (caminhões × carros)
+  const naFrota = (fr) => f.veiculos.filter((v) => frotaDe(v) === fr && v.situacao !== 'vendido' && casaVarios(usos, v.uso));
+  const blocos = FROTAS.map((fr) => {
+    const its = itens.filter((it) => it.frota === fr.id);
+    const n = naFrota(fr.id).length;
+    const total = somaLinhas(its, base);
+    const porGrupo = Object.fromEntries(GRUPOS.map((g) => [g.id, somaLinhas(its.filter((it) => it.grupo === g.id), base)]));
+    const comGasto = new Set(its.map((it) => it.veiculoId)).size;
+    return { ...fr, n, total, porGrupo, comGasto, media: n ? total / n : 0 };
+  });
+  // gráficos, ranking, tipos e mapa: todas as frotas ou uma
+  const doVer = (lista) => (ver === 'todas' ? lista : lista.filter((it) => it.frota === ver));
+  const itensVerAno = doVer(itensAno); const itensVer = doMes(itensVerAno);
+  const serie = serieMensal(itensVerAno, base);
+  const porVeic = new Map();
+  for (const it of itensVer) if (it.veiculo) porVeic.set(it.veiculoId, (porVeic.get(it.veiculoId) || 0) + valorItem(base, it));
+  const ranking = [...porVeic].sort((a, b) => b[1] - a[1]);
+  const porTag = new Map(); let semTag = 0;
+  for (const it of itensVer) { const v = valorItem(base, it); if (!it.tags.length) semTag += v; it.tags.forEach((t) => porTag.set(t, (porTag.get(t) || 0) + v)); }
   const calor = (() => {
     const m = new Map();
-    for (const l of linhasAno) {
-      const v = l.servico?.veiculo; if (!v) continue;
-      const k = Number(String(base === 'competencia' ? l.entrada : base === 'vencimento' ? l.vencimento : l.pagamento).slice(5, 7)) - 1;
-      if (!m.has(v.id)) m.set(v.id, { v, meses: Array(12).fill(0), total: 0 });
-      const x = m.get(v.id); x.meses[k] += valorPela(base, l); x.total += valorPela(base, l);
+    for (const it of itensVerAno) {
+      if (!it.veiculo) continue;
+      if (!m.has(it.veiculoId)) m.set(it.veiculoId, { v: it.veiculo, meses: Array(12).fill(0), total: 0 });
+      const x = m.get(it.veiculoId); const val = valorItem(base, it); x.meses[mesDoItem(base, it)] += val; x.total += val;
     }
     return [...m.values()].sort((a, b) => b.total - a.total);
   })();
   const maxCel = Math.max(1, ...calor.flatMap((x) => x.meses));
   const nivel = (v) => (v <= 0 ? 0 : Math.min(5, Math.ceil((v / maxCel) * 5)));
-
+  const pend = f.servicos.filter((x) => !x.apontado).length;
+  const placasPend = new Set(f.servicos.filter((x) => x.desconhecida).map((x) => x.placa_arquivo)).size;
+  const ultImp = f.importacoes[0];
+  const abrir = (vid) => ir('frota-veiculos', { abrir: vid });
+  const rotVer = ver === 'todas' ? 'toda a frota' : FROTAS.find((x) => x.id === ver).rotulo.toLowerCase();
   const exp = [{ titulo: 'Placa', valor: (x) => placaBonita(x.v.placa) }, { titulo: 'Veículo', valor: (x) => nomeVeiculo(x.v), largura: 26 }, { titulo: 'Categoria', valor: (x) => x.v.categoria },
     ...MESES.map((m, i) => ({ titulo: m, valor: (x) => Math.round(x.meses[i] * 100) / 100, texto: (x) => (x.meses[i] ? moeda(x.meses[i]) : ''), num: true })),
     { titulo: 'Total', valor: (x) => Math.round(x.total * 100) / 100, texto: (x) => moeda(x.total), num: true }];
   return html`
-    <${Cabecalho} titulo="Painel da frota" sub=${`Manutenção de veículos (contas a pagar: corretiva, preventiva e pneus)${ultImp ? ` · dados de ${dataHora(ultImp.criado_em)}` : ''}`} />
-    ${!f.lancamentos.length ? html`<div class="aviso-faixa"><span>Ainda não há despesas. Importe o arquivo do contas a pagar para começar.</span>
-      <button class="btn btn-destaque btn-peq" onClick=${() => ir('frota-importar')}>Importar despesas</button></div>` : ''}
-    ${pend.length > 0 && html`<div class="aviso-faixa"><span>📝 <b>${pl(pend.length, 'nota esperando', 'notas esperando')}</b> o tipo de manutenção.</span>
-      <button class="btn btn-destaque btn-peq" onClick=${() => ir('frota-apontar')}>Apontar agora</button></div>`}
-    ${placasPend.size > 0 && html`<div class="aviso-faixa"><span>⚠ <b>${pl(placasPend.size, 'placa', 'placas')}</b> nas despesas sem cadastro (veículo novo ou placa digitada errada).</span>
-      <button class="btn btn-destaque btn-peq" onClick=${() => ir('frota-placas')}>Resolver placas</button></div>`}
-    <${Filtros} ativos=${[cats.length, grupos.length, usos.join() !== 'empresa', !gerais].filter(Boolean).length}
-      acoes=${html`<${Exportar} titulo=${`Gasto por veículo e mês · ${anoV}`} filtros=${`${BASE_TXT[base]}`} arquivo=${`frota-veiculo-mes-${anoV}`} colunas=${exp} linhas=${calor} />`}>
+    <${Cabecalho} titulo="Painel da frota" sub=${`Manutenção de veículos: corretiva, preventiva e pneus (contas a pagar)${ultImp ? ` · dados de ${dataHora(ultImp.criado_em)}` : ''}`} />
+    <${AvisosLinha} itens=${[
+      !f.lancamentos.length && { icone: 'frota-importar', texto: 'Sem despesas ainda', botao: 'Importar', acao: () => ir('frota-importar') },
+      pend > 0 && { icone: 'frota-apontar', texto: html`<b>${pend}</b> ${pend === 1 ? 'nota' : 'notas'} para apontar`, botao: 'Apontar', acao: () => ir('frota-apontar') },
+      placasPend > 0 && { icone: 'frota-placas', texto: html`<b>${placasPend}</b> ${placasPend === 1 ? 'placa' : 'placas'} sem cadastro`, botao: 'Resolver', acao: () => ir('frota-placas') },
+    ]} />
+    <${Filtros} ativos=${[grupos.length, usos.join() !== 'empresa', !gerais].filter(Boolean).length}
+      acoes=${html`<${Exportar} titulo=${`Gasto por veículo e mês · ${anoV} · ${rotVer}`} filtros=${BASE_TXT[base]} arquivo=${`frota-veiculo-mes-${anoV}`} colunas=${exp} linhas=${calor} />`}>
       <label class="campo-inline">Ano <select class="entrada" value=${anoV} onChange=${(e) => { setAno(Number(e.target.value)); setMes(null); }}>
         ${(f.anos.length ? f.anos : [anoV]).map((a) => html`<option value=${a}>${a}</option>`)}</select></label>
       <${SeletorBase} base=${base} aoMudar=${setBase} />
       <${MultiEscolha} todos="Todas as contas" rotulo="Contas" valor=${grupos} aoMudar=${setGrupos} opcoes=${GRUPOS.map((g) => ({ valor: g.id, rotulo: g.rotulo }))} />
-      <${MultiEscolha} todos="Todas as categorias" rotulo="Categorias" valor=${cats} aoMudar=${setCats} opcoes=${cats2.map((c) => ({ valor: c, rotulo: c }))} />
       <${MultiEscolha} todos="Empresa e particulares" rotulo="Uso" valor=${usos} aoMudar=${setUsos} opcoes=${Object.entries(USOS_VEICULO).map(([k, t]) => ({ valor: k, rotulo: t }))} />
       <label class="check"><input type="checkbox" checked=${gerais} onChange=${(e) => setGerais(e.target.checked)} /> incluir despesas gerais</label>
     </${Filtros}>
-    <div class="cartoes">
-      <${Cartao} titulo=${`Gasto em ${anoV}`} valor=${moeda(totalAno)} sub=${`média ${moeda(mesesComGasto ? totalAno / mesesComGasto : 0)} por mês`} />
-      ${anoV === anoAtual && html`<${Cartao} titulo=${`${MESES[mesAtual]}/${anoV}`} valor=${moeda(totMes(mesAtual))}
-        variacao=${mesAtual > 0 && totMes(mesAtual - 1) > 0 ? varTxt(totMes(mesAtual), totMes(mesAtual - 1)) : null} aoClicar=${() => setMes(mesAtual)} />`}
-      <${Cartao} titulo="Média por veículo" valor=${moeda(porVeic.size ? (total - geral) / porVeic.size : 0)} sub=${`${porVeic.size} com gasto de ${veicAtivos} na frota · ${rotMes}`} />
-      ${GRUPOS.map((g) => html`<${Cartao} key=${g.id} titulo=${g.rotulo} valor=${moeda(porGrupo[g.id])} sub=${total > 0 ? `${num((porGrupo[g.id] / total) * 100, 0)}% · ${rotMes}` : rotMes}
-        cor=${grupos.length === 1 && grupos[0] === g.id ? 'c-ativo' : ''} aoClicar=${() => setGrupos(grupos.length === 1 && grupos[0] === g.id ? [] : [g.id])} />`)}
-      ${gerais && html`<${Cartao} titulo="Despesas gerais" valor=${moeda(geral)} sub="sem veículo ou placa a resolver" />`}
+    <div class="cartoes fr-resumo">
+      <${Cartao} titulo=${`Gasto total ${anoV}`} valor=${moeda(totalAno)} sub=${`média ${moeda(totalAno / mesesComGasto)} por mês`} />
+      ${anoV === anoAtual && html`<${Cartao} titulo=${`Gasto em ${MESES[mesAtual]}/${anoV}`} valor=${moeda(totMes(mesAtual))}
+        variacao=${mesAtual > 0 && totMes(mesAtual - 1) > 0 ? varTxt(totMes(mesAtual), totMes(mesAtual - 1)) : null} aoClicar=${() => setMes(mes === mesAtual ? null : mesAtual)} />`}
+      ${gerais && html`<${Cartao} titulo=${`Despesas gerais · ${rotMes}`} valor=${moeda(geral)} sub="peças p/ estoque, pneus e serviços sem veículo" />`}
     </div>
-    <section class="painel"><div class="painel-topo"><h2>Gasto mês a mês · ${anoV}</h2>
+    <div class="fr-frotas">${blocos.map((b) => html`<section class="painel fr-frota" key=${b.id}>
+      <div class="painel-topo"><h2><${Icone} nome=${b.id === 'caminhoes' ? 'frota' : 'frota-veiculos'} tam=${20} /> ${b.rotulo}</h2>
+        <span class="nota">${pl(b.n, 'veículo', 'veículos')} · ${rotMes}</span></div>
+      <div class="fr-numeros">
+        <div><small>Gasto</small><b>${moeda(b.total)}</b></div>
+        <div><small>Média por veículo</small><b>${moeda(b.media)}</b></div>
+        <div><small>Por veículo/mês</small><b>${moeda(mes === null ? b.media / mesesComGasto : b.media)}</b></div>
+      </div>
+      <${DivisaoContas} partes=${GRUPOS.map((g) => ({ ...g, valor: b.porGrupo[g.id], media: b.n ? b.porGrupo[g.id] / b.n : 0 }))} />
+      <button type="button" class="btn-link" onClick=${() => setVer(ver === b.id ? 'todas' : b.id)}>${ver === b.id ? 'Ver toda a frota nos gráficos' : `Ver só ${b.rotulo.toLowerCase()} nos gráficos ›`}</button>
+    </section>`)}</div>
+    <div class="fr-ver"><span>Gráficos e tabela de:</span>
+      <div class="seg" role="group" aria-label="Frota nos gráficos">${[{ id: 'todas', rotulo: 'Toda a frota' }, ...FROTAS].map((x) => html`<button type="button"
+        class=${ver === x.id ? 'ativo' : ''} aria-pressed=${ver === x.id} onClick=${() => setVer(x.id)}>${x.rotulo}</button>`)}</div>
       ${mes !== null && html`<button class="chip ativo" onClick=${() => setMes(null)} aria-label="Ver o ano todo">${MESES[mes]}/${anoV} ✕</button>`}</div>
+    <section class="painel"><h2>Gasto mês a mês · ${anoV} · ${rotVer}</h2>
       <${ColunasEmpilhadas} categorias=${MESES} series=${GRUPOS.filter((g) => casaVarios(grupos, g.id)).map((g) => ({ nome: g.rotulo, cor: g.cor, valores: serie[g.id] }))}
         formatar=${moeda} formatarEixo=${fmtK} aoClicar=${(i) => setMes(mes === i ? null : i)} selecionada=${mes} />
       <p class="nota">${BASE_AJUDA[base]} Toque num mês para ver o ranking e os tipos daquele mês.</p></section>
     <div class="duas-colunas">
       <section class="painel"><h2>Veículos que mais gastaram · ${rotMes}</h2>
         <${BarrasH} itens=${ranking.slice(0, 12).map(([id, val]) => { const v = f.mapa.veiculo.get(id); return { id, rotulo: placaBonita(v.placa), sub: nomeVeiculo(v), valor: val, texto: moeda(val) }; })}
-          aoClicar=${(i) => abrir(i.id)} vazio="Sem gastos de veículos neste período." />
+          aoClicar=${(x) => abrir(x.id)} vazio="Sem gastos de veículos neste período." />
         ${ranking.length > 12 && html`<p class="nota">Mostrando 12 de ${ranking.length}. A tabela abaixo tem todos.</p>`}</section>
       <section class="painel"><h2>Tipos de manutenção · ${rotMes}</h2>
         <${BarrasH} itens=${[...porTag].sort((a, b) => b[1] - a[1]).map(([t, val]) => ({ rotulo: f.mapa.tag.get(t)?.nome || '?', valor: val, texto: moeda(val) }))}
           vazio="Nenhuma nota apontada neste período." cor="var(--fr-preventiva)" />
-        ${semTag > 0 && html`<p class="nota">${moeda(semTag)} ainda sem tipo de manutenção. <button class="btn-link" onClick=${() => ir('frota-apontar')}>Apontar</button></p>`}
-        <p class="nota">Uma nota com 2 tipos conta nos dois.</p></section>
+        <p class="nota">${semTag > 0 ? html`${moeda(semTag)} ainda sem tipo. <button class="btn-link" onClick=${() => ir('frota-apontar')}>Apontar</button> · ` : ''}Uma nota com 2 tipos conta nos dois.</p></section>
     </div>
     <section class="painel"><div class="painel-topo"><h2>Gasto por veículo e mês · ${anoV}</h2><span class="nota">quanto mais escuro, maior o gasto</span></div>
       ${!calor.length ? html`<${Vazio} texto="Sem gastos de veículos neste ano." />` : html`<div class="tabela-rolagem"><table class="tabela calor">
@@ -128,6 +142,18 @@ export function TelaFrotaPainel() {
           <td class="n" data-rotulo="Total"><b>${moeda(x.total)}</b></td></tr>`)}</tbody></table></div>`}
     </section>`;
 }
+
+// corretiva × preventiva × pneus de uma frota: barra 100% + total e média por veículo de cada conta
+function DivisaoContas({ partes }) {
+  const total = partes.reduce((t, p) => t + p.valor, 0);
+  return html`<div class="fr-divisao">
+    <div class="fr-div-barra" aria-hidden="true">${total > 0 && partes.map((p) => p.valor > 0 && html`<span style=${{ width: `${(p.valor / total) * 100}%`, background: p.cor }}></span>`)}</div>
+    <table class="fr-div-tabela"><thead><tr><th scope="col">Conta</th><th scope="col" class="n">Total</th><th scope="col" class="n">%</th><th scope="col" class="n">Por veículo</th></tr></thead>
+      <tbody>${partes.map((p) => html`<tr key=${p.id}><th scope="row"><i style=${{ background: p.cor }} aria-hidden="true"></i>${p.rotulo}</th>
+        <td class="n">${moeda(p.valor)}</td><td class="n">${total > 0 ? `${num((p.valor / total) * 100, 0)}%` : '–'}</td><td class="n">${moeda(p.media)}</td></tr>`)}</tbody></table>
+  </div>`;
+}
+
 const BASE_TXT = { competencia: 'por competência (data de entrada da nota)', vencimento: 'por vencimento das parcelas', pagamento: 'pelo que foi pago' };
 const BASE_AJUDA = { competencia: 'Competência: o valor total da nota no mês da data de entrada (mesmo parcelado).', vencimento: 'Vencimento: cada parcela no mês em que vence.',
   pagamento: 'Pagamento: cada parcela no mês em que foi paga (com juros/descontos).' };
@@ -175,7 +201,7 @@ export function TelaFrotaApontar() {
         <button type="button" class="nota-corpo" onClick=${() => (varios ? alternar(s.id) : setApontar({ fila: aba === 'pendentes' ? lista : [s], i: aba === 'pendentes' ? lista.indexOf(s) : 0 }))}>
           <span class="nota-placa"><${Placa} s=${s} /><small>${s.veiculo ? nomeVeiculo(s.veiculo) : ''}</small></span>
           <span class="nota-meio"><b>${s.fornecedor}</b><small>${data(s.entrada)} · ${pl(s.parcelas, 'parcela', 'parcelas')} · título ${s.titulo}</small>
-            <span>${s.grupos.map((g) => html`<${EtqGrupo} grupo=${g} /> `)}${s.apontado ? html`<${TagsLidas} ids=${s.tags} f=${f} />` : ''}</span>
+            <span>${s.grupos.map((g) => html`<${EtqGrupo} grupo=${g} /> `)}${s.partes.length > 1 ? html`<${Etiqueta} cor="roxo">dividida em ${s.partes.length} veículos</${Etiqueta}> ` : ''}${s.apontado ? html`<${TagsLidas} ids=${s.tags} f=${f} />` : ''}</span>
             ${s.obsFinanceiro && html`<small class="nota-obs">“${s.obsFinanceiro}”</small>`}</span>
           <span class="nota-valor"><b>${moeda(s.total)}</b><small>${s.apontado ? `apontada ${s.apontado_em ? dataHora(s.apontado_em) : ''}` : 'apontar ›'}</small></span>
         </button></li>`)}</ul>

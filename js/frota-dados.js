@@ -32,6 +32,10 @@ export const dataPela = (base, l) => (base === 'vencimento' ? l.vencimento : bas
 export const valorPela = (base, l) => (base === 'pagamento' ? pagoDaLinha(l) : Number(l.valor || 0));
 
 export const CATEGORIAS_VEICULO = ['Caminhão', 'Caminhão 3/4', 'Caminhão truck', 'Caminhão bitruck', 'Cavalo mecânico', 'Carreta', 'Van', 'Picape', 'Carro', 'Moto', 'Outro'];
+// FROTAS: caminhões e carros não se misturam nas médias (a categoria do cadastro decide)
+export const CATEGORIAS_CAMINHAO = ['Caminhão', 'Caminhão 3/4', 'Caminhão truck', 'Caminhão bitruck', 'Cavalo mecânico', 'Carreta'];
+export const FROTAS = [{ id: 'caminhoes', rotulo: 'Caminhões' }, { id: 'carros', rotulo: 'Carros e utilitários' }];
+export const frotaDe = (v) => (!v ? 'geral' : CATEGORIAS_CAMINHAO.includes(v.categoria) ? 'caminhoes' : 'carros');
 export const SITUACOES_VEICULO = { ativo: 'Ativo', parado: 'Parado', vendido: 'Vendido' };
 export const USOS_VEICULO = { empresa: 'Frota da empresa', particular: 'Particular (sócios)' };
 export const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
@@ -66,13 +70,13 @@ export function sugestoesPlaca(placa, veiculos, max = 3) {
 // ---------------------------------------------------------------------
 let cache = null; let carregando = null; const ouvintes = new Set();
 async function buscar(api) {
-  const [veiculos, tags, apelidos, servicos, lancamentos, importacoes] = await Promise.all([
+  const [veiculos, tags, apelidos, servicos, lancamentos, importacoes, rateios] = await Promise.all([
     api.listar('frota_veiculos', { ordem: ['placa', 'asc'] }), api.listar('frota_tags', { ordem: ['ordem', 'asc'] }),
     api.listar('frota_placa_apelidos', { ordem: ['placa', 'asc'] }), api.listar('frota_servicos'),
     api.listar('frota_lancamentos', { nulo: ['removido_em'], ordem: ['id', 'asc'] }),
-    api.listar('frota_importacoes', { ordem: ['id', 'desc'], limite: 100 }),
+    api.listar('frota_importacoes', { ordem: ['id', 'desc'], limite: 100 }), api.listar('frota_rateios'),
   ]);
-  return montar({ veiculos, tags, apelidos, servicos, lancamentos, importacoes });
+  return montar({ veiculos, tags, apelidos, servicos, lancamentos, importacoes, rateios });
 }
 export function recarregarFrota(api) {
   carregando = buscar(api).then((f) => { cache = f; carregando = null; ouvintes.forEach((o) => o(f)); return f; })
@@ -102,8 +106,11 @@ function montar(b) {
     if (!lancsDe.has(l.servico_id)) lancsDe.set(l.servico_id, []);
     lancsDe.get(l.servico_id).push(l);
   }
+  const ratDe = new Map();
+  for (const r of b.rateios) { if (!ratDe.has(r.servico_id)) ratDe.set(r.servico_id, []); ratDe.get(r.servico_id).push(r); }
   const servicos = b.servicos.map((s) => {
     const lancs = lancsDe.get(s.id) || [];
+    const rateios = ratDe.get(s.id) || [];
     const veiculoId = s.veiculo_manual_id || s.veiculo_id || null;
     const total = lancs.reduce((t, l) => t + Number(l.valor || 0), 0);
     const pago = lancs.reduce((t, l) => t + (l.pagamento ? Number(l.valor || 0) : 0), 0);
@@ -115,30 +122,52 @@ function montar(b) {
       total, pago, aberto: total - pago, grupos, grupo: grupos.length === 1 ? grupos[0] : grupos.sort((x, y) => lancs.filter((l) => l.grupo === y).length - lancs.filter((l) => l.grupo === x).length)[0],
       parcelas, entrada: lancs.reduce((m, l) => (!m || l.entrada < m ? l.entrada : m), null),
       fornecedor: lancs[0]?.fornecedor_nome || '', obsFinanceiro: lancs[0]?.observacao || '',
-      apontado: (s.tags || []).length > 0,
+      apontado: (s.tags || []).length > 0, rateios,
     };
-  }).filter((s) => s.lancs.length);   // nota que sumiu do financeiro não aparece (o apontamento continua guardado no banco)
+  }).filter((s) => s.lancs.length);
+  // PARTES de cada nota: o que ficou no veículo da placa original + cada divisão para outro veículo
+  for (const s of servicos) {
+    const soma = s.rateios.reduce((t, r) => t + Number(r.valor), 0);
+    const esc = soma > s.total && soma > 0 ? s.total / soma : 1;   // nota diminuiu depois da divisão: divide proporcionalmente
+    s.somaRateios = soma;
+    s.partes = [
+      { principal: true, veiculoId: s.veiculoId, veiculo: s.veiculo, valor: Math.max(0, s.total - soma * esc), tags: s.tags || [], observacao: s.observacao, hodometro: s.hodometro },
+      ...s.rateios.map((r) => ({ principal: false, rateioId: r.id, veiculoId: r.veiculo_id, veiculo: veiculo.get(r.veiculo_id), valor: Number(r.valor) * esc, tags: r.tags, observacao: r.observacao })),
+    ];
+  }   // nota que sumiu do financeiro não aparece (o apontamento continua guardado no banco)
   const servico = new Map(servicos.map((s) => [s.id, s]));
   for (const l of b.lancamentos) { l.servico = servico.get(l.servico_id); }
+  // ITENS = linha do financeiro × parte (é o que os painéis somam; uma nota dividida conta em cada veículo)
+  const itens = [];
+  for (const l of b.lancamentos) {
+    const s = l.servico; if (!s) continue;
+    for (const pt of s.partes) {
+      const fator = s.total > 0 ? pt.valor / s.total : (pt.principal ? 1 : 0);
+      if (fator <= 0) continue;
+      itens.push({ l, s, parte: pt, veiculo: pt.veiculo || null, veiculoId: pt.veiculoId || null, grupo: l.grupo, fator, tags: pt.tags, frota: frotaDe(pt.veiculo) });
+    }
+  }
   const anos = [...new Set(b.lancamentos.map((l) => Number(String(l.entrada).slice(0, 4))))].sort((x, y) => y - x);
-  return { ...b, mapa: { veiculo, tag, servico }, servicos, anos, carregadoEm: new Date() };
+  return { ...b, mapa: { veiculo, tag, servico }, servicos, itens, anos, carregadoEm: new Date() };
 }
 
 // linhas que entram num painel: ano, base de data e filtros (veículo/categoria/uso/grupo; gerais opcionais)
 export function linhasDoPeriodo(f, { ano, base, mes = null, filtro = () => true }) {
   const pre = `${ano}-`;
-  return f.lancamentos.filter((l) => {
-    const d = dataPela(base, l);
+  return f.itens.filter((it) => {
+    const d = dataPela(base, it.l);
     if (!d || !String(d).startsWith(pre)) return false;
     if (mes !== null && Number(String(d).slice(5, 7)) - 1 !== mes) return false;
-    return filtro(l);
+    return filtro(it);
   });
 }
+export const valorItem = (base, it) => valorPela(base, it.l) * it.fator;
+export const mesDoItem = (base, it) => Number(String(dataPela(base, it.l)).slice(5, 7)) - 1;
 // série mês a mês por grupo (corretiva/preventiva/pneus)
 export function serieMensal(linhas, base) {
   const s = Object.fromEntries(GRUPOS.map((g) => [g.id, Array(12).fill(0)]));
-  for (const l of linhas) { const m = Number(String(dataPela(base, l)).slice(5, 7)) - 1; s[l.grupo][m] += valorPela(base, l); }
+  for (const it of linhas) s[it.grupo][mesDoItem(base, it)] += valorItem(base, it);
   return s;
 }
-export const somaLinhas = (linhas, base) => linhas.reduce((t, l) => t + valorPela(base, l), 0);
+export const somaLinhas = (linhas, base) => linhas.reduce((t, it) => t + valorItem(base, it), 0);
 export const nomeVeiculo = (v) => (v ? [v.marca, v.modelo].filter(Boolean).join(' ') : '');
