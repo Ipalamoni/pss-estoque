@@ -3,9 +3,12 @@
 Arquivo público: sem nomes de pessoas, senhas, tokens ou dados da empresa.
 
 ## Situação atual (24/11/2026)
-- Sistema publicado: https://ipalamoni.github.io/pss-estoque/ (versão do app 2.15.0).
-- Banco de produção (Supabase `kuttfnmjvzgzebjpjvvy`, "estoque-pss"): versão **2.13.0**, todas as
+- Sistema publicado: https://ipalamoni.github.io/pss-estoque/ (versão do app 2.16.0).
+- Banco de produção (Supabase `kuttfnmjvzgzebjpjvvy`, "estoque-pss"): versão **2.16.0**, todas as
   conferências OK. Não mexer no projeto Supabase `pss-vendas`.
+- v2.16.0 (24/11/2026, banco + tela): padrão dos nomes. Todo cadastro com 1ª letra maiúscula e o resto minúsculo;
+  razão social e UF todas maiúsculas; siglas conhecidas (PCP, PSS, PVC, UHT, BOPP, LTDA...) ficam maiúsculas. Feito no
+  banco (gatilhos), vale para tela, planilha e pré-cadastro. Aplicado em produção: 78 nomes arrumados (na auditoria).
 - v2.15.0 (24/11/2026, só tela): no computador, botão "Abrir em nova janela" no topo e Ctrl+clique (ou botão do
   meio) no menu abre a tela em outra janela do app. O tempo sem uso é contado junto por todas as janelas e sair
   numa janela tira todas.

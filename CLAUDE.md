@@ -55,6 +55,8 @@ não técnico), GUIA_DO_DONO.md (tela a tela), ESPECIFICACAO_DO_SISTEMA.md e CON
 ## 2. UX e UI em computador, tablet e celular
 - Toda tela nova ou alterada segue o padrão do sistema (`ui.js`, `app.css`) e é revisada nas três larguras: 390 px (celular), 800 px (tablet), 1280 px (computador).
 - Acessibilidade WCAG 2.1 AA: contraste ≥ 4,5:1 no texto, foco visível, tudo usável pelo teclado, rótulos em todos os campos, alvos de toque ≥ 44 px.
+- Nomes de cadastro: 1ª letra maiúscula e o resto minúsculo; razão social e UF TODAS MAIÚSCULAS (o banco aplica
+  sozinho: `nome_padrao`, `nome_maiusculo` e gatilhos `padronizar_nomes`, v2.16). Cadastro novo com nome entra no gatilho.
 - Textos claros e iguais em todo lugar (o nome no menu = título da tela = atalho). Botões dizem a ação ("Salvar pedido", não "OK").
 - Cartões e atalhos levam ao lugar certo já filtrado. Sem informação repetida na mesma tela.
 
