@@ -3,15 +3,15 @@
 Arquivo público: sem nomes de pessoas, senhas, tokens ou dados da empresa.
 
 ## Situação atual (24/11/2026)
-- Sistema publicado: https://ipalamoni.github.io/pss-estoque/ (versão do app 2.19.0).
-- Banco de produção (Supabase `kuttfnmjvzgzebjpjvvy`, "estoque-pss"): versão **2.19.0**, todas as
+- Sistema publicado: https://ipalamoni.github.io/pss-estoque/ (versão do app 2.20.0).
+- Banco de produção (Supabase `kuttfnmjvzgzebjpjvvy`, "estoque-pss"): versão **2.20.0**, todas as
   conferências OK. Não mexer no projeto Supabase `pss-vendas`.
-- v2.20.0 (24/11/2026, EM ESPERA para publicar): módulo MANUTENÇÃO DE VEÍCULOS (Painel da frota, Apontar despesas,
-  Veículos com ficha/raio-x, Placas a resolver, Importar despesas, Tipos de manutenção; caminhões × carros separados,
-  avisos compactos, divisão de nota entre veículos). Código pronto e testado
-  (demonstração + cópia dos dados reais). FALTA: aplicar `banco/atualizar-banco-v2.20.sql` em produção, rodar a
-  carga inicial privada (58 veículos + 43 correções de placa, fora do repositório), importar o CSV e publicar na main.
-  A função admin-usuarios precisa ser republicada para criar usuário já com o papel "frota" (editar usuário funciona).
+- v2.20.0 (24/11/2026, banco + tela, PUBLICADO): módulo MANUTENÇÃO DE VEÍCULOS (Painel da frota com caminhões,
+  utilitários e carros separados; Apontar despesas com divisão de nota entre veículos; Veículos com ficha/raio-x;
+  Placas a resolver; Importar despesas; Tipos de manutenção). Banco v2.20 aplicado em produção; carga inicial feita
+  (58 veículos + 43 correções de placa; arquivo privado, fora do repositório). Próximo: o dono importa o CSV do ano
+  pela tela "Importar despesas". Pendente: republicar a função admin-usuarios para CRIAR usuário já com o papel
+  "frota" (editar um usuário e marcar o papel já funciona). Fase seguinte: consulta automática ao Firebird.
 - v2.19.0 (24/11/2026, banco + tela): consumo (no setor e pela receita) só pode ser corrigido até 1 hora depois;
   transferência não se corrige (mensagem explica: cancelar antes de recebida; depois, inventário). Aplicado em produção.
 - v2.18.0 (24/11/2026, banco + tela): prazo para corrigir lançamento. Só o administrador corrige a qualquer momento;
