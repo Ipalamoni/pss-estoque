@@ -1376,3 +1376,110 @@ html[data-tema="escuro"] {
 .sino-ico.atraso { background: #c62828; color: #fff; }
 [data-tema="escuro"] .sino-ico.pre { background: #3a2a12; color: #ffd9a8; }
 .fo-lista { margin: 0; padding-left: 1.2em; font-size: 1.1rem; line-height: 1.5; }
+
+/* =====================================================================
+   VERSÃO 2.12 — tablet das masseiras: tudo centralizado, letras maiores
+   (pessoas com a vista cansada) e o ícone da masseira em todo card de masseira
+   ===================================================================== */
+.mac-ico { display: inline-flex; align-items: center; justify-content: center; width: 58px; height: 58px; border-radius: 16px; flex: none;
+  background: color-mix(in srgb, var(--cor) 13%, transparent); color: var(--cor); }
+.modal-ico { display: inline-flex; vertical-align: -6px; margin-right: 8px; color: var(--cor); }
+.com-ico { display: inline-flex; align-items: center; gap: 8px; }
+.com-ico .icone, .qc-nome .icone { color: var(--cor); flex: none; }
+.qc-nome { display: inline-flex; align-items: center; gap: 6px; }
+/* quadrado da masseira */
+.mac-tile { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; padding: 18px 14px; }
+.mac-tile-topo { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; width: 100%; }
+.mac-nome { font-size: 1.4rem; line-height: 1.2; }
+.mac-cap { font-size: 1rem; font-weight: 700; color: var(--texto-2); background: var(--fundo); border: 1px solid var(--borda); border-radius: 999px; padding: 2px 12px; }
+.mac-linhas, .mac-ops { font-size: 1.02rem; color: var(--texto-2); }
+.mac-status { justify-content: center; flex-wrap: wrap; font-size: 1.12rem; }
+.mac-status small { font-size: 1rem; }
+.mac-batendo { font-size: 1.08rem; font-weight: 700; }
+.mac-prox { margin-top: auto; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 1.02rem; }
+.mac-num { position: static; align-self: center; font-size: 1rem; }
+.mac-mudou { align-self: center; font-size: 1rem; }
+/* quem está trabalhando + contadores */
+.mac-operador { justify-content: center; gap: 16px; }
+.mac-operador small { font-size: 1rem; }
+.mac-operador b { font-size: 1.35rem; }
+.mac-trocar { margin-left: 18px; font-size: 1.05rem; }
+.mac-cont { align-items: center; justify-content: center; text-align: center; gap: 4px; padding: 14px 12px; }
+.mac-cont small { font-size: 1rem; font-weight: 600; color: var(--texto-2); }
+.mac-cont b { font-size: 2.1rem; }
+.mac-cont b.mac-txt { font-size: 1.4rem; }
+.mac-acao { font-size: 1.05rem; }
+.maceiras-tela > .nota, .maceiras-tela .leg { font-size: 1rem; }
+/* batendo agora */
+.ep-item { justify-content: center; text-align: center; }
+.ep-info { align-items: center; }
+.ep-info .selo-tempo { align-self: center; }
+.ep-mac { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.ep-mac .icone { color: var(--cor); }
+/* cadastro das masseiras */
+.mac-cad { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; }
+.mac-cad-topo { justify-content: center; gap: 8px; font-size: 1.15rem; }
+.mac-cad-info { justify-content: center; }
+.mac-cad-info span, .mac-cad-linha { align-items: center; font-size: 1rem; }
+.mac-cad small { font-size: .9rem; }
+/* status do quadrado: a bolinha fica junto do texto (não sozinha numa linha) */
+.mac-status { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.mac-status b { display: inline; line-height: 1.3; }
+.mac-status .mac-luz { display: inline-block; width: 16px; height: 16px; vertical-align: -2px; margin-right: 8px; }
+
+/* =====================================================================
+   VERSÃO 2.12 — LEGIBILIDADE EM TODO O SISTEMA (pedido do dono: muitas pessoas com
+   a vista cansada). Nenhum texto de apoio abaixo de ~14 px; informação dos cards
+   centralizada. Vem por último para valer sobre as regras antigas.
+   ===================================================================== */
+small { font-size: .9rem; }
+.topo small, .menu-rodape small { font-size: .875rem; }
+.menu-grupo { font-size: .8rem; letter-spacing: .05em; }
+.trilha { font-size: .9rem; }
+.btn { font-size: .95rem; }
+.btn-peq { font-size: .9rem; min-height: 36px; padding: 4px 12px; }
+.chip { font-size: .92rem; }
+.etq { font-size: .875rem; padding: 3px 10px; }
+.campo-ajuda { font-size: .875rem; }
+.semaf, .selo-tempo { font-size: .9rem; }
+.em-chip { font-size: .875rem; }
+.linha-tempo-mini { font-size: .875rem; }
+.bh-valor, .bh-rotulo small { font-size: .875rem; }
+.transf-tempo { font-size: .9rem; }
+.bt-txt { font-size: .875rem; }
+.atalho span { font-size: .95rem; }
+.abc span, .abc strong { font-size: .9rem; }
+/* cartões de resumo: tudo centralizado; a seta "›" fica no canto */
+.cartao { position: relative; text-align: center; align-items: center; justify-content: center; padding: 12px 14px; gap: 4px; }
+.cartao-titulo { justify-content: center; font-size: .95rem; width: auto; }
+.cartao-seta { position: absolute; top: 8px; right: 10px; margin: 0; }
+.cartao-valor { font-size: 1.5rem; }
+.cartao-sub, .cartao-var { font-size: .9rem; }
+.kpi { align-items: center; text-align: center; }
+.kpi small { font-size: .875rem; letter-spacing: .02em; }
+.kpi b { font-size: 1.9rem; }
+.kpi span { font-size: .95rem; }
+@media (max-width: 640px) {
+  .cartao-titulo { font-size: .9rem; }
+  .bh-valor { font-size: .875rem; }
+}
+.mudo { font-size: .875rem; }
+.prog-pri { font-size: .95rem; padding: 2px 9px; }
+.menu-grupo, .menu-grupo span { font-size: .84rem; }
+.campo-rotulo { font-size: .95rem; }
+.cl-sub, .cl-itens { font-size: .92rem; }
+.bh-rotulo { font-size: .92rem; }
+.tabela { font-size: .92rem; }
+@media (max-width: 640px) { .tabela td::before { font-size: .9rem; } }
+/* atalhos: texto centralizado dentro do botão (pedido do dono) */
+.atalho { justify-content: center !important; text-align: center !important; }
+.kpis { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }   /* os 6 indicadores cabem numa linha no computador */
+.com-ico { white-space: nowrap; }
+/* tabela da programação no tablet/celular: só as etiquetas das etapas (a linha do tempo completa fica no detalhe) */
+@media (max-width: 1100px) { .tabela td .linha-tempo-mini { display: none; } }
+/* janela da masseira (tablet): números da fila e bateladas do dia maiores */
+.fila-nums { font-size: 1rem; }
+.fila-horas { font-size: .95rem; }
+.fila-espera { font-size: 1rem; }
+.batida { font-size: .98rem; padding: 6px 12px; }
+.mac-faixa { font-size: 1.1rem; flex-wrap: wrap; }

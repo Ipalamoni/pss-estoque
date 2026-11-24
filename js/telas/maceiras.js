@@ -65,7 +65,7 @@ export function TelaMaceiras() {
       <div class="ep-lista">${emProd.map((b) => {
         const m = dados.mapa.maceira.get(b.maceira_id); const min = duracaoBatelada(b, agora);
         return html`<div class="ep-item" key=${b.id}>
-          <div class="ep-info"><b>${m?.nome || 'Masseira'}</b><span>${dados.mapa.ficha.get(b.ficha_id)?.nome}</span>
+          <div class="ep-info"><b class="ep-mac"><${Icone} nome="masseira" tam=${26} /> ${m?.nome || 'Masseira'}</b><span>${dados.mapa.ficha.get(b.ficha_id)?.nome}</span>
             <small>começou ${hora(b.iniciada_em)}${b.operador_id ? ` · ${dados.mapa.operador.get(b.operador_id)?.nome || ''}` : ''}</small>
             <${SeloTempo} estado=${estadoTempo(min, prazoBatelada(dados, b.ficha_id, m))} min=${min} grande /></div>
           <button class="ep-botao" disabled=${!opera} onClick=${exigir(() => setFinalizar({ bs: [b] }))}><${Icone} nome="finalizar" tam=${28} /> FINALIZAR BATELADA</button>
@@ -97,10 +97,11 @@ export function TelaMaceiras() {
         const nomesOp = (m.operadores || []).map((id) => dados.mapa.operador.get(id)?.nome).filter(Boolean);
         return html`<button class=${'mac-tile s-' + s.cor} key=${m.id} onClick=${() => setAberta(m)}>
           ${avisos.some((a) => a.maceira_id === m.id) && html`<div class="mac-mudou"><${Icone} nome="aviso" tam=${18} /> MUDANÇA</div>`}
-          <div class="mac-tile-topo"><b class="mac-nome">${m.nome}</b>${m.capacidade_kg && html`<span class="mac-cap">${num(m.capacidade_kg, 0)} kg</span>`}</div>
+          <div class="mac-tile-topo"><span class="mac-ico" aria-hidden="true"><${Icone} nome="masseira" tam=${38} /></span><b class="mac-nome">${m.nome}</b></div>
+          ${m.capacidade_kg && html`<span class="mac-cap">${num(m.capacidade_kg, 0)} kg</span>`}
           <div class="mac-linhas">${(m.linhas || []).map((id) => dados.mapa.linha.get(id)?.nome).filter(Boolean).join(' · ') || 'sem linha definida'}</div>
           ${nomesOp.length > 0 && html`<div class="mac-ops">👤 ${nomesOp.join(' · ')}</div>`}
-          <div class="mac-status"><span class="mac-luz"></span><b>${s.rotulo}</b>${s.min !== null && s.cor !== 'cinza' && !s.batendo ? html`<small> · ${tempoTexto(s.min)} sem iniciar</small>` : ''}</div>
+          <div class="mac-status"><b><span class="mac-luz"></span>${s.rotulo}</b>${s.min !== null && s.cor !== 'cinza' && !s.batendo ? html`<small>${tempoTexto(s.min)} sem iniciar</small>` : ''}</div>
           ${s.batendo && html`<div class="mac-batendo">${dados.mapa.ficha.get(s.batendo.ficha_id)?.nome}</div>`}
           <div class="mac-prox">${prox ? html`<span>Próxima: <b>${dados.mapa.ficha.get(prox.ficha_id)?.nome}</b></span>
               <span class="mac-num">${num(prox.pronto, 0)} pronta${prox.pronto === 1 ? '' : 's'} · ${num(somar(s.progs, 'pronto'), 0)} na fila</span>`
@@ -192,9 +193,9 @@ function MaceiraAberta({ m, fluxo, agora, opera, aoFechar, aoIniciar, operador }
   const iniciar = (l, extra) => (naOrdem(l) ? aoIniciar({ ...l, maceira_destino: m.id, ...extra }) : setForaOrdem({ l, extra }));
   const batidas = fluxo.bateladas.filter((b) => b.maceira_id === m.id && b.situacao !== 'cancelada' && diaDe(b.iniciada_em) === hoje).sort((a, b) => String(b.iniciada_em).localeCompare(String(a.iniciada_em)));
   const eventos = useEventos(fila.map((l) => l.programacao_id));
-  return html`<${Modal} titulo=${m.nome} aoFechar=${aoFechar} largo>
+  return html`<${Modal} titulo=${m.nome} icone=${html`<${Icone} nome="masseira" tam=${28} />`} aoFechar=${aoFechar} largo>
     <div class=${'mac-faixa s-' + s.cor}><span class="mac-luz"></span><b>${s.rotulo}</b>
-      <span>${s.batendo ? `começou há ${tempoTexto(s.batendo.min)}` : s.min !== null && s.cor !== 'cinza' ? `${tempoTexto(s.min)} sem iniciar` : ''} · tempo médio ${s.T} min</span></div>
+      <span>${!s.batendo && s.min !== null && s.cor !== 'cinza' ? `${tempoTexto(s.min)} sem iniciar · ` : ''}tempo médio ${s.T} min</span></div>
     <div class="titulo-com-acao"><h3>Fila desta masseira</h3></div>
     <p class="nota">Primeiro o que já tem a base aqui, na ordem do PCP. Quando uma base chega, ela entra no lugar dela sozinha.</p>
     ${!fila.length ? html`<${Vazio} texto="Nada programado para esta masseira hoje." />`

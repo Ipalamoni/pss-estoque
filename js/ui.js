@@ -133,7 +133,7 @@ export function AreaProtegida({ rotulo = 'formulário', classe = '', children })
 let seqModal = 0;
 const pilhaModais = [];   // só a janela de cima responde ao Esc e prende o Tab
 const FOCAVEIS = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
-export function Modal({ titulo, aoFechar, children, rodape, largo, cheio, semProtecao }) {
+export function Modal({ titulo, icone, aoFechar, children, rodape, largo, cheio, semProtecao }) {
   const caixa = useRef(null);
   const [idTitulo] = useState(() => `modal-titulo-${++seqModal}`);
   const [sujo, setSujo] = useState(false);
@@ -175,7 +175,7 @@ export function Modal({ titulo, aoFechar, children, rodape, largo, cheio, semPro
       onInput=${marcar} onChange=${marcar}>
       <div class="modal-topo">
         ${aoFechar && html`<button class="btn-voltar" title="Voltar" aria-label="Voltar" onClick=${pedirFechar}><${Seta} /></button>`}
-        <h2 id=${idTitulo}>${titulo}</h2>
+        <h2 id=${idTitulo}>${icone && html`<span class="modal-ico" aria-hidden="true">${icone}</span>`}${titulo}</h2>
         ${aoFechar && html`<button class="btn-icone btn-fechar" title="Fechar" aria-label="Fechar" onClick=${pedirFechar}>✕</button>`}
       </div>
       <div class="modal-corpo">${children}</div>

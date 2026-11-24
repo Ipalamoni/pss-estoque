@@ -7,6 +7,7 @@ import { num, hojeISO, somarDias, data, pl, qtd } from '../util.js';
 import { Colunas, BarrasH } from '../graficos.js';
 import { useFluxo, ETAPAS, somar, semaforo, tempoTexto, tempoMedio, useRelogio, diaDe, minutos, hora, prazoBatelada, duracaoBatelada, estadoTempo, SeloTempo, ESTADO_TEMPO } from '../producao-util.js';
 import { Exportar } from '../exportar.js';
+import { Icone } from '../icones.js';
 
 const DIAS = [{ id: -1, t: 'Ontem' }, { id: 0, t: 'Hoje' }, { id: 1, t: 'Amanhã' }];
 
@@ -81,7 +82,7 @@ export function TelaPainelProducao() {
           <thead><tr><th>Masseira</th><th>Situação</th><th>Padeiro</th><th>Agora</th><th class="n">Programado</th><th class="n">Iniciado</th><th class="n">Pronto</th><th class="n">Na pesagem</th><th>Horários</th></tr></thead>
           <tbody>${sems.map(({ m, s }) => {
             const ult = s.ultima;
-            return html`<tr key=${m.id}><td data-rotulo="Masseira"><b>${m.nome}</b></td>
+            return html`<tr key=${m.id}><td data-rotulo="Masseira"><b class="com-ico"><${Icone} nome="masseira" tam=${20} />${m.nome}</b></td>
               <td data-rotulo="Situação"><span class=${'semaf s-' + s.cor}><i></i>${desloc === 0 ? s.rotulo : '–'}</span></td>
               <td data-rotulo="Padeiro">${ult ? dados.mapa.operador.get(ult.operador_id)?.nome : '–'}</td>
               <td data-rotulo="Agora">${s.batendo ? html`${dados.mapa.ficha.get(s.batendo.ficha_id)?.nome} <small>há ${tempoTexto(s.batendo.min)}</small>` : s.min !== null && desloc === 0 && s.cor !== 'cinza' ? html`<small>${tempoTexto(s.min)} sem iniciar</small>` : '–'}</td>
@@ -130,7 +131,7 @@ function ProgPrioridade({ linhas, dados }) {
   [...linhas].sort((a, b) => (dados.mapa.maceira.get(a.maceira_id)?.ordem ?? 999) - (dados.mapa.maceira.get(b.maceira_id)?.ordem ?? 999) || a.prioridade - b.prioridade)
     .forEach((l) => { const k = l.maceira_id || 0; if (!grupos.has(k)) grupos.set(k, []); grupos.get(k).push(l); });
   return html`<div class="prog-grupos">${[...grupos.entries()].map(([mid, ls]) => html`<div class="prog-grupo">
-    <h3>${dados.mapa.maceira.get(mid)?.nome || 'Sem masseira definida'}</h3>
+    <h3 class="com-ico">${mid ? html`<${Icone} nome="masseira" tam=${22} />` : ''}${dados.mapa.maceira.get(mid)?.nome || 'Sem masseira definida'}</h3>
     ${ls.map((l) => {
       const f = dados.mapa.ficha.get(l.ficha_id);
       const sit = l.finalizada ? ['verde', 'Finalizada'] : l.finalizado >= l.programado ? ['verde', 'Pronta para fechar'] : l.em_producao > 0 || l.iniciado > 0 ? ['laranja', 'Em produção'] : l.pronto > 0 ? ['roxo', 'Aguardando a masseira'] : l.pesado > 0 ? ['azul', 'Na pesagem / a caminho'] : ['cinza', 'A pesar'];

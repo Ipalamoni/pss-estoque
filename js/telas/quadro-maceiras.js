@@ -49,7 +49,7 @@ export function QuadroMaceiras({ dia, setDia, SeletorDia }) {
     ${!fluxo ? html`<${Carregando} />` : html`
     <div class="quadro">${cols.map((m) => { const itens = daCol(m.id); const tot = itens.reduce((s, p) => s + Number(p.quantidade), 0);
       return html`<section class=${'quadro-col' + (m.id ? '' : ' sem')} key=${m.id ?? 'sem'} ...${alvo(m.id, itens.length)}>
-        <header><b>${m.nome}</b><small>${num(tot, 1)} receita(s)${m.capacidade_kg ? ` · ${num(m.capacidade_kg, 0)} kg` : ''}</small>
+        <header><b class="qc-nome">${m.id ? html`<${Icone} nome="masseira" tam=${20} /> ` : ''}${m.nome}</b><small>${num(tot, 1)} receita(s)${m.capacidade_kg ? ` · ${num(m.capacidade_kg, 0)} kg` : ''}</small>
           ${m.id && (() => { const pend = (dados.avisos || []).filter((a) => a.maceira_id === m.id && !a.ciente_em);
             return html`${pend.length > 0 && html`<span class="qc-aviso" title="O tablet ainda não confirmou que viu"><${Icone} nome="aviso" tam=${14} /> ${pend.length} aviso(s) não visto(s) desde ${hora(pend[0].criado_em)}</span>`}
               <button type="button" class="btn btn-sec btn-peq qc-recado" onClick=${() => setRecado(m)}><${Icone} nome="aviso" tam=${14} /> Recado para o padeiro</button>`; })()}

@@ -32,6 +32,7 @@ function Maceiras({ edita }) {
     ${edita && html`<div class="titulo-com-acao"><span></span><button class="btn btn-pri" onClick=${() => setEd({})}><${Icone} nome="mais" tam=${16} /> Nova masseira</button></div>`}
     ${!dados.maceiras.length ? html`<${Vazio} texto="Nenhuma masseira cadastrada." />` : html`<div class="grade-cartoes-mac">${dados.maceiras.map((m) => html`
       <button class=${'mac-cad' + (m.ativa ? '' : ' inativa')} key=${m.id} onClick=${() => edita && setEd(m)} disabled=${!edita}>
+        <span class="mac-ico" aria-hidden="true"><${Icone} nome="masseira" tam=${36} /></span>
         <div class="mac-cad-topo"><b>${m.nome}</b>${!m.ativa && html`<${Etiqueta} cor="cinza">inativa</${Etiqueta}>`}</div>
         <div class="mac-cad-info"><span><small>Capacidade</small>${m.capacidade_kg ? `${num(m.capacidade_kg, 0)} kg` : '–'}</span>
           <span><small>Tempo próprio</small>${m.tempo_min ? `${m.tempo_min} min` : 'o da receita'}</span></div>
