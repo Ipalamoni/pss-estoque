@@ -28,7 +28,7 @@ export function TelaProdutos() {
 
   return html`
     <${Cabecalho} titulo="Produtos" sub="Matérias-primas, embalagens e materiais controlados no estoque">
-      <${Exportar} titulo="Cadastro de produtos" filtros=${pl(linhas.length, 'produto', 'produtos')} arquivo=${`produtos-${hojeISO()}`} linhas=${linhas} colunas=${[
+      <${Exportar} tabela="produtos.telaprodutos" titulo="Cadastro de produtos" filtros=${pl(linhas.length, 'produto', 'produtos')} arquivo=${`produtos-${hojeISO()}`} linhas=${linhas} colunas=${[
         { titulo: 'Código', valor: (p) => p.codigo }, { titulo: 'Código ERP', valor: (p) => p.codigo_erp }, { titulo: 'Descrição', valor: (p) => p.descricao, largura: 36 },
         { titulo: 'Categoria', valor: (p) => CATEGORIAS[p.categoria] }, { titulo: 'Grupo', valor: (p) => p.grupo }, { titulo: 'Classif.', valor: (p) => p.classificacao },
         { titulo: 'Marca', valor: (p) => p.marca }, { titulo: 'Unid. estoque', valor: (p) => p.unidade_estoque }, { titulo: 'Unid. compra', valor: (p) => p.unidade_compra },
@@ -50,7 +50,7 @@ export function TelaProdutos() {
         <option value="">Todas as classificações</option>${classifs.map((c) => html`<option value=${c}>Classificação ${c}</option>`)}</select>
       <label class="check"><input type="checkbox" checked=${inativos} onChange=${(e) => setInativos(e.target.checked)} /> Mostrar inativos</label>
     </${Filtros}>
-    <${Tabela} linhas=${linhas} aoClicar=${(p) => setEditando(p)} ordemInicial=${{ chave: 'codigo', dir: 1 }}
+    <${Tabela} id="produtos.telaprodutos" linhas=${linhas} aoClicar=${(p) => setEditando(p)} ordemInicial=${{ chave: 'codigo', dir: 1 }}
       colunas=${[
         { chave: 'codigo', titulo: 'Código', render: (p) => html`<b>${p.codigo}</b>` },
         { chave: 'descricao', titulo: 'Descrição', classe: 'col-desc', render: (p) => html`${p.descricao}${p.pre_cadastro && html`<span class="tag-pre">pré-cadastro</span>`}${!p.ativo && html` <${Etiqueta}>inativo</${Etiqueta}>`}` },

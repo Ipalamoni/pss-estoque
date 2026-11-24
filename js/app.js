@@ -8,6 +8,7 @@ import { prazoBatelada, duracaoBatelada, estadoTempo, tempoTexto } from './produ
 import { indicadores } from './calc.js';
 import { Icone } from './icones.js';
 import { MarcaArtas } from './marca.js';
+import { carregarPreferencias } from './preferencias.js';
 
 import { TelaInicio } from './telas/inicio.js';
 
@@ -461,6 +462,7 @@ function App() {
   const [senha, setSenha] = useState(false);
   const [visao, setVisao] = useState(null);
   const [novaVersao, setNovaVersao] = useState(false);
+  useEffect(() => { if (usuario?.user_id) carregarPreferencias(usuario.user_id); }, [usuario?.user_id]);   // colunas escolhidas por esta pessoa
   useEffect(() => {   // aviso de versão nova (o service worker trocou os arquivos)
     if (!('serviceWorker' in navigator)) return;
     let tinha = !!navigator.serviceWorker.controller;

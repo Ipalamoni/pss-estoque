@@ -1,6 +1,6 @@
 // Relatórios: pedidos, compras por produto, consumo do período, ajustes e correções
 import { html, useState, useMemo, useEffect, useApp, Escolher, Busca, Etiqueta, Cabecalho, Abas, Tabela, Cartao, Carregando, Modal, avisar, useHistorico, Filtros, useFiltroMudou } from '../ui.js';
-import { CATEGORIAS, STATUS_PEDIDO, TIPOS_MOV, MOTIVOS_INVENTARIO, qtd, num, moeda, data, dataHora, hojeISO, somarDias, diasEntre, numeroPedido, contem, fator, qu, pl, plural, nomeUsuario, mensagemErro } from '../util.js';
+import { MP_EMB, casaCategoria, CATEGORIAS, STATUS_PEDIDO, TIPOS_MOV, MOTIVOS_INVENTARIO, qtd, num, moeda, data, dataHora, hojeISO, somarDias, diasEntre, numeroPedido, contem, fator, qu, pl, plural, nomeUsuario, mensagemErro } from '../util.js';
 import { Exportar } from '../exportar.js';
 import { resumoPedido, PrazoEtiqueta, PedidoDetalhe, COR_STATUS } from './pedidos.js';
 import { Icone } from '../icones.js';
@@ -62,7 +62,7 @@ function RelPedidos({ de, ate }) {
         ${Object.entries(STATUS_PEDIDO).map(([k, t]) => html`<option value=${k}>${t}</option>`)}</select>
       <div class="filtro-escolher"><${Escolher} itens=${dados.fornecedores} valor=${forn} aoMudar=${setForn} rotuloDe=${(f) => f.nome} placeholder="Fornecedor (todos)" /></div>
       ${forn && html`<button class="btn-link" onClick=${() => setForn(null)}>limpar</button>`}
-      <${Exportar} titulo="Pedidos de compra" arquivo=${`rel-pedidos-${de}-a-${ate}`} colunas=${cols} linhas=${linhas}
+      <${Exportar} tabela="relatorios.relpedidos" titulo="Pedidos de compra" arquivo=${`rel-pedidos-${de}-a-${ate}`} colunas=${cols} linhas=${linhas}
         filtros=${`Pedidos de ${data(de)} a ${data(ate)}`} totais=${['TOTAL', '', '', '', '', moeda(total), '', '']} />
     </div>
     <div class="cartoes">
@@ -71,7 +71,7 @@ function RelPedidos({ de, ate }) {
       <${Cartao} titulo="Atrasados" valor=${atras.length} cor=${atras.length ? 'c-vermelho' : ''} sub=${moeda(atras.reduce((s, p) => s + p.r.valor, 0))} />
       <${Cartao} titulo="Recebidos" valor=${moeda(soma((p) => p.status === 'recebido'))} />
     </div>
-    <${Tabela} linhas=${linhas} aoClicar=${(p) => setAberto(p.id)} ordemInicial=${{ chave: 'data_pedido', dir: -1 }} colunas=${[
+    <${Tabela} id="relatorios.relpedidos" linhas=${linhas} aoClicar=${(p) => setAberto(p.id)} ordemInicial=${{ chave: 'data_pedido', dir: -1 }} colunas=${[
       { chave: 'id', titulo: 'Pedido', render: (p) => html`<b>${numeroPedido(p.id)}</b>` },
       { chave: 'data_pedido', titulo: 'Data', render: (p) => data(p.data_pedido) },
       { chave: 'f', titulo: 'Fornecedor', valor: (p) => p.r.fornecedor?.nome, render: (p) => p.r.fornecedor?.nome },
@@ -80,7 +80,7 @@ function RelPedidos({ de, ate }) {
       { chave: 'valor', titulo: 'Valor', num: true, valor: (p) => p.r.valor, render: (p) => moeda(p.r.valor) },
       { chave: 'perc', titulo: 'Recebido', num: true, valor: (p) => p.r.perc, render: (p) => `${num(p.r.perc, 0)}%` },
       { chave: 'status', titulo: 'Situação', render: (p) => html`<${Etiqueta} cor=${COR_STATUS[p.status]}>${STATUS_PEDIDO[p.status]}</${Etiqueta}>` },
-    ]} rodape=${linhas.length > 1 && html`<tr><td colspan="5">${pl(linhas.length, 'pedido', 'pedidos')}</td><td class="n"><b>${moeda(total)}</b></td><td colspan="2"></td></tr>`} />
+    ]} totais=${linhas.length > 1 && { rotulo: pl(linhas.length, 'pedido', 'pedidos'), valor: moeda(total) }} />
     ${aberto && html`<${PedidoDetalhe} pedido=${dados.pedidos.find((p) => p.id === aberto)} aoFechar=${() => setAberto(null)} />`}`;
 }
 
@@ -88,7 +88,7 @@ function RelPedidos({ de, ate }) {
 function RelComprasProduto({ de, ate }) {
   const { dados } = useApp();
   const [busca, setBusca] = useState('');
-  const [cat, setCat] = useState('');
+  const [cat, setCat] = useState(MP_EMB);
   const [aberto, setAberto] = useState(null);
   const ped = dados.mapa;
   const linhas = useMemo(() => dados.pedidoItens.map((i) => {
@@ -96,7 +96,7 @@ function RelComprasProduto({ de, ate }) {
     const f = fator(pr, i.unidade);
     return { ...i, p, pr, forn: ped.fornecedor.get(p?.fornecedor_id), recebido: i.qtd_recebida_base / f, pendente: ['aberto', 'parcial'].includes(p?.status) ? Math.max(i.quantidade_base - i.qtd_recebida_base, 0) / f : 0,
       preco_base: i.quantidade_base ? i.valor_total / i.quantidade_base : 0 };
-  }).filter((x) => x.p && x.p.status !== 'cancelado' && x.p.data_pedido >= de && x.p.data_pedido <= ate && (!cat || x.pr?.categoria === cat)
+  }).filter((x) => x.p && x.p.status !== 'cancelado' && x.p.data_pedido >= de && x.p.data_pedido <= ate && casaCategoria(cat, x.pr?.categoria)
     && contem(`${x.pr?.codigo} ${x.pr?.descricao} ${x.forn?.nome}`, busca)), [dados, de, ate, busca, cat]);
   const total = linhas.reduce((s, x) => s + Number(x.valor_total), 0);
   // resumo por produto
@@ -120,14 +120,14 @@ function RelComprasProduto({ de, ate }) {
   return html`
     <div class="filtros">
       <${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Produto ou fornecedor" />
-      <select class="entrada" value=${cat} onChange=${(e) => setCat(e.target.value)}><option value="">Todas as categorias</option>
+      <select class="entrada" value=${cat} onChange=${(e) => setCat(e.target.value)}><option value="">Todas as categorias</option><option value=${MP_EMB}>Matéria-prima e embalagem</option>
         ${Object.entries(CATEGORIAS).map(([k, t]) => html`<option value=${k}>${t}</option>`)}</select>
-      <${Exportar} titulo="Compras por produto" arquivo=${`rel-compras-produto-${de}-a-${ate}`} colunas=${cols} linhas=${linhas}
+      <${Exportar} tabela="relatorios.relcomprasproduto" titulo="Compras por produto" arquivo=${`rel-compras-produto-${de}-a-${ate}`} colunas=${cols} linhas=${linhas}
         filtros=${`Pedidos de ${data(de)} a ${data(ate)}`} totais=${['TOTAL', '', '', '', '', '', '', '', '', moeda(total), '', '', '']} />
     </div>
     <h3>Resumo por produto</h3>
-    <${Tabela} linhas=${porProduto} ordemInicial=${{ chave: 'valor', dir: -1 }} colunas=${[
-      { chave: 'p', titulo: 'Produto', valor: (a) => a.pr?.descricao, render: (a) => html`<b>${a.pr?.descricao}</b><br /><small>${a.pr?.codigo}</small>` },
+    <${Tabela} id="relatorios.relcomprasproduto" linhas=${porProduto} ordemInicial=${{ chave: 'valor', dir: -1 }} colunas=${[
+      { chave: 'cod', titulo: 'Código', valor: (a) => a.pr?.codigo, render: (a) => a.pr?.codigo }, { chave: 'p', titulo: 'Produto', valor: (a) => a.pr?.descricao, render: (a) => html`<b>${a.pr?.descricao}</b>` },
       { chave: 'base', titulo: 'Quantidade comprada', num: true, render: (a) => `${qu(a.base, a.pr?.unidade_estoque)}${a.pr?.unidade_compra ? ` (${qu(a.base / a.pr.fator_compra, a.pr.unidade_compra, 1)})` : ''}` },
       { chave: 'valor', titulo: 'Valor', num: true, render: (a) => moeda(a.valor) },
       { chave: 'pm', titulo: 'Preço médio', num: true, valor: (a) => a.valor / a.base, render: (a) => `${moeda(a.base ? a.valor / a.base : 0)}/${a.pr?.unidade_estoque}` },
@@ -135,7 +135,7 @@ function RelComprasProduto({ de, ate }) {
       { chave: 'f', titulo: 'Fornecedores', render: (a) => [...a.fornecedores].join(', ') },
     ]} />
     <h3>Itens dos pedidos</h3>
-    <${Tabela} linhas=${linhas} aoClicar=${(x) => setAberto(x.pedido_id)} ordemInicial=${{ chave: 'prod', dir: 1 }} colunas=${[
+    <${Tabela} id="relatorios.relcomprasproduto-2" linhas=${linhas} aoClicar=${(x) => setAberto(x.pedido_id)} ordemInicial=${{ chave: 'prod', dir: 1 }} colunas=${[
       { chave: 'prod', titulo: 'Produto', valor: (x) => `${x.pr?.descricao} ${x.p.data_pedido}`, render: (x) => html`<b>${x.pr?.descricao}</b>` },
       { chave: 'f', titulo: 'Fornecedor', valor: (x) => x.forn?.nome, render: (x) => x.forn?.nome },
       { chave: 'pedido_id', titulo: 'Pedido', render: (x) => numeroPedido(x.pedido_id) },
@@ -145,7 +145,7 @@ function RelComprasProduto({ de, ate }) {
       { chave: 'valor_total', titulo: 'Total', num: true, render: (x) => moeda(x.valor_total) },
       { chave: 'pendente', titulo: 'Pendente', num: true, render: (x) => (x.pendente > 0 ? qu(x.pendente, x.unidade) : '–') },
       { chave: 's', titulo: 'Situação', valor: (x) => x.p.status, render: (x) => html`<${Etiqueta} cor=${COR_STATUS[x.p.status]}>${STATUS_PEDIDO[x.p.status]}</${Etiqueta}>` },
-    ]} rodape=${linhas.length > 1 && html`<tr><td colspan="6">${pl(linhas.length, 'item', 'itens')}</td><td class="n"><b>${moeda(total)}</b></td><td colspan="2"></td></tr>`} />
+    ]} totais=${linhas.length > 1 && { rotulo: pl(linhas.length, 'item', 'itens'), valor_total: moeda(total) }} />
     ${aberto && html`<${PedidoDetalhe} pedido=${dados.pedidos.find((p) => p.id === aberto)} aoFechar=${() => setAberto(null)} />`}`;
 }
 
@@ -166,7 +166,7 @@ function useMovimentos(de, ate, tipos) {
 function RelConsumo({ de, ate }) {
   const { dados } = useApp();
   const movs = useMovimentos(de, ate, ['saida_receita', 'saida_avulsa', 'saida_almox', 'correcao']);
-  const [cat, setCat] = useState('');
+  const [cat, setCat] = useState(MP_EMB);
   const dias = Math.max(diasEntre(de, ate) + 1, 1);
   const linhas = useMemo(() => {
     if (!movs) return [];
@@ -176,7 +176,7 @@ function RelConsumo({ de, ate }) {
       const tipo = x.tipo === 'correcao' ? tipoDe.get(x.corrige_id) : x.tipo;
       if (!tipo || tipo === 'correcao' || !['saida_receita', 'saida_avulsa', 'saida_almox'].includes(tipo)) continue;
       const pr = dados.mapa.produto.get(x.produto_id);
-      if (cat && pr?.categoria !== cat) continue;
+      if (!casaCategoria(cat, pr?.categoria)) continue;
       const a = m.get(x.produto_id) || { id: x.produto_id, pr, saida_receita: 0, saida_avulsa: 0, saida_almox: 0, valor: 0 };
       a[tipo] += -Number(x.quantidade); a.valor += -Number(x.valor); m.set(x.produto_id, a);
     }
@@ -192,21 +192,21 @@ function RelConsumo({ de, ate }) {
   if (!movs) return html`<${Carregando} />`;
   return html`
     <div class="filtros">
-      <select class="entrada" value=${cat} onChange=${(e) => setCat(e.target.value)}><option value="">Todas as categorias</option>
+      <select class="entrada" value=${cat} onChange=${(e) => setCat(e.target.value)}><option value="">Todas as categorias</option><option value=${MP_EMB}>Matéria-prima e embalagem</option>
         ${Object.entries(CATEGORIAS).map(([k, t]) => html`<option value=${k}>${t}</option>`)}</select>
-      <${Exportar} titulo="Consumo do período" arquivo=${`rel-consumo-${de}-a-${ate}`} colunas=${cols} linhas=${linhas}
+      <${Exportar} tabela="relatorios.relconsumo" titulo="Consumo do período" arquivo=${`rel-consumo-${de}-a-${ate}`} colunas=${cols} linhas=${linhas}
         filtros=${`${data(de)} a ${data(ate)} (${pl(dias, 'dia', 'dias')})`} totais=${['TOTAL', '', '', '', '', '', '', '', moeda(totalValor)]} />
     </div>
     <p class="nota">Saídas de ${data(de)} a ${data(ate)} (${pl(dias, 'dia', 'dias')}), já considerando as correções. Valor pelo custo médio do momento da saída.</p>
-    <${Tabela} linhas=${linhas} ordemInicial=${{ chave: 'valor', dir: -1 }} colunas=${[
-      { chave: 'p', titulo: 'Produto', valor: (a) => a.pr?.descricao, render: (a) => html`<b>${a.pr?.descricao}</b><br /><small>${a.pr?.codigo}</small>` },
+    <${Tabela} id="relatorios.relconsumo" linhas=${linhas} ordemInicial=${{ chave: 'valor', dir: -1 }} colunas=${[
+      { chave: 'cod', titulo: 'Código', valor: (a) => a.pr?.codigo, render: (a) => a.pr?.codigo }, { chave: 'p', titulo: 'Produto', valor: (a) => a.pr?.descricao, render: (a) => html`<b>${a.pr?.descricao}</b>` },
       { chave: 'saida_receita', titulo: 'Por receita', num: true, render: (a) => qtd(a.saida_receita) },
       { chave: 'saida_avulsa', titulo: 'Avulsa', num: true, render: (a) => qtd(a.saida_avulsa) },
       { chave: 'saida_almox', titulo: 'Almoxarifado', num: true, render: (a) => qtd(a.saida_almox) },
       { chave: 'total', titulo: 'Total', num: true, render: (a) => html`<b>${qu(a.total, a.pr?.unidade_estoque)}</b>` },
       { chave: 'media', titulo: 'Média/dia', num: true, render: (a) => num(a.media, 2) },
       { chave: 'valor', titulo: 'Valor', num: true, render: (a) => moeda(a.valor) },
-    ]} rodape=${linhas.length > 1 && html`<tr><td colspan="6">${pl(linhas.length, 'produto', 'produtos')}</td><td class="n"><b>${moeda(totalValor)}</b></td></tr>`} />`;
+    ]} totais=${linhas.length > 1 && { rotulo: pl(linhas.length, 'produto', 'produtos'), valor: moeda(totalValor) }} />`;
 }
 
 // ---------------------------- AJUSTES E CORREÇÕES -------------------
@@ -229,7 +229,7 @@ function RelAjustes({ de, ate }) {
       <select class="entrada" value=${tipo} onChange=${(e) => setTipo(e.target.value)}>
         <option value="">Inventário, correções e saídas avulsas</option>
         <option value="inventario">Só ajustes de inventário</option><option value="correcao">Só correções</option><option value="saida_avulsa">Só saídas avulsas</option></select>
-      <${Exportar} titulo="Ajustes e correções" arquivo=${`rel-ajustes-${de}-a-${ate}`} colunas=${cols} linhas=${lista}
+      <${Exportar} tabela="relatorios.relajustes" titulo="Ajustes e correções" arquivo=${`rel-ajustes-${de}-a-${ate}`} colunas=${cols} linhas=${lista}
         filtros=${`${data(de)} a ${data(ate)}`} totais=${['TOTAL', '', '', '', '', '', moeda(total), '', '', '']} />
     </div>
     <p class="nota">Tudo o que mexeu no estoque fora do fluxo normal: diferenças de inventário, correções de lançamento e saídas avulsas (com justificativa).</p>
@@ -237,7 +237,7 @@ function RelAjustes({ de, ate }) {
       <${Cartao} titulo="Lançamentos" valor=${lista.length} />
       <${Cartao} titulo="Efeito no valor do estoque" valor=${moeda(total)} cor=${total < 0 ? 'c-vermelho' : ''} />
     </div>
-    <${Tabela} linhas=${lista} ordemInicial=${{ chave: 'id', dir: -1 }} colunas=${[
+    <${Tabela} id="relatorios.relajustes" linhas=${lista} ordemInicial=${{ chave: 'id', dir: -1 }} colunas=${[
       { chave: 'id', titulo: 'Nº', num: true, render: (m) => html`<small>#${m.id}</small>` },
       { chave: 'data_hora', titulo: 'Data/hora', render: (m) => dataHora(m.data_hora) },
       { chave: 'p', titulo: 'Produto', valor: (m) => p(m)?.descricao, render: (m) => p(m)?.descricao },
@@ -276,14 +276,14 @@ function RelRecebimentos({ de, ate }) {
       <select class="entrada" value=${filtro} onChange=${(e) => setFiltro(e.target.value)}>
         <option value="">Todos os recebimentos</option><option value="div">Com divergência</option>
         <option value="pend">Divergência aguardando ciência</option><option value="sem">Sem pedido</option></select>
-      <${Exportar} titulo="Recebimentos" arquivo=${`rel-recebimentos-${de}-a-${ate}`} colunas=${cols} linhas=${lista} filtros=${`${data(de)} a ${data(ate)}`} />
+      <${Exportar} tabela="relatorios.relrecebimentos" titulo="Recebimentos" arquivo=${`rel-recebimentos-${de}-a-${ate}`} colunas=${cols} linhas=${lista} filtros=${`${data(de)} a ${data(ate)}`} />
     </div>
     <div class="cartoes">
       <${Cartao} titulo="Recebimentos" valor=${lista.length} />
       <${Cartao} titulo="Com divergência" valor=${lista.filter((r) => r.divergencia).length} />
       <${Cartao} titulo="Aguardando ciência" valor=${lista.filter((r) => r.divergencia && !r.ciente_por).length} cor=${lista.some((r) => r.divergencia && !r.ciente_por) ? 'c-laranja' : ''} />
     </div>
-    <${Tabela} linhas=${lista} aoClicar=${(r) => r.pedido_id && setAberto(r.pedido_id)} ordemInicial=${{ chave: 'id', dir: -1 }} colunas=${[
+    <${Tabela} id="relatorios.relrecebimentos" linhas=${lista} aoClicar=${(r) => r.pedido_id && setAberto(r.pedido_id)} ordemInicial=${{ chave: 'id', dir: -1 }} colunas=${[
       { chave: 'id', titulo: 'Data/hora', valor: (r) => r.id, render: (r) => dataHora(r.data_hora) },
       { chave: 'pedido_id', titulo: 'Pedido', render: (r) => (r.pedido_id ? html`<b>${numeroPedido(r.pedido_id)}</b>` : html`<small>sem pedido</small>`) },
       { chave: 'f', titulo: 'Fornecedor', valor: forn, render: forn },

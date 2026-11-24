@@ -43,7 +43,7 @@ export function TelaFichas() {
           render: (f) => (f.rendimento_qtd ? `${qtd(f.rendimento_qtd)} ${f.rendimento_unidade || ''}` : html`<${Etiqueta} cor="laranja">preencher</${Etiqueta}>`) },
         { chave: 'n', titulo: 'Ingredientes', num: true, valor: (f) => itensDe(f.id).length, render: (f) => itensDe(f.id).length },
         { chave: 'peso', titulo: 'Massa (kg)', num: true, valor: (f) => pesoKg(itensDe(f.id), dados.mapa.produto), render: (f) => qtd(pesoKg(itensDe(f.id), dados.mapa.produto)) },
-        { chave: 'atualizado_em', titulo: 'Última alteração', render: (f) => (f.atualizado_em ? html`${dados.mapa.perfil.get(f.atualizado_por)?.nome}<br /><small>${dataHora(f.atualizado_em)}</small>` : '–') },
+        { chave: 'atualizado_em', titulo: 'Última alteração', render: (f) => (f.atualizado_em ? html`${dados.mapa.perfil.get(f.atualizado_por)?.nome}` : '–') }, { chave: 'quando', titulo: 'Quando', valor: (f) => f.atualizado_em || '', render: (f) => (f.atualizado_em ? dataHora(f.atualizado_em) : '–') },
         verCusto && { chave: 'custo', titulo: 'Custo estimado', num: true, valor: (f) => custoFicha(itensDe(f.id), dados.mapa.produto), render: (f) => moeda(custoFicha(itensDe(f.id), dados.mapa.produto)) },
       ].filter(Boolean)} />
     ${verCusto && html`<p class="nota">Custo estimado = quantidade de cada ingrediente × custo médio atual do estoque. Custo completo (último e médio, por unidade) em Gestão de custos.</p>`}

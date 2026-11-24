@@ -125,7 +125,7 @@ export function TelaHistoricoProducao() {
 
   return html`
     <${Cabecalho} titulo="Histórico da produção" sub=${`Tudo o que foi feito na produção, com data, hora e quem fez · ${periodo}`}>
-      ${linhas && html`<${Exportar} titulo="Histórico da produção" filtros=${periodo} arquivo=${`historico-producao-${de}-a-${ate}`} paisagem=${true}
+      ${linhas && html`<${Exportar} tabela="historico-producao.telahistoricoproducao" titulo="Histórico da produção" filtros=${periodo} arquivo=${`historico-producao-${de}-a-${ate}`} paisagem=${true}
         linhas=${filtradas} colunas=${[{ titulo: 'Data e hora', valor: (l) => dataHora(l.quando), largura: 16 }, { titulo: 'Ação', valor: (l) => ACOES[l.acao][0] + (l.fora ? ' (fora da ordem)' : ''), largura: 22 },
           { titulo: 'Padeiro', valor: (l) => l.padeiro || '' }, { titulo: 'Usuário / tablet', valor: (l) => l.usuario || '' }, { titulo: 'Masseira', valor: (l) => l.masseira || '' },
           { titulo: 'Receita / produto', valor: (l) => l.receita || '', largura: 26 }, { titulo: 'Quantidade', valor: (l) => l.qtd || '' }, { titulo: 'Detalhe', valor: (l) => l.obs || '', largura: 40 }]} />`}
@@ -151,7 +151,7 @@ export function TelaHistoricoProducao() {
       <select class="entrada" aria-label="Masseira" value=${fMac} onChange=${(e) => setFMac(e.target.value)}><option value="">Todas as masseiras</option>
         ${masseiras.map((m) => html`<option value=${m}>${m}</option>`)}</select>
     </${Filtros}>
-    <${Tabela} linhas=${filtradas} chave="k" max=${500} vazio="Nada registrado neste período com esses filtros." colunas=${[
+    <${Tabela} id="historico-producao.telahistoricoproducao" linhas=${filtradas} chave="k" max=${500} vazio="Nada registrado neste período com esses filtros." colunas=${[
       { chave: 'quando', titulo: 'Data e hora', render: (l) => html`<b>${dataHora(l.quando).slice(9)}</b> <small>${dataHora(l.quando).slice(0, 8)}</small>` },
       { chave: 'acao', titulo: 'Ação', valor: (l) => ACOES[l.acao][0], render: (l) => html`<${Etiqueta} cor=${ACOES[l.acao][1]}>${ACOES[l.acao][0]}</${Etiqueta}>${l.fora ? html` <${Etiqueta} cor="laranja">fora da ordem</${Etiqueta}>` : ''}` },
       { chave: 'padeiro', titulo: 'Padeiro', render: (l) => l.padeiro || '–' },

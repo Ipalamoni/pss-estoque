@@ -153,7 +153,7 @@ function InicioOperacao() {
         <${Tabela} linhas=${atencao} max=${12} vazio="Tudo certo: nenhum item zerado, crítico ou no ponto de compra."
           aoClicar=${(p) => ir('estoque', { status: p.status })} aoVerTodos=${() => ir('estoque', { status: 'alerta' })}
           colunas=${[
-            { chave: 'descricao', titulo: 'Produto', render: (p) => html`<b>${p.descricao}</b><br /><small>${p.codigo}</small>` },
+            { chave: 'cod', titulo: 'Código', valor: (p) => p.codigo, render: (p) => p.codigo }, { chave: 'descricao', titulo: 'Produto', render: (p) => html`<b>${p.descricao}</b>` },
             { chave: 'saldo', titulo: 'Saldo', num: true, render: (p) => qtdDupla(p, p.saldo) },
             { chave: 'cobertura', titulo: 'Cobertura', num: true, render: (p) => (p.cobertura === null ? '–' : `${num(p.cobertura, 1)} ${p.cobertura < 2 ? 'dia' : 'dias'}`) },
             { chave: 'status_ordem', titulo: 'Situação', render: (p) => html`<${Etiqueta} cor=${STATUS_ESTOQUE[p.status].cor}>${STATUS_ESTOQUE[p.status].rotulo}</${Etiqueta}>` },
@@ -164,7 +164,7 @@ function InicioOperacao() {
         <${Tabela} linhas=${entregas} max=${12} vazio="Nenhum pedido aguardando entrega."
           aoClicar=${(p) => ir('pedidos', { abrir: p.id })} aoVerTodos=${() => ir('pedidos', { filtro: 'pendentes' })}
           colunas=${[
-            { chave: 'id', titulo: 'Pedido', render: (p) => html`<b>${numeroPedido(p.id)}</b><br /><small>${mapa.fornecedor.get(p.fornecedor_id)?.nome}</small>` },
+            { chave: 'id', titulo: 'Pedido', render: (p) => html`<b>${numeroPedido(p.id)}</b>` }, { chave: 'forn', titulo: 'Fornecedor', render: (p) => html`${mapa.fornecedor.get(p.fornecedor_id)?.nome}` },
             { chave: 'previsao_entrega', titulo: 'Previsão', render: (p) => data(p.previsao_entrega) },
             { chave: 'dias', titulo: 'Faltam', num: true, valor: (p) => (p.previsao_entrega ? diasEntre(hoje, p.previsao_entrega) : 999),
               render: (p) => { if (!p.previsao_entrega) return '–'; const d = diasEntre(hoje, p.previsao_entrega);

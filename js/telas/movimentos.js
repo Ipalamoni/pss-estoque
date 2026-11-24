@@ -80,7 +80,7 @@ export function TelaMovimentos() {
 
   return html`
     <${Cabecalho} titulo="Movimentações (kardex)" sub="Extrato de tudo que entrou e saiu, com o saldo depois de cada lançamento. Escolha um produto para ver a ficha dele. Nenhuma linha é apagada: erro se corrige com nova linha.">
-      ${movs && html`<${Exportar} titulo=${titulo} filtros=${filtrosTxt} arquivo=${`${pr ? 'kardex-' + pr.codigo : 'movimentacoes'}-${de}-a-${ate}`} colunas=${colExp} linhas=${linhasExp} />`}
+      ${movs && html`<${Exportar} tabela="movimentos.telamovimentos" titulo=${titulo} filtros=${filtrosTxt} arquivo=${`${pr ? 'kardex-' + pr.codigo : 'movimentacoes'}-${de}-a-${ate}`} colunas=${colExp} linhas=${linhasExp} />`}
     </${Cabecalho}>
     <${Filtros} ativos=${[tipo, usu, loc, semTransf].filter(Boolean).length} fixo=${html`<div class="filtro-escolher"><${Escolher} itens=${dados.produtos} valor=${prod} aoMudar=${setProd} rotuloDe=${(x) => `${x.codigo} · ${x.descricao}`} placeholder="Produto (todos)" /></div>
       ${prod && html`<button class="btn-link" onClick=${() => setProd(null)}>limpar</button>`}`}>
@@ -100,17 +100,17 @@ export function TelaMovimentos() {
       <${Cartao} titulo="Saídas" valor=${qu(kardex.sai, pr.unidade_estoque)} />
       <${Cartao} titulo=${kardex.local ? 'No local, no fim' : 'Saldo no fim do período'} valor=${qu(kardex.fim, pr.unidade_estoque)} sub=${kardex.local ? '' : `hoje: ${qu(pr.saldo, pr.unidade_estoque)} (inclui em trânsito)`} />
     </div>`}
-    ${movs === null ? html`<${Carregando} />` : html`<${Tabela} linhas=${lista} max=${500} aoClicar=${setAberto} colunas=${[
+    ${movs === null ? html`<${Carregando} />` : html`<${Tabela} id="movimentos.telamovimentos" linhas=${lista} max=${500} aoClicar=${setAberto} colunas=${[
       { chave: 'id', titulo: 'Nº', num: true, render: (m) => html`<small>#${m.id}</small>` },
       { chave: 'data_hora', titulo: 'Data/hora', render: (m) => dataHora(m.data_hora) },
-      { chave: 'prod', titulo: 'Produto', valor: (m) => p(m)?.descricao, render: (m) => html`<b>${p(m)?.descricao}</b><br /><small>${p(m)?.codigo}</small>` },
+      { chave: 'cod', titulo: 'Código', valor: (m) => p(m)?.codigo, render: (m) => p(m)?.codigo }, { chave: 'prod', titulo: 'Produto', valor: (m) => p(m)?.descricao, render: (m) => html`<b>${p(m)?.descricao}</b>` },
       { chave: 'tipo', titulo: 'Tipo', render: (m) => html`<${Etiqueta} cor=${COR_TIPO[m.tipo]}>${TIPOS_MOV[m.tipo]}</${Etiqueta}>${corrigidos.has(m.id) && html` <${Etiqueta} cor="laranja">corrigido</${Etiqueta}>`}` },
       { chave: 'quantidade', titulo: 'Quantidade', num: true, valor: (m) => (loc ? qLocal(m) : Number(m.quantidade)), render: (m) => { const q = loc || ehTransf(m) ? qLocal(m) : Number(m.quantidade);
-        return html`<b class=${ehTransf(m) ? 'texto-azul' : q < 0 ? 'texto-vermelho' : 'texto-verde'}>${q > 0 ? '+' : ''}${qtd(q)}</b> ${p(m)?.unidade_estoque}${ehTransf(m) && !loc ? html`<br /><small class="texto-cinza">no local</small>` : ''}`; } },
-      { chave: 'local', titulo: 'Local', valor: (m) => nomeLocal(dados, m.local_id), render: (m) => (m.local_id ? html`${nomeLocal(dados, m.local_id)}${m.etapa ? html`<br /><small>${ETAPAS_TRANSF[m.etapa] || m.etapa}</small>` : ''}` : '–') },
+        return html`<b class=${ehTransf(m) ? 'texto-azul' : q < 0 ? 'texto-vermelho' : 'texto-verde'}>${q > 0 ? '+' : ''}${qtd(q)}</b> ${p(m)?.unidade_estoque}${ehTransf(m) && !loc ? html` <small class="texto-cinza">(no local)</small>` : ''}`; } },
+      { chave: 'local', titulo: 'Local', valor: (m) => nomeLocal(dados, m.local_id), render: (m) => (m.local_id ? html`${nomeLocal(dados, m.local_id)}` : '–') }, { chave: 'etapa', titulo: 'Etapa', render: (m) => (m.etapa ? html`${ETAPAS_TRANSF[m.etapa] || m.etapa}` : '–') },
       vv && { chave: 'valor', titulo: 'Valor', num: true, render: (m) => (ehTransf(m) ? html`<span class="texto-cinza">–</span>` : moeda(m.valor)) },
       { chave: 'saldo_apos', titulo: loc ? 'Saldo no local' : 'Saldo após', num: true, render: (m) => (loc ? (m.saldo_local_apos != null ? qtd(m.saldo_local_apos) : '–') : qtd(m.saldo_apos)) },
-      { chave: 'u', titulo: 'Usuário', valor: (m) => dados.mapa.perfil.get(m.usuario_id)?.nome, render: (m) => html`${nomeUsuario(dados.mapa.perfil.get(m.usuario_id))}${m.operador_id ? html`<br /><small>padeiro ${dados.mapa.operador.get(m.operador_id)?.nome}</small>` : ''}` },
+      { chave: 'u', titulo: 'Usuário', valor: (m) => dados.mapa.perfil.get(m.usuario_id)?.nome, render: (m) => html`${nomeUsuario(dados.mapa.perfil.get(m.usuario_id))}` }, { chave: 'padeiro', titulo: 'Padeiro', valor: (m) => dados.mapa.operador.get(m.operador_id)?.nome || '', render: (m) => (m.operador_id ? dados.mapa.operador.get(m.operador_id)?.nome : '–') },
       { chave: 'obs', titulo: 'Referência / observação', valor: (m) => m.observacao, render: (m) => html`<small>${[ref(m), m.destino, MOTIVOS_INVENTARIO[m.motivo] || m.motivo, m.observacao].filter(Boolean).join(' · ')}</small>` },
     ]} />`}
     ${aberto && html`<${DetalheMovimento} mov=${aberto} podeCorrigir=${podeCorrigir(aberto)} aoFechar=${(ok) => { setAberto(null); if (ok) carregar(); }} />`}`;

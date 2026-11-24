@@ -32,6 +32,9 @@ export const TIPOS_PRODUTO = {
   materia_prima: 'Matéria-prima', embalagem: 'Embalagem', intermediario: 'Intermediário (base)',
   uso: 'Uso e consumo', produto_acabado: 'Produto acabado',
 };
+// filtro de tipo dos relatórios: começa em "Matéria-prima e embalagem" (o resto quase não se usa)
+export const MP_EMB = 'mp_emb';
+export const casaCategoria = (filtro, categoria) => !filtro || (filtro === MP_EMB ? ['materia_prima', 'embalagem'].includes(categoria) : categoria === filtro);
 export const tipoProduto = (p) => (['escritorio', 'limpeza', 'outros'].includes(p?.categoria) ? 'uso' : p?.categoria);
 
 export const TIPOS_LOCAL = {

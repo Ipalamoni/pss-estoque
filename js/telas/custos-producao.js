@@ -76,8 +76,8 @@ export function CustoProdutoAcabado() {
     </div>
     <div class="filtros"><span class="chips"><button class=${'chip' + (vis === 'receita' ? ' ativo' : '')} aria-pressed=${!!(vis === 'receita')} onClick=${() => setVis('receita')}>Por receita</button>
       <button class=${'chip' + (vis === 'batelada' ? ' ativo' : '')} aria-pressed=${!!(vis === 'batelada')} onClick=${() => setVis('batelada')}>Por batelada</button></span>
-      <${Exportar} titulo="Custo do produto acabado" filtros=${`${de} a ${ate}`} arquivo=${`custo-produto-${de}-a-${ate}`} colunas=${vis === 'receita' ? colR : colB} linhas=${vis === 'receita' ? porReceita : lista} /></div>
-    ${vis === 'receita' ? html`<${Tabela} linhas=${porReceita} vazio="Nenhuma batelada finalizada no período." colunas=${[
+      <${Exportar} tabela="custos-producao.custoprodutoacabado" titulo="Custo do produto acabado" filtros=${`${de} a ${ate}`} arquivo=${`custo-produto-${de}-a-${ate}`} colunas=${vis === 'receita' ? colR : colB} linhas=${vis === 'receita' ? porReceita : lista} /></div>
+    ${vis === 'receita' ? html`<${Tabela} id="custos-producao.custoprodutoacabado" linhas=${porReceita} vazio="Nenhuma batelada finalizada no período." colunas=${[
         { chave: 'r', titulo: 'Receita', valor: (r) => f(r.id)?.nome, render: (r) => html`<b>${f(r.id)?.codigo}</b> ${f(r.id)?.nome}` },
         { chave: 'n', titulo: 'Bateladas', num: true },
         { chave: 'q', titulo: 'Produzido', num: true, render: (r) => `${num(r.q, 0)} ${unid(r.id)}` },
@@ -92,7 +92,7 @@ export function CustoProdutoAcabado() {
       ${porReceita.length > 0 && de !== ate && html`<h3 class="titulo-secao">Custo por unidade, dia a dia</h3>
         <${Colunas} categorias=${dias.map((d) => d.slice(8, 10) + '/' + d.slice(5, 7))} formatar=${m4} altura=${200}
           series=${[{ nome: 'Custo por unidade (média do dia)', valores: dias.map((d) => { const bs = lista.filter((b) => b.data === d); const q = bs.reduce((s, b) => s + b.q, 0); return q > 0 ? bs.reduce((s, b) => s + b.tot, 0) / q : 0; }) }]} />`}`
-      : html`<${Tabela} linhas=${lista} chave="batelada_id" vazio="Nenhuma batelada finalizada no período." max=${400} colunas=${[
+      : html`<${Tabela} id="custos-producao.custoprodutoacabado-2" linhas=${lista} chave="batelada_id" vazio="Nenhuma batelada finalizada no período." max=${400} colunas=${[
         { chave: 'batelada_id', titulo: 'Nº', num: true }, { chave: 'data', titulo: 'Dia' },
         { chave: 'f', titulo: 'Receita', render: (b) => `${f(b.ficha_id)?.codigo} ${f(b.ficha_id)?.nome}` },
         { chave: 'mac', titulo: 'Masseira', render: (b) => dados.mapa.maceira.get(b.maceira_id)?.nome || '–' },
@@ -130,14 +130,14 @@ export function EstoqueValorizado() {
     ${porTipo.length > 0 && html`<div class="barra-tipos">${porTipo.map((x) => html`<span style=${`flex:${x.v}`} title=${`${TIPOS_PRODUTO[x.k]}: ${moeda(x.v)}`}><b>${TIPOS_PRODUTO[x.k]}</b> ${num((x.v / total) * 100, 0)}%</span>`)}</div>`}
     <div class="filtros"><input class="entrada busca" placeholder="Buscar produto" value=${busca} onInput=${(e) => setBusca(e.target.value)} />
       <select class="entrada" value=${tipo} onChange=${(e) => setTipo(e.target.value)}><option value="">Todos os tipos</option>${Object.entries(TIPOS_PRODUTO).map(([k, v]) => html`<option value=${k}>${v}</option>`)}</select>
-      <${Exportar} titulo="Estoque valorizado por local" filtros=${dataHora(new Date())} arquivo=${`estoque-valorizado-${hojeISO()}`} linhas=${linhas} colunas=${[
+      <${Exportar} tabela="custos-producao.estoquevalorizado" titulo="Estoque valorizado por local" filtros=${dataHora(new Date())} arquivo=${`estoque-valorizado-${hojeISO()}`} linhas=${linhas} colunas=${[
         { titulo: 'Código', valor: (p) => p.codigo }, { titulo: 'Produto', valor: (p) => p.descricao, largura: 32 }, { titulo: 'Tipo', valor: (p) => TIPOS_PRODUTO[tipoProduto(p)] },
         { titulo: 'Unid.', valor: (p) => p.unidade_estoque }, ...locais.map((l) => ({ titulo: nomeLocal(dados, l.id), valor: (p) => Math.round(p.por[l.id] * 1000) / 1000, num: true })),
         { titulo: 'Em trânsito', valor: (p) => p.tr, num: true }, { titulo: 'Total', valor: (p) => Math.round((p.fis + p.tr) * 1000) / 1000, num: true },
         { titulo: 'Custo médio', valor: (p) => p.cm, texto: (p) => m4(p.cm), num: true }, { titulo: 'Valor', valor: (p) => Math.round(p.valor * 100) / 100, texto: (p) => moeda(p.valor), num: true }]}
         totais=${['TOTAL', '', '', '', ...locais.map((l) => moeda(totLocal(l.id))), moeda(totTr), '', '', moeda(total)]} /></div>
-    <${Tabela} linhas=${linhas} ordemInicial=${{ chave: 'valor', dir: -1 }} max=${400} colunas=${[
-      { chave: 'descricao', titulo: 'Produto', render: (p) => html`<b>${p.descricao}</b><br /><small>${p.codigo}</small>` },
+    <${Tabela} id="custos-producao.estoquevalorizado" linhas=${linhas} ordemInicial=${{ chave: 'valor', dir: -1 }} max=${400} colunas=${[
+      { chave: 'cod', titulo: 'Código', valor: (p) => p.codigo, render: (p) => p.codigo }, { chave: 'descricao', titulo: 'Produto', classe: 'col-desc', render: (p) => html`<b>${p.descricao}</b>` },
       ...locais.map((l) => ({ chave: 'l' + l.id, titulo: l.nome, num: true, valor: (p) => p.por[l.id], render: (p) => (Math.abs(p.por[l.id]) > 0.0001 ? html`<span class=${p.por[l.id] < 0 ? 'texto-vermelho' : ''}>${num(p.por[l.id], 2)}</span>` : html`<span class="texto-cinza">–</span>`) })),
       { chave: 'tr', titulo: 'Trânsito', num: true, render: (p) => (p.tr > 0 ? html`<span class="texto-azul">${num(p.tr, 2)}</span>` : '–') },
       { chave: 'cm', titulo: 'Custo médio', num: true, render: (p) => html`${m4(p.cm)}<small>/${p.unidade_estoque}</small>` },
@@ -173,12 +173,12 @@ export function AvulsasPerdas() {
     ${top.length > 0 && html`<h3 class="titulo-secao">Onde mais saiu dinheiro</h3>
       <div class="barras-h">${top.map(([id, val]) => html`<div class="bh-linha"><span class="bh-rotulo">${dados.mapa.produto.get(id)?.descricao}</span>
         <span class="bh-trilho"><span class="bh-barra" style=${`width:${(val / top[0][1]) * 100}%`}></span></span><span class="bh-valor">${moeda(val)}</span></div>`)}</div>`}
-    <div class="filtros"><${Exportar} titulo="Saídas avulsas e perdas" filtros=${`${de} a ${ate}`} arquivo=${`avulsas-perdas-${de}-a-${ate}`} linhas=${movs} colunas=${[
+    <div class="filtros"><${Exportar} tabela="custos-producao.avulsasperdas" titulo="Saídas avulsas e perdas" filtros=${`${de} a ${ate}`} arquivo=${`avulsas-perdas-${de}-a-${ate}`} linhas=${movs} colunas=${[
       { titulo: 'Data/hora', valor: (m) => dataHora(m.data_hora) }, { titulo: 'Tipo', valor: (m) => (m.tipo === 'perda' ? 'Perda' : 'Saída avulsa') },
       { titulo: 'Produto', valor: (m) => pr(m)?.descricao, largura: 32 }, { titulo: 'Quantidade', valor: (m) => -Number(m.quantidade), num: true }, { titulo: 'Unid.', valor: (m) => pr(m)?.unidade_estoque },
       { titulo: 'Local', valor: (m) => nomeLocal(dados, m.local_id) }, { titulo: 'Valor', valor: v, texto: (m) => moeda(v(m)), num: true },
       { titulo: 'Quem', valor: quem }, { titulo: 'Motivo / observação', valor: (m) => m.observacao || '', largura: 40 }]} /></div>
-    <${Tabela} linhas=${movs} vazio="Nenhuma saída avulsa ou perda no período." colunas=${[
+    <${Tabela} id="custos-producao.avulsasperdas" linhas=${movs} vazio="Nenhuma saída avulsa ou perda no período." colunas=${[
       { chave: 'data_hora', titulo: 'Data/hora', render: (m) => dataHora(m.data_hora) },
       { chave: 'tipo', titulo: 'Tipo', render: (m) => html`<${Etiqueta} cor=${m.tipo === 'perda' ? 'vermelho' : 'laranja'}>${m.tipo === 'perda' ? 'Perda' : 'Avulsa'}</${Etiqueta}>` },
       { chave: 'p', titulo: 'Produto', render: (m) => pr(m)?.descricao },

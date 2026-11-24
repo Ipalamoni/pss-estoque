@@ -21,7 +21,7 @@ export function TelaAuditoria() {
   const lista = useMemo(() => (regs || []).filter((r) => !tabela || r.tabela === tabela), [regs, tabela]);
   return html`
     <${Cabecalho} titulo="Auditoria" sub="Registro automático (feito pelo banco) de toda criação e alteração em cadastros, pedidos, programação, usuários e configurações. Não pode ser editado nem apagado.">
-      ${regs && html`<${Exportar} titulo="Auditoria" filtros=${`${de.split('-').reverse().join('/')} a ${ate.split('-').reverse().join('/')}`} arquivo=${`auditoria-${de}-a-${ate}`} linhas=${lista}
+      ${regs && html`<${Exportar} tabela="auditoria.telaauditoria" titulo="Auditoria" filtros=${`${de.split('-').reverse().join('/')} a ${ate.split('-').reverse().join('/')}`} arquivo=${`auditoria-${de}-a-${ate}`} linhas=${lista}
         colunas=${[{ titulo: 'Data/hora', valor: (r) => dataHora(r.data_hora) }, { titulo: 'Usuário', valor: (r) => (r.usuario_id ? nomeUsuario(dados.mapa.perfil.get(r.usuario_id)) : 'sistema'), largura: 28 },
           { titulo: 'Ação', valor: (r) => ACAO[r.acao]?.[0] }, { titulo: 'Onde', valor: (r) => `${TABELAS[r.tabela] || r.tabela} #${r.registro_id}`, largura: 26 },
           { titulo: 'O que mudou', valor: (r) => mudancas(r), largura: 80 }]} />`}
@@ -33,7 +33,7 @@ export function TelaAuditoria() {
         ${Object.entries(TABELAS).map(([k, t]) => html`<option value=${k}>${t}</option>`)}</select>
     </${Filtros}>
     <p class="nota">As movimentações de estoque não aparecem aqui porque elas mesmas já são um registro permanente (veja “Movimentações”).</p>
-    ${regs === null ? html`<${Carregando} />` : html`<${Tabela} linhas=${lista} max=${500} colunas=${[
+    ${regs === null ? html`<${Carregando} />` : html`<${Tabela} id="auditoria.telaauditoria" linhas=${lista} max=${500} colunas=${[
       { chave: 'data_hora', titulo: 'Data/hora', render: (r) => dataHora(r.data_hora) },
       { chave: 'u', titulo: 'Usuário', valor: (r) => dados.mapa.perfil.get(r.usuario_id)?.nome, render: (r) => (r.usuario_id ? nomeUsuario(dados.mapa.perfil.get(r.usuario_id)) : html`<small>sistema</small>`) },
       { chave: 'acao', titulo: 'Ação', render: (r) => html`<${Etiqueta} cor=${ACAO[r.acao]?.[1]}>${ACAO[r.acao]?.[0]}</${Etiqueta}>` },

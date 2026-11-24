@@ -19,7 +19,7 @@ export function TelaFornecedores() {
 
   return html`
     <${Cabecalho} titulo="Fornecedores">
-      <${Exportar} titulo="Cadastro de fornecedores" filtros=${pl(linhas.length, 'fornecedor', 'fornecedores')} arquivo=${`fornecedores-${hojeISO()}`} linhas=${linhas} colunas=${[
+      <${Exportar} tabela="fornecedores.telafornecedores" titulo="Cadastro de fornecedores" filtros=${pl(linhas.length, 'fornecedor', 'fornecedores')} arquivo=${`fornecedores-${hojeISO()}`} linhas=${linhas} colunas=${[
         { titulo: 'Nome fantasia', valor: (f) => f.nome, largura: 28 }, { titulo: 'Razão social', valor: (f) => f.razao_social, largura: 32 }, { titulo: 'Tipo', valor: (f) => (f.tipo_pessoa === 'PF' ? 'Pessoa física' : 'Pessoa jurídica') }, { titulo: 'CNPJ / CPF', valor: (f) => formatarDoc(f.cnpj, f.tipo_pessoa), largura: 20 },
         { titulo: 'Inscr. estadual', valor: (f) => f.inscricao_estadual }, { titulo: 'Contato', valor: (f) => f.contato }, { titulo: 'Telefone', valor: (f) => f.telefone },
         { titulo: 'WhatsApp', valor: (f) => f.whatsapp }, { titulo: 'E-mail', valor: (f) => f.email, largura: 28 }, { titulo: 'Endereço', valor: (f) => f.endereco, largura: 30 },
@@ -33,7 +33,7 @@ export function TelaFornecedores() {
     <${Filtros} ativos=${inativos ? 1 : 0} fixo=${html`<${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Buscar por nome, CNPJ, CPF ou contato" />`}>
       <label class="check"><input type="checkbox" checked=${inativos} onChange=${(e) => setInativos(e.target.checked)} /> Mostrar inativos</label>
     </${Filtros}>
-    <${Tabela} linhas=${linhas} aoClicar=${setEditando} ordemInicial=${{ chave: 'nome', dir: 1 }}
+    <${Tabela} id="fornecedores.telafornecedores" linhas=${linhas} aoClicar=${setEditando} ordemInicial=${{ chave: 'nome', dir: 1 }}
       colunas=${[
         { chave: 'nome', titulo: 'Fornecedor', render: (f) => html`<b>${f.nome}</b>${f.pre_cadastro && html`<span class="tag-pre">pré-cadastro</span>`}${!f.ativo && html` <${Etiqueta}>inativo</${Etiqueta}>`}` },
         { chave: 'cnpj', titulo: 'CNPJ / CPF', render: (f) => formatarDoc(f.cnpj, f.tipo_pessoa) || '–' },

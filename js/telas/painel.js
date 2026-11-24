@@ -96,7 +96,7 @@ export function TelaPainel() {
 
   return html`
     <${Cabecalho} titulo="Painel de Estoque e Compras" sub=${`Estoque, compras e consumo · atualizado em ${dataHora(dados.carregadoEm || new Date())}`}>
-      ${cmp && html`<${Exportar} titulo="Painel de Estoque e Compras" filtros=${`Compras e consumo: ${P.rotulo} (${data(P.de)} a ${data(P.ate)})`}
+      ${cmp && html`<${Exportar} tabela="painel.telapainel" titulo="Painel de Estoque e Compras" filtros=${`Compras e consumo: ${P.rotulo} (${data(P.de)} a ${data(P.ate)})`}
         arquivo=${`painel-gerencial-${h}`} paisagem=${false} colunas=${[{ titulo: 'Indicador', valor: (l) => l[0], largura: 42 }, { titulo: 'Valor', valor: (l) => l[1], largura: 22 }, { titulo: 'Detalhe', valor: (l) => l[2] || '', largura: 40 }]}
         linhas=${resumoIndicadores(est, cmp, P)} abas=${() => abasExcel(est, cmp, P, dados)} />`}
     </${Cabecalho}>
@@ -116,7 +116,7 @@ export function TelaPainel() {
         cor=${alertaQtd ? 'c-vermelho' : ''} aoClicar=${() => ir('estoque', { status: 'alerta' })} />
     </div>
     <section class="painel"><h3>Quantidades em estoque (por grupo e classificação)</h3>
-      <${Tabela} linhas=${est.quant} chave="k" max=${12} aoVerTodos=${() => ir('estoque')} colunas=${[
+      <${Tabela} id="painel.telapainel" linhas=${est.quant} chave="k" max=${12} aoVerTodos=${() => ir('estoque')} colunas=${[
         { chave: 'grupo', titulo: 'Grupo', render: (g) => html`<b>${g.grupo}</b>` },
         { chave: 'classe', titulo: 'Classif.', render: (g) => (g.classe ? html`<${Etiqueta} cor="azul">${g.classe}</${Etiqueta}>` : '–') },
         { chave: 'saldo', titulo: 'Quantidade', num: true, render: (g) => html`<b>${num(g.saldo, g.saldo < 100 ? 2 : 0)}</b> <small>${g.unidade}</small>` },
@@ -172,7 +172,7 @@ export function TelaPainel() {
             <tbody>${est.cats.map((c) => { const r = cmp.receberCat.get(c.id) || 0; return html`<tr><td>${c.rotulo}</td><td class="n">${moeda(c.valor)}</td><td class="n">${r ? moeda(r) : '–'}</td><td class="n"><b>${moeda(c.valor + r)}</b></td></tr>`; })}</tbody></table>
         </section>
         <section class="painel"><h3>Próximas entregas</h3>
-          <${Tabela} linhas=${cmp.proximos} max=${8} aoClicar=${(p) => ir('pedidos', { abrir: p.id })} aoVerTodos=${() => ir('pedidos', { filtro: 'pendentes' })} vazio="Nenhum pedido pendente." colunas=${[
+          <${Tabela} id="painel.telapainel-2" linhas=${cmp.proximos} max=${8} aoClicar=${(p) => ir('pedidos', { abrir: p.id })} aoVerTodos=${() => ir('pedidos', { filtro: 'pendentes' })} vazio="Nenhum pedido pendente." colunas=${[
             { chave: 'id', titulo: 'Pedido', render: (p) => html`<b>${numeroPedido(p.id)}</b>` },
             { chave: 'f', titulo: 'Fornecedor', render: (p) => p.r.fornecedor?.nome },
             { chave: 'previsao_entrega', titulo: 'Previsão', render: (p) => (p.previsao_entrega ? data(p.previsao_entrega) : '–') },

@@ -6,6 +6,7 @@ import { html, useState, useEffect, useRef, useApp, avisar, useCelular } from '.
 import { excelBlob, pdfTabela, pdfBlob, imprimirPDF, baixar, compartilhar } from './export.js';
 import { mensagemErro, hojeISO } from './util.js';
 import { Icone } from './icones.js';
+import { usePreferencia } from './preferencias.js';
 
 const limpar = (t) => String(t || 'relatorio').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
@@ -28,15 +29,17 @@ export function Exportar(props) {
   }, [menu]);
   const nome = props.arquivo || `${limpar(props.titulo)}-${hojeISO()}`;
   const sem = new Set(props.sem || []);
+  const escondidas = usePreferencia(props.tabela ? `colunas.${props.tabela}` : '_', []);
+  const colunasExp = (props.colunas || []).filter((c) => !props.tabela || !escondidas.includes(String(c.titulo)));
 
   async function gerar(tipo) {
     if (tipo === 'excel') {
       const abas = props.abas ? props.abas() : [{ nome: props.titulo, linhas: props.linhas,
-        colunas: props.colunas.map((c) => ({ titulo: c.titulo, valor: c.valor, largura: c.largura })) }];
+        colunas: colunasExp.map((c) => ({ titulo: c.titulo, valor: c.valor, largura: c.largura })) }];
       return { blob: await excelBlob(abas), nome: `${nome}.xlsx` };
     }
     const doc = props.pdf ? await props.pdf(dados.params)
-      : await pdfTabela({ titulo: props.titulo, filtros: props.filtros, colunas: props.colunas, linhas: props.linhas,
+      : await pdfTabela({ titulo: props.titulo, filtros: props.filtros, colunas: colunasExp, linhas: props.linhas,
         totais: props.totais, paisagem: props.paisagem !== false, params: dados.params });
     return { doc, blob: pdfBlob(doc), nome: `${nome}.pdf` };
   }

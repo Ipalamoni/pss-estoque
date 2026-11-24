@@ -55,15 +55,15 @@ export function ResumoPrevisao({ dia, titulo, aoAbrir }) {
   const semRend = lista.filter((l) => l.previsto === null);
   return html`<section class="painel previsao-resumo">
     <h3>${titulo || `Previsão de produção · ${rotuloDiaPrev(dia)}`}</h3>
-    <${Tabela} linhas=${lista} chave="chave" aoClicar=${aoAbrir ? () => aoAbrir() : null}
+    <${Tabela} id="previsao.resumoprevisao" linhas=${lista} chave="chave" aoClicar=${aoAbrir ? () => aoAbrir() : null}
       colunas=${[
-        { chave: 'nome', titulo: 'Produto', valor: nomeProduto, render: (l) => html`<b>${nomeProduto(l)}</b><br /><small>${l.codigo} · ${l.nome}</small>` },
+        { chave: 'nome', titulo: 'Produto', valor: nomeProduto, classe: 'col-desc', render: (l) => html`<b>${nomeProduto(l)}</b>` }, { chave: 'rec', titulo: 'Receita', valor: (l) => `${l.codigo} · ${l.nome}`, render: (l) => `${l.codigo} · ${l.nome}` },
         { chave: 'receitas', titulo: 'Receitas', num: true, valor: (l) => Number(l.receitas), render: (l) => num(l.receitas, 1) },
         { chave: 'rendimento_qtd', titulo: 'Rende por receita', num: true, valor: (l) => Number(l.rendimento_qtd || 0),
           render: (l) => (l.rendimento_qtd ? `${num(l.rendimento_qtd, 0)} ${unid(l)}` : html`<${Etiqueta} cor="vermelho">sem rendimento</${Etiqueta}>`) },
         { chave: 'previsto', titulo: 'Previsão', num: true, valor: (l) => Number(l.previsto || 0), render: (l) => (l.previsto === null ? '–' : html`<b>${num(l.previsto, 0)} ${unid(l)}</b>`) },
       ]}
-      rodape=${html`<tr><td colspan="3"><b>Total previsto</b></td><td class="n previsao-total"><b>${totalPorUnidade(lista)}</b></td></tr>`} />
+      totais=${{ rotulo: 'Total previsto', previsto: totalPorUnidade(lista) }} />
     ${semRend.length > 0 && html`<p class="nota">⚠ ${pl(semRend.length, 'receita está', 'receitas estão')} sem rendimento cadastrado na ficha técnica (${semRend.map((l) => l.codigo).join(', ')}). A engenharia precisa preencher "rende por receita".</p>`}
   </section>`;
 }
@@ -134,7 +134,7 @@ export function TelaPrevisao() {
 
   return html`
     <${Cabecalho} titulo="Programado × produzido" sub=${reduzido ? 'O que está programado e quanto já foi produzido, hoje e amanhã' : 'Receitas programadas × rendimento de cada receita, e o que já foi produzido (bateladas finalizadas)'}>
-      <${Exportar} titulo="Previsão de produção" filtros=${periodoTxt} arquivo=${`previsao-producao-${de}${umDia ? '' : '-a-' + ate}`}
+      <${Exportar} tabela="previsao.telaprevisao" titulo="Previsão de produção" filtros=${periodoTxt} arquivo=${`previsao-producao-${de}${umDia ? '' : '-a-' + ate}`}
         colunas=${aba === 'dia' ? colDia : colProd} linhas=${aba === 'dia' ? linhas : porProduto}
         abas=${() => [{ nome: 'Dia a dia', colunas: colDia, linhas }, { nome: 'Por produto', colunas: colProd, linhas: porProduto }]} />
     </${Cabecalho}>
@@ -154,10 +154,10 @@ export function TelaPrevisao() {
       </div>
       ${linhas.some((l) => l.previsto === null) && html`<div class="aviso-faixa"><span>⚠ Há receitas sem rendimento cadastrado: a previsão delas não entra no total. A engenharia preenche "rende por receita" na ficha técnica.</span></div>`}
       <${Abas} abas=${[{ id: 'dia', titulo: 'Dia a dia' }, { id: 'produto', titulo: 'Total por produto' }]} ativa=${aba} aoMudar=${setAba} />
-      ${aba === 'dia' ? html`<${Tabela} linhas=${linhas} chave="chave" vazio="Nada programado neste período."
+      ${aba === 'dia' ? html`<${Tabela} id="previsao.telaprevisao" linhas=${linhas} chave="chave" vazio="Nada programado neste período."
         colunas=${[
           { chave: 'data', titulo: 'Dia', render: (l) => rotuloDiaPrev(l.data) },
-          { chave: 'nome', titulo: 'Produto', valor: nomeProduto, render: (l) => html`<b>${nomeProduto(l)}</b><br /><small>${l.codigo} · ${l.nome}</small>` },
+          { chave: 'nome', titulo: 'Produto', valor: nomeProduto, classe: 'col-desc', render: (l) => html`<b>${nomeProduto(l)}</b>` }, { chave: 'rec', titulo: 'Receita', valor: (l) => `${l.codigo} · ${l.nome}`, render: (l) => `${l.codigo} · ${l.nome}` },
           { chave: 'receitas', titulo: 'Receitas', num: true, valor: (l) => Number(l.receitas), render: (l) => num(l.receitas, 1) },
           { chave: 'rendimento_qtd', titulo: 'Rende por receita', num: true, valor: (l) => Number(l.rendimento_qtd || 0),
             render: (l) => (l.rendimento_qtd ? `${num(l.rendimento_qtd, 0)} ${unid(l)}` : html`<${Etiqueta} cor="vermelho">sem rendimento</${Etiqueta}>`) },
@@ -165,15 +165,15 @@ export function TelaPrevisao() {
           { chave: 'produzido', titulo: 'Produzido', num: true, valor: (l) => Number(l.produzido || 0), render: (l) => html`${num(l.produzido || 0, 0)} <${Progresso} l=${l} />` },
           { chave: 'sit', titulo: 'Situação', valor: (l) => situacaoLinha(l, hoje).t, render: (l) => { const s = situacaoLinha(l, hoje); return html`<${Etiqueta} cor=${s.cor}>${s.t}</${Etiqueta}>`; } },
         ]}
-        rodape=${linhas.length > 0 && html`<tr><td colspan="2"><b>Total</b></td><td class="n"><b>${num(receitasTot, 1)}</b></td><td></td><td class="n"><b>${totalPorUnidade(linhas)}</b></td><td class="n"><b>${num(linhas.reduce((s, l) => s + Number(l.produzido || 0), 0), 0)}</b></td><td></td></tr>`} />`
-      : html`<${Tabela} linhas=${porProduto} chave="chave" vazio="Nada programado neste período."
+        totais=${linhas.length > 0 && { rotulo: 'Total', receitas: num(receitasTot, 1), previsto: totalPorUnidade(linhas), produzido: num(linhas.reduce((s, l) => s + Number(l.produzido || 0), 0), 0) }} />`
+      : html`<${Tabela} id="previsao.telaprevisao-2" linhas=${porProduto} chave="chave" vazio="Nada programado neste período."
         colunas=${[
-          { chave: 'nome', titulo: 'Produto', valor: nomeProduto, render: (a) => html`<b>${nomeProduto(a)}</b><br /><small>${a.codigo} · ${a.nome}</small>` },
+          { chave: 'nome', titulo: 'Produto', valor: nomeProduto, classe: 'col-desc', render: (a) => html`<b>${nomeProduto(a)}</b>` }, { chave: 'rec', titulo: 'Receita', valor: (a) => `${a.codigo} · ${a.nome}`, render: (a) => `${a.codigo} · ${a.nome}` },
           { chave: 'ndias', titulo: 'Dias', num: true },
           { chave: 'produzido', titulo: 'Produzido', num: true, valor: (a) => a.produzido || 0, render: (a) => num(a.produzido || 0, 0) },
           { chave: 'receitas', titulo: 'Receitas', num: true, render: (a) => num(a.receitas, 1) },
           { chave: 'previsto', titulo: 'Previsão', num: true, valor: (a) => a.previsto || 0, render: (a) => (a.previsto === null ? html`<${Etiqueta} cor="vermelho">sem rendimento</${Etiqueta}>` : html`<b>${num(a.previsto, 0)} ${unid(a)}</b>`) },
         ]}
-        rodape=${porProduto.length > 0 && html`<tr><td colspan="2"><b>Total</b></td><td class="n"><b>${num(linhas.reduce((s, l) => s + Number(l.produzido || 0), 0), 0)}</b></td><td class="n"><b>${num(receitasTot, 1)}</b></td><td class="n"><b>${totalPorUnidade(linhas)}</b></td></tr>`} />`}
+        totais=${porProduto.length > 0 && { rotulo: 'Total', produzido: num(linhas.reduce((s, l) => s + Number(l.produzido || 0), 0), 0), receitas: num(receitasTot, 1), previsto: totalPorUnidade(linhas) }} />`}
       <p class="nota">Previsão = receitas programadas × quanto cada receita rende (ficha técnica). Produzido = soma das bateladas finalizadas pela engenharia. Receitas canceladas não entram.</p>`}`;
 }

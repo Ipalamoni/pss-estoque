@@ -6,7 +6,7 @@
 // aparece só como aviso ("saindo").
 // =====================================================================
 import { html, useState, useMemo, useApp, Cabecalho, Abas, Busca, Tabela, Etiqueta, Vazio, Filtros } from '../ui.js';
-import { num, qu, moeda, contem, TIPOS_PRODUTO, tipoProduto, operaLocal, ehGestao, dataHora, pl, SITUACAO_TRANSF } from '../util.js';
+import { MP_EMB, casaCategoria, num, qu, moeda, contem, TIPOS_PRODUTO, tipoProduto, operaLocal, ehGestao, dataHora, pl, SITUACAO_TRANSF } from '../util.js';
 import { Exportar } from '../exportar.js';
 import { nomeLocal, minutos, tempoTexto } from '../producao-util.js';
 
@@ -22,7 +22,7 @@ export function TelaEstoqueLocal() {
   const [visao, setVisao] = useState(estadoRota?.visao || 'resumo');
   const [unid, setUnid] = useState('');
   const [loc, setLoc] = useState('');
-  const [tipo, setTipo] = useState('');
+  const [tipo, setTipo] = useState(MP_EMB);
   const [busca, setBusca] = useState('');
   const [soSaldo, setSoSaldo] = useState(true);
   const [soMov, setSoMov] = useState(false);
@@ -56,7 +56,7 @@ export function TelaEstoqueLocal() {
     return porProd;
   }, [dados.carregadoEm, unid, loc, papeis]);
 
-  const produtos = dados.produtos.filter((p) => p.controla_estoque && (!tipo || tipoProduto(p) === tipo)
+  const produtos = dados.produtos.filter((p) => p.controla_estoque && casaCategoria(tipo, tipoProduto(p))
     && contem(`${p.codigo} ${p.descricao} ${p.grupo || ''} ${p.marca || ''}`, busca));
   const linhas = produtos.map((p) => {
     const c = calc.get(p.id) || { porLocal: new Map(), transito: 0, chegando: 0, saindo: 0 };
@@ -71,7 +71,7 @@ export function TelaEstoqueLocal() {
       ${dados.unidades.filter((u) => u.ativa).map((u) => html`<option value=${String(u.id)}>${u.nome}</option>`)}</select>`}
     <select class="entrada" value=${loc} onChange=${(e) => setLoc(e.target.value)}><option value="">${gestao ? 'Todos os locais' : 'Todos os meus locais'}</option>
       ${permitidos.filter((l) => !unid || String(l.unidade_id) === unid).map((l) => html`<option value=${String(l.id)}>${nomeLocal(dados, l.id)}</option>`)}</select>
-    <select class="entrada" value=${tipo} onChange=${(e) => setTipo(e.target.value)}><option value="">Todos os tipos</option>
+    <select class="entrada" value=${tipo} onChange=${(e) => setTipo(e.target.value)}><option value="">Todos os tipos</option><option value=${MP_EMB}>Matéria-prima e embalagem</option>
       ${Object.entries(TIPOS_PRODUTO).map(([k, v]) => html`<option value=${k}>${v}</option>`)}</select>
     <label class="check"><input type="checkbox" checked=${soSaldo} onChange=${(e) => setSoSaldo(e.target.checked)} /> só com saldo</label>
     <label class="check"><input type="checkbox" checked=${soMov} onChange=${(e) => setSoMov(e.target.checked)} /> só com separado ou trânsito</label>
@@ -92,7 +92,7 @@ export function TelaEstoqueLocal() {
 function Resumo({ linhas, tudo, verCusto, un, rotulo }) {
   const segunda = (l) => (l.p.unidade2 && l.q2 > 0 ? html`<small> · ${num(l.q2, 0)} ${l.p.unidade2}${l.q2 === 1 ? '' : 's'}</small>` : '');
   const cols = [
-    { chave: 'p', titulo: 'Produto', valor: (l) => l.p.descricao, render: (l) => html`<b>${l.p.descricao}</b><br /><small>${l.p.codigo}${l.p.marca ? ` · ${l.p.marca}` : ''}</small>`, classe: 'col-desc' },
+    { chave: 'cod', titulo: 'Código', valor: (l) => l.p.codigo, render: (l) => l.p.codigo }, { chave: 'p', titulo: 'Produto', valor: (l) => l.p.descricao, render: (l) => html`<b>${l.p.descricao}</b>`, classe: 'col-desc' }, { chave: 'marca', titulo: 'Marca', valor: (l) => l.p.marca || '', render: (l) => l.p.marca || '–' },
     { chave: 'tipo', titulo: 'Tipo', valor: (l) => TIPOS_PRODUTO[tipoProduto(l.p)], render: (l) => html`<small>${TIPOS_PRODUTO[tipoProduto(l.p)]}</small>` },
     { chave: 'disp', titulo: 'Disponível', num: true, render: (l) => html`${un(l, l.disp)}${segunda(l)}` },
     { chave: 'sep', titulo: 'Separado', num: true, render: (l) => (l.sep ? un(l, l.sep) : '–') },
@@ -107,8 +107,8 @@ function Resumo({ linhas, tudo, verCusto, un, rotulo }) {
     { titulo: 'Total', valor: (l) => l.total, num: true }, ...(verCusto ? [{ titulo: 'Valor', valor: (l) => Math.round(l.valor * 100) / 100, num: true }] : [])];
   const valor = linhas.reduce((s, l) => s + l.valor, 0);
   return html`<div class="titulo-com-acao"><span class="nota">${pl(linhas.length, 'produto', 'produtos')}${verCusto ? ` · valor total ${moeda(valor)}` : ''}</span>
-    <${Exportar} titulo="Estoque por local · resumo" filtros=${rotulo} arquivo="estoque-resumo" colunas=${exp} linhas=${linhas} /></div>
-    <${Tabela} linhas=${linhas} colunas=${cols} vazio="Nenhum produto com estes filtros." ordemInicial=${{ chave: 'p', dir: 1 }} />`;
+    <${Exportar} tabela="estoque-local.resumo" titulo="Estoque por local · resumo" filtros=${rotulo} arquivo="estoque-resumo" colunas=${exp} linhas=${linhas} /></div>
+    <${Tabela} id="estoque-local.resumo" linhas=${linhas} colunas=${cols} vazio="Nenhum produto com estes filtros." ordemInicial=${{ chave: 'p', dir: 1 }} />`;
 }
 
 function Mapa({ linhas, escopo, unid, multi, tudo, un, rotulo }) {
@@ -119,7 +119,7 @@ function Mapa({ linhas, escopo, unid, multi, tudo, un, rotulo }) {
     : escopo.map((l) => ({ id: l.id, nome: l.nome, locais: [l.id] }));
   const cel = (l, c) => c.locais.reduce((s, lid) => { const v = l.c.porLocal.get(lid); return s + (v ? v.disp + v.sep + (porUnidade ? 0 : v.chegando - (tudo ? v.chegando : 0)) : 0); }, 0);
   const cols = [
-    { chave: 'p', titulo: 'Produto', valor: (l) => l.p.descricao, render: (l) => html`<b>${l.p.descricao}</b><br /><small>${l.p.unidade_estoque}</small>`, classe: 'col-desc' },
+    { chave: 'p', titulo: 'Produto', valor: (l) => l.p.descricao, render: (l) => html`<b>${l.p.descricao}</b>`, classe: 'col-desc' }, { chave: 'un', titulo: 'Unid.', render: (l) => html`${l.p.unidade_estoque}` },
     ...colunas.map((c) => ({ chave: 'c' + c.id, titulo: c.nome, num: true, valor: (l) => cel(l, c), render: (l) => { const v = cel(l, c); return v ? num(v, 3) : html`<span class="texto-cinza">–</span>`; } })),
     { chave: 'tr', titulo: tudo ? 'Em trânsito' : 'Chegando', num: true, valor: (l) => l.transito + l.chegando, render: (l) => (l.transito + l.chegando ? html`<span class="texto-azul">+${num(l.transito + l.chegando, 3)}</span>` : '–') },
     { chave: 'total', titulo: 'Total', num: true, render: (l) => html`<b>${num(l.total, 3)}</b>` },
@@ -128,8 +128,8 @@ function Mapa({ linhas, escopo, unid, multi, tudo, un, rotulo }) {
     ...colunas.map((c) => ({ titulo: c.nome, valor: (l) => cel(l, c), num: true })), { titulo: tudo ? 'Em trânsito' : 'Chegando', valor: (l) => l.transito + l.chegando, num: true },
     { titulo: 'Total', valor: (l) => l.total, num: true }];
   return html`<div class="titulo-com-acao"><span class="nota">Cada coluna = disponível + separado ${porUnidade ? 'da unidade' : 'do local'}. Toque no produto no formato "Detalhado" para ver cada local.</span>
-    <${Exportar} titulo="Estoque por local · mapa" filtros=${rotulo} arquivo="estoque-mapa" colunas=${exp} linhas=${linhas} /></div>
-    <${Tabela} linhas=${linhas} colunas=${cols} vazio="Nenhum produto com estes filtros." ordemInicial=${{ chave: 'p', dir: 1 }} />`;
+    <${Exportar} tabela="estoque-local.mapa" titulo="Estoque por local · mapa" filtros=${rotulo} arquivo="estoque-mapa" colunas=${exp} linhas=${linhas} /></div>
+    <${Tabela} id="estoque-local.mapa" linhas=${linhas} colunas=${cols} vazio="Nenhum produto com estes filtros." ordemInicial=${{ chave: 'p', dir: 1 }} />`;
 }
 
 function Detalhado({ linhas, un, rotulo, verCusto }) {
@@ -158,7 +158,7 @@ function Abertas({ ids, gestao }) {
   const { dados, ir } = useApp();
   const lista = dados.transferencias.filter((t) => gestao || ids.has(t.origem_id) || ids.has(t.destino_id))
     .map((t) => ({ ...t, itens: dados.transfItens.filter((i) => i.transferencia_id === t.id) }));
-  return html`<${Tabela} linhas=${lista} aoClicar=${(t) => ir('transferencias', { abrir: { id: t.id } })} vazio="Nenhuma transferência em aberto (separada ou em trânsito)."
+  return html`<${Tabela} id="estoque-local.abertas" linhas=${lista} aoClicar=${(t) => ir('transferencias', { abrir: { id: t.id } })} vazio="Nenhuma transferência em aberto (separada ou em trânsito)."
     ordemInicial=${{ chave: 'id', dir: -1 }} colunas=${[
       { chave: 'id', titulo: 'Nº', num: true },
       { chave: 'sit', titulo: 'Situação', valor: (t) => t.situacao, render: (t) => html`<${Etiqueta} cor=${t.situacao === 'enviada' ? 'azul' : 'laranja'}>${SITUACAO_TRANSF[t.situacao]}</${Etiqueta}>` },

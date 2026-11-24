@@ -1523,3 +1523,32 @@ small { font-size: .9rem; }
   background: #ffd84d; color: #3a2a00; border: 2px solid #b88a00; font: inherit; font-weight: 800; font-size: .95rem; }
 .btn-afinalizar:disabled { opacity: .6; cursor: not-allowed; }
 .btn-afinalizar:focus-visible { outline: 3px solid var(--foco, #0b5cad); outline-offset: 2px; }
+
+/* =====================================================================
+   VERSÃO 2.13 — LISTAS EM "MODO PLANILHA" (computador e tablet)
+   Cabeçalho e 1ª coluna travados (a tabela rola por dentro, como "congelar painéis"
+   do Excel), linhas mais baixas, zebrado, cada célula numa linha só.
+   No celular continuam os cartões.
+   ===================================================================== */
+:root { --zebra: #f7f9fb; --zebra-hover: #eef5f2; }
+html[data-tema="escuro"] { --zebra: #272a2e; --zebra-hover: #2c3532; }
+@media (min-width: 641px) {
+  .tabela-rolagem { max-height: calc(100vh - var(--topo) - 64px); overflow: auto; }
+  .tabela th { top: 0; z-index: 2; font-size: .875rem; font-weight: 700; padding: 7px 10px; vertical-align: bottom; }
+  .tabela th:first-child { z-index: 3; }
+  .tabela td { padding: 4px 10px; white-space: nowrap; vertical-align: middle; }
+  .tabela tbody tr:nth-child(even) td { background: var(--zebra); }
+  .tabela tbody tr.clicavel:hover td { background: var(--zebra-hover); }
+  .tabela td .td-v { white-space: nowrap; }
+  /* textos longos (descrição, observação): cortam com "…" e mostram tudo ao parar o mouse */
+  .tabela td.col-desc .td-v, .tabela td.col-texto .td-v { display: inline-block; max-width: 30rem; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
+  .tabela tfoot td { position: sticky; bottom: 0; z-index: 1; background: var(--cabecalho-tabela); font-weight: 700; }
+}
+@media (min-width: 641px) {
+  /* coluna travada: sombra na borda direita mostra que as outras passam por baixo */
+  .tabela td:first-child, .tabela th:first-child { box-shadow: 1px 0 0 var(--borda), 4px 0 6px -4px rgba(0,0,0,.25); }
+}
+/* botão "Colunas" acima da lista e a janela de escolha */
+.tabela-barra { display: flex; justify-content: flex-end; margin: 0 0 6px; }
+.colunas-lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 4px 14px; }
+.colunas-item { min-height: 40px; }

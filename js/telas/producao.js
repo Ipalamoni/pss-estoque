@@ -177,16 +177,17 @@ function ProgramacaoDia({ dia, setDia, engenharia, pesagem }) {
       <h3>Receitas programadas</h3>
       <div class="exportar">
         <label class="check"><input type="checkbox" checked=${verCanceladas} onChange=${(e) => setVerCanceladas(e.target.checked)} /> mostrar canceladas</label>
-        <${Exportar} titulo="Programação de produção" filtros=${rotuloDia(dia)} arquivo=${`programacao-${dia}`} colunas=${colExp} linhas=${visiveis} abas=${abasExcel} />
+        <${Exportar} tabela="producao.programacaodia" titulo="Programação de produção" filtros=${rotuloDia(dia)} arquivo=${`programacao-${dia}`} colunas=${colExp} linhas=${visiveis} abas=${abasExcel} />
       </div>
     </div>
-    <${Tabela} linhas=${visiveis} aoClicar=${setAberta} vazio=${engenharia ? 'Nada programado para este dia. Use o campo acima para programar.' : 'Nada programado para este dia.'}
+    <${Tabela} id="producao.programacaodia" linhas=${visiveis} aoClicar=${setAberta} vazio=${engenharia ? 'Nada programado para este dia. Use o campo acima para programar.' : 'Nada programado para este dia.'}
       classeLinha=${(p) => (p.situacao === 'cancelada' ? 'linha-apagada' : '')}
       colunas=${[
         { chave: 'r', titulo: 'Receita', valor: (p) => ficha(p.ficha_id)?.nome, render: (p) => html`<b>${ficha(p.ficha_id)?.codigo} · ${ficha(p.ficha_id)?.nome}</b>
           ${p.itens_alterados && html` <${Etiqueta} cor="laranja" titulo=${textoAlteracao(p, dados)}>receita alterada</${Etiqueta}>`}
           ${p.observacao && html`<br /><small>${p.observacao}</small>`}` },
-        { chave: 'mac', titulo: 'Masseira', valor: (p) => dados.mapa.maceira.get(p.maceira_id)?.nome || '', render: (p) => html`${dados.mapa.maceira.get(p.maceira_id)?.nome || html`<small class="texto-cinza">sem masseira</small>`}${p.operador_id ? html`<br /><small>${dados.mapa.operador.get(p.operador_id)?.nome}</small>` : ''}` },
+        { chave: 'mac', titulo: 'Masseira', valor: (p) => dados.mapa.maceira.get(p.maceira_id)?.nome || '', render: (p) => html`${dados.mapa.maceira.get(p.maceira_id)?.nome || html`<small class="texto-cinza">sem masseira</small>`}` },
+        { chave: 'padeiro', titulo: 'Padeiro', valor: (p) => dados.mapa.operador.get(p.operador_id)?.nome || '', render: (p) => dados.mapa.operador.get(p.operador_id)?.nome || '–' },
         { chave: 'quantidade', titulo: 'Programado', num: true, valor: (p) => Number(p.quantidade), render: (p) => num(p.quantidade, 3) },
         { chave: 'feito', titulo: 'Pesado', num: true, render: (p) => html`<b>${num(p.feito, 3)}</b>` },
         { chave: 'etapas', titulo: 'Onde está', ordenar: false, render: (p) => html`<${EtapasMini} f=${fx.get(p.id)} />
@@ -198,7 +199,7 @@ function ProgramacaoDia({ dia, setDia, engenharia, pesagem }) {
           ${engenharia && html`<button class="btn btn-sec btn-peq" onClick=${() => setEditar(p)}>Editar</button>`}</span>` },
       ]} />
     ${fora.length > 0 && html`<h3>Produções fora da programação</h3>
-      <${Tabela} linhas=${fora} colunas=${[
+      <${Tabela} id="producao.programacaodia-2" linhas=${fora} colunas=${[
         { chave: 'data_hora', titulo: 'Hora', render: (p) => dataHora(p.data_hora) },
         { chave: 'r', titulo: 'Receita', valor: (p) => ficha(p.ficha_id)?.nome, render: (p) => html`<b>${ficha(p.ficha_id)?.nome}</b>${p.alterada ? html` <${Etiqueta} cor="laranja">alterada</${Etiqueta}>` : ''}` },
         { chave: 'multiplicador', titulo: 'Quantas', num: true, render: (p) => num(p.multiplicador, 3) },
@@ -517,9 +518,9 @@ function ProgramacaoPeriodo({ aoAbrirDia }) {
       <${Cartao} titulo="Programado" valor=${rec(tP)} /><${Cartao} titulo="Produzido" valor=${rec(tF)} sub=${tP ? `${num((tF / tP) * 100, 0)}% atendido` : '–'} />
       <${Cartao} titulo="Pendente" valor=${rec(Math.max(tP - tF, 0))} cor=${tP - tF > 0 ? 'c-laranja' : ''} />
     </div>
-    <div class="filtros"><${Exportar} titulo="Programação de produção" filtros=${`${data(de)} a ${data(ate)}`} arquivo=${`programacao-${de}-a-${ate}`} colunas=${cols} linhas=${linhas}
+    <div class="filtros"><${Exportar} tabela="producao.programacaoperiodo" titulo="Programação de produção" filtros=${`${data(de)} a ${data(ate)}`} arquivo=${`programacao-${de}-a-${ate}`} colunas=${cols} linhas=${linhas}
       totais=${['TOTAL', '', '', num(tP, 3), num(tF, 3), num(Math.max(tP - tF, 0), 3), '', '', '']} /></div>
-    <${Tabela} linhas=${linhas} aoClicar=${(p) => aoAbrirDia(p.data)} vazio="Nada programado neste período." colunas=${[
+    <${Tabela} id="producao.programacaoperiodo" linhas=${linhas} aoClicar=${(p) => aoAbrirDia(p.data)} vazio="Nada programado neste período." colunas=${[
       { chave: 'data', titulo: 'Dia', render: (p) => rotuloDia(p.data) },
       { chave: 'r', titulo: 'Receita', valor: (p) => ficha(p.ficha_id)?.nome, render: (p) => html`<b>${ficha(p.ficha_id)?.codigo} · ${ficha(p.ficha_id)?.nome}</b>${p.itens_alterados ? html` <${Etiqueta} cor="laranja">alterada</${Etiqueta}>` : ''}` },
       { chave: 'quantidade', titulo: 'Programado', num: true, valor: (p) => Number(p.quantidade), render: (p) => num(p.quantidade, 3) },
@@ -689,7 +690,7 @@ function SaidasProducaoConteudo({ aba, de, ate, prods, movs }) {
     <div class="filtros"><${ExportarC} verCusto=${verCusto} titulo="Matéria-prima consumida na produção" filtros=${periodo} arquivo=${`consumo-producao-${de}-a-${ate}`} colunas=${cols} linhas=${linhas}
       totais=${['TOTAL', '', '', '', '', '', '', moeda(tV)]} /></div>
     <${TabelaC} verCusto=${verCusto} linhas=${linhas} vazio="Nenhum consumo neste período." colunas=${[
-      { chave: 'p', titulo: 'Matéria-prima', valor: (x) => prod(x.id)?.descricao, render: (x) => html`<b>${prod(x.id)?.descricao}</b><br /><small>${prod(x.id)?.codigo}${prod(x.id)?.classificacao ? ` · classificação ${prod(x.id).classificacao}` : ''}</small>` },
+      { chave: 'cod', titulo: 'Código', valor: (x) => prod(x.id)?.codigo, render: (x) => prod(x.id)?.codigo }, { chave: 'p', titulo: 'Matéria-prima', valor: (x) => prod(x.id)?.descricao, render: (x) => html`<b>${prod(x.id)?.descricao}</b>`, classe: 'col-desc' }, { chave: 'classif', titulo: 'Classif.', valor: (x) => prod(x.id)?.classificacao || '', render: (x) => prod(x.id)?.classificacao || '–' },
       { chave: 'receita', titulo: 'Pelas receitas', num: true, render: (x) => qu(x.receita, un(x)) },
       { chave: 'avulsa', titulo: 'Avulsas', num: true, render: (x) => (x.avulsa ? qu(x.avulsa, un(x)) : '–') },
       { chave: 't', titulo: 'Total', num: true, valor: (x) => x.receita + x.avulsa, render: (x) => html`<b>${qu(x.receita + x.avulsa, un(x))}</b>` },

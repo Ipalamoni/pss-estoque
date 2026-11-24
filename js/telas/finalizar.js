@@ -162,8 +162,8 @@ function Finalizadas() {
     { titulo: 'Diferença', valor: (b) => dif(b) ?? '', num: true }, { titulo: 'Finalizou', valor: (b) => `${pes(b.finalizada_por)} ${b.finalizada_em ? dataHora(b.finalizada_em) : ''}` },
     { titulo: 'Motivo cancelamento', valor: (b) => b.cancelada_motivo || '' }];
   return html`<div class="filtros"><input class="entrada" type="date" value=${de} onChange=${(e) => setDe(e.target.value)} /> até <input class="entrada" type="date" value=${ate} onChange=${(e) => setAte(e.target.value)} />
-      ${lista && html`<${Exportar} titulo="Bateladas finalizadas" filtros=${`${de} a ${ate}`} arquivo="bateladas" linhas=${lista} colunas=${colunasExp} />`}</div>
-    ${!lista ? html`<${Carregando} />` : html`<${Tabela} linhas=${lista} vazio="Nenhuma batelada finalizada no período." colunas=${[
+      ${lista && html`<${Exportar} tabela="finalizar.finalizadas" titulo="Bateladas finalizadas" filtros=${`${de} a ${ate}`} arquivo="bateladas" linhas=${lista} colunas=${colunasExp} />`}</div>
+    ${!lista ? html`<${Carregando} />` : html`<${Tabela} id="finalizar.finalizadas" linhas=${lista} vazio="Nenhuma batelada finalizada no período." colunas=${[
       { chave: 'id', titulo: 'Nº', num: true },
       { chave: 'ini', titulo: 'Início', valor: (b) => b.iniciada_em, render: (b) => dataHora(b.iniciada_em) },
       { chave: 'mac', titulo: 'Masseira', render: (b) => dados.mapa.maceira.get(b.maceira_id)?.nome || '–' },
@@ -174,5 +174,5 @@ function Finalizadas() {
       { chave: 'd', titulo: 'Dif. padrão', num: true, valor: (b) => dif(b) ?? 0,
         render: (b) => { const d = dif(b); return d == null ? '–' : html`<span class=${d < 0 ? 'texto-vermelho' : d > 0 ? 'texto-verde' : ''}>${d > 0 ? '+' : ''}${num(d, 0)}</span>`; } },
       { chave: 'fin', titulo: 'Finalizou', render: (b) => html`<small>${pes(b.finalizada_por)}</small>` },
-    ]} rodape=${html`<tr><td colspan="5"><b>Total</b></td><td class="n"><b>${num(lista.reduce((s, b) => s + Number(b.quantidade_produzida || 0), 0), 0)}</b></td><td colspan="2"></td></tr>`} />`}`;
+    ]} totais=${{ rotulo: 'Total', q: num(lista.reduce((s, b) => s + Number(b.quantidade_produzida || 0), 0), 0) }} />`}`;
 }

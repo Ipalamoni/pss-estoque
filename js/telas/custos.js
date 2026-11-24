@@ -8,7 +8,7 @@
 //        → médio = (50×1,00 + 100×1,10) ÷ 150 = R$ 1,0667/kg
 // =====================================================================
 import { html, useState, useEffect, useMemo, useApp, Tabela, Modal, Cartao, Cabecalho, Etiqueta, Busca, Abas, Carregando, avisar, Filtros } from '../ui.js';
-import { CATEGORIAS, data, dataHora, hojeISO, num, qtd, moeda, pl, contem, numeroPedido, mensagemErro } from '../util.js';
+import { MP_EMB, casaCategoria, CATEGORIAS, data, dataHora, hojeISO, num, qtd, moeda, pl, contem, numeroPedido, mensagemErro } from '../util.js';
 import { Exportar } from '../exportar.js';
 import { CustoProdutoAcabado, EstoqueValorizado, AvulsasPerdas } from './custos-producao.js';
 
@@ -42,10 +42,10 @@ export function TelaCustos() {
 // ------------------------------- PRODUTOS ----------------------------
 function CustosProdutos({ ult }) {
   const { dados } = useApp();
-  const [cat, setCat] = useState('materia_prima');
+  const [cat, setCat] = useState(MP_EMB);
   const [busca, setBusca] = useState('');
   const [inativos, setInativos] = useState(false);
-  const linhas = useMemo(() => dados.produtos.filter((p) => (inativos || p.ativo) && (!cat || p.categoria === cat)
+  const linhas = useMemo(() => dados.produtos.filter((p) => (inativos || p.ativo) && casaCategoria(cat, p.categoria)
       && contem(`${p.codigo} ${p.descricao} ${p.grupo || ''} ${p.classificacao || ''} ${p.marca || ''}`, busca))
     .map((p) => { const u = ult.get(p.id); const uc = u ? Number(u.ultimo_custo) : null; const cm = Number(p.custo_medio || 0);
       return { ...p, uc, ud: u?.ultima_data, utipo: u?.ultimo_tipo, uforn: u?.fornecedor_id ? dados.mapa.fornecedor.get(Number(u.fornecedor_id))?.nome : '',
@@ -69,10 +69,10 @@ function CustosProdutos({ ult }) {
   ];
   return html`
     <div class="titulo-com-acao"><span></span>
-      <${Exportar} titulo="Gestão de custos - produtos" filtros=${`${cat ? CATEGORIAS[cat] : 'Todas as categorias'} · ${pl(linhas.length, 'produto', 'produtos')}`}
+      <${Exportar} tabela="custos.custosprodutos" titulo="Gestão de custos - produtos" filtros=${`${cat === MP_EMB ? 'Matéria-prima e embalagem' : cat ? CATEGORIAS[cat] : 'Todas as categorias'} · ${pl(linhas.length, 'produto', 'produtos')}`}
         arquivo=${`custos-produtos-${hojeISO()}`} colunas=${colExp} linhas=${linhas} /></div>
     <div class="cartoes">
-      <${Cartao} titulo="Produtos" valor=${linhas.length} sub=${cat ? CATEGORIAS[cat] : 'todas as categorias'} />
+      <${Cartao} titulo="Produtos" valor=${linhas.length} sub=${cat === MP_EMB ? 'matéria-prima e embalagem' : cat ? CATEGORIAS[cat] : 'todas as categorias'} />
       <${Cartao} titulo="Valor em estoque (custo médio)" valor=${moeda(totalValor)} />
       <${Cartao} titulo="Último custo acima do médio (+5%)" valor=${subiram} cor=${subiram ? 'c-laranja' : ''} sub="preço subiu na última compra" />
       <${Cartao} titulo="Sem custo de compra" valor=${semCusto} cor=${semCusto ? 'c-laranja' : ''} sub="ainda sem entrada com preço" />
@@ -80,24 +80,25 @@ function CustosProdutos({ ult }) {
     <${Filtros} ativos=${[cat, inativos].filter(Boolean).length} fixo=${html`<${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Código, produto, grupo, classificação ou marca" />`}>
       <div class="chips">
         <button class=${'chip' + (!cat ? ' ativo' : '')} aria-pressed=${!!(!cat)} onClick=${() => setCat('')}>Todas</button>
+        <button class=${'chip' + (cat === MP_EMB ? ' ativo' : '')} aria-pressed=${cat === MP_EMB} onClick=${() => setCat(MP_EMB)}>Matéria-prima e embalagem</button>
         ${Object.entries(CATEGORIAS).map(([k, v]) => html`<button class=${'chip' + (cat === k ? ' ativo' : '')} aria-pressed=${!!(cat === k)} onClick=${() => setCat(k)}>${v}</button>`)}
       </div>
       <label class="check"><input type="checkbox" checked=${inativos} onChange=${(e) => setInativos(e.target.checked)} /> Mostrar inativos</label>
     </${Filtros}>
-    <${Tabela} linhas=${linhas} ordemInicial=${{ chave: 'descricao', dir: 1 }}
+    <${Tabela} id="custos.custosprodutos" linhas=${linhas} ordemInicial=${{ chave: 'descricao', dir: 1 }}
       colunas=${[
-        { chave: 'descricao', titulo: 'Produto', render: (p) => html`<b>${p.descricao}</b><br /><small>${p.codigo}${p.grupo ? ' · ' + p.grupo : ''}${p.classificacao ? ' · ' + p.classificacao : ''}</small>` },
+        { chave: 'cod', titulo: 'Código · grupo', render: (p) => html`${p.codigo}${p.grupo ? ' · ' + p.grupo : ''}${p.classificacao ? ' · ' + p.classificacao : ''}` }, { chave: 'descricao', titulo: 'Produto', render: (p) => html`<b>${p.descricao}</b>` },
         { chave: 'saldo', titulo: 'Saldo', num: true, valor: (p) => Number(p.saldo), render: (p) => `${qtd(p.saldo)} ${p.unidade_estoque}` },
         { chave: 'uc', titulo: 'Último custo', num: true, valor: (p) => p.uc ?? -1,
           render: (p) => (p.uc === null ? html`<${Etiqueta} cor="laranja">sem compra</${Etiqueta}>` : html`<b>${m4(p.uc)}</b>/${p.unidade_estoque}
             ${p.ucEmb ? html`<br /><small>${moeda(p.ucEmb)}/${p.unidade_compra}</small>` : ''}`) },
-        { chave: 'ud', titulo: 'Última compra', valor: (p) => p.ud || '', render: (p) => (p.ud ? html`${data(p.ud.slice(0, 10))}<br /><small>${p.uforn || (p.utipo === 'implantacao' ? 'implantação de saldo' : '')}${p.uped ? ' · ' + numeroPedido(p.uped) : ''}</small>` : '–') },
+        { chave: 'ud', titulo: 'Última compra', valor: (p) => p.ud || '', render: (p) => (p.ud ? html`${data(p.ud.slice(0, 10))}` : '–') }, { chave: 'uforn', titulo: 'Fornecedor / origem', render: (p) => html`${p.uforn || (p.utipo === 'implantacao' ? 'implantação de saldo' : '')}${p.uped ? ' · ' + numeroPedido(p.uped) : ''}` },
         { chave: 'cm', titulo: 'Custo médio', num: true, render: (p) => html`<b>${m4(p.cm)}</b>/${p.unidade_estoque}` },
         { chave: 'dif', titulo: 'Último x médio', num: true, valor: (p) => p.dif ?? -999,
           render: (p) => (p.dif === null ? '–' : html`<span class=${p.dif > 5 ? 'txt-vermelho' : p.dif < -5 ? 'txt-verde' : ''}>${p.dif > 0 ? '+' : ''}${num(p.dif, 1)}%</span>`) },
         { chave: 'valor', titulo: 'Valor em estoque', num: true, render: (p) => moeda(p.valor) },
       ]}
-      rodape=${linhas.length > 1 && html`<tr><td colspan="6">${pl(linhas.length, 'produto', 'produtos')}</td><td class="n"><b>${moeda(totalValor)}</b></td></tr>`} />
+      totais=${linhas.length > 1 && { rotulo: pl(linhas.length, 'produto', 'produtos'), valor: moeda(totalValor) }} />
     <p class="nota">Valores na unidade de estoque (kg, L, un…). <b>Último custo</b> = custo unitário da última entrada com preço (pedido/nota ou implantação). <b>Custo médio</b> = média ponderada: a cada entrada, (saldo × médio anterior + quantidade × custo da entrada) ÷ (saldo + quantidade); saídas não mudam o médio.</p>`;
 }
 
@@ -144,11 +145,11 @@ function CustosFichas({ ult }) {
   const fichaAberta = aberta && linhas.find((f) => f.id === aberta);
   return html`
     <div class="titulo-com-acao"><span></span>
-      <${Exportar} titulo="Gestão de custos - fichas" filtros=${pl(linhas.length, 'receita', 'receitas')} arquivo=${`custos-fichas-${hojeISO()}`} colunas=${colExp} linhas=${linhas} abas=${abasExcel} /></div>
+      <${Exportar} tabela="custos.custosfichas" titulo="Gestão de custos - fichas" filtros=${pl(linhas.length, 'receita', 'receitas')} arquivo=${`custos-fichas-${hojeISO()}`} colunas=${colExp} linhas=${linhas} abas=${abasExcel} /></div>
     <div class="filtros"><${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Receita ou produto acabado" /></div>
-    <${Tabela} linhas=${linhas} aoClicar=${(f) => setAberta(f.id)} ordemInicial=${{ chave: 'nome', dir: 1 }}
+    <${Tabela} id="custos.custosfichas" linhas=${linhas} aoClicar=${(f) => setAberta(f.id)} ordemInicial=${{ chave: 'nome', dir: 1 }}
       colunas=${[
-        { chave: 'nome', titulo: 'Receita / produto acabado', render: (f) => html`<b>${f.produto_final || f.nome}</b><br /><small>${f.codigo} · ${f.nome}</small>` },
+        { chave: 'nome', titulo: 'Receita / produto acabado', render: (f) => html`<b>${f.produto_final || f.nome}</b>` }, { chave: 'rec', titulo: 'Receita', render: (f) => html`${f.codigo} · ${f.nome}` },
         { chave: 'rend', titulo: 'Rende', num: true, valor: (f) => f.c.rend || 0, render: (f) => (f.c.rend ? `${num(f.c.rend, 0)} ${un(f)}` : html`<${Etiqueta} cor="laranja">sem rendimento</${Etiqueta}>`) },
         { chave: 'tUlt', titulo: 'Receita · último custo', num: true, valor: (f) => f.c.tUlt, render: (f) => html`${moeda(f.c.tUlt)}${f.c.semUlt ? ' *' : ''}` },
         { chave: 'tMed', titulo: 'Receita · custo médio', num: true, valor: (f) => f.c.tMed, render: (f) => moeda(f.c.tMed) },
@@ -177,7 +178,7 @@ function FichaCusto({ f, aoFechar }) {
     <p>Produto acabado: <b>${f.produto_final || f.nome}</b> · rende <b>${c.rend ? `${num(c.rend, 0)} ${un}` : 'não informado'}</b> por receita</p>
     <${Tabela} linhas=${c.itens} ordemInicial=${{ chave: 'tUlt', dir: -1 }}
       colunas=${[
-        { chave: 'ing', titulo: 'Ingrediente', valor: (i) => i.p?.descricao, render: (i) => html`<b>${i.p?.descricao}</b><br /><small>${i.p?.codigo}</small>` },
+        { chave: 'cod', titulo: 'Código', valor: (i) => i.p?.codigo, render: (i) => i.p?.codigo }, { chave: 'ing', titulo: 'Ingrediente', valor: (i) => i.p?.descricao, render: (i) => html`<b>${i.p?.descricao}</b>` },
         { chave: 'q', titulo: 'Por receita', num: true, render: (i) => `${qtd(i.q)} ${i.p?.unidade_estoque}` },
         { chave: 'uc', titulo: 'Último custo', num: true, valor: (i) => i.uc ?? -1, render: (i) => (i.uc === null ? html`<${Etiqueta} cor="laranja">sem compra</${Etiqueta}>` : `${m4(i.uc)}/${i.p?.unidade_estoque}`) },
         { chave: 'cm', titulo: 'Custo médio', num: true, render: (i) => `${m4(i.cm)}/${i.p?.unidade_estoque}` },
@@ -185,7 +186,7 @@ function FichaCusto({ f, aoFechar }) {
         { chave: 'tMed', titulo: 'Total · médio', num: true, render: (i) => moeda(i.tMed) },
         { chave: 'part', titulo: '% receita', num: true, valor: (i) => (c.tUlt ? i.tUlt / c.tUlt : 0), render: (i) => `${num(c.tUlt ? (i.tUlt / c.tUlt) * 100 : 0, 1)}%` },
       ]}
-      rodape=${html`<tr><td colspan="4"><b>Custo de 1 receita (batelada)</b></td><td class="n"><b>${moeda(c.tUlt)}</b></td><td class="n"><b>${moeda(c.tMed)}</b></td><td></td></tr>`} />
+      totais=${{ rotulo: 'Custo de 1 receita (batelada)', tUlt: moeda(c.tUlt), tMed: moeda(c.tMed) }} />
     <div class="cartoes">
       <${Cartao} titulo="Receita · último custo" valor=${moeda(c.tUlt)} />
       <${Cartao} titulo="Receita · custo médio" valor=${moeda(c.tMed)} />

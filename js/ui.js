@@ -3,6 +3,7 @@
 // =====================================================================
 import { html, render, useState, useEffect, useRef, useMemo, createContext, useContext } from './vendor/preact-htm.js';
 import { lerNumero, unidadesDoProduto, contem, ordenar, qtd } from './util.js';
+import { usePreferencia, salvarPreferencia } from './preferencias.js';
 
 export { html, render, useState, useEffect, useRef, useMemo, createContext, useContext };
 
@@ -334,8 +335,13 @@ const Seta = () => html`<svg width="18" height="18" viewBox="0 0 24 24" fill="no
 
 // ------------------------------ Tabela -------------------------------
 // colunas: [{ chave, titulo, valor:(l)=>valor p/ ordenar, render:(l)=>conteúdo, num:true, classe }]
-export function Tabela({ colunas: colunasBrutas, linhas, aoClicar, vazio, rodape, ordemInicial, chave = 'id', classeLinha, max, aoVerTodos }) {
-  const colunas = colunasBrutas.filter(Boolean);   // coluna escondida (ex.: valores para pesagem) chega como false
+// id: liga o botão "Colunas" (cada pessoa escolhe as colunas visíveis; fica salvo no perfil dela)
+export function Tabela({ id, colunas: colunasBrutas, linhas, aoClicar, vazio, rodape, totais, ordemInicial, chave = 'id', classeLinha, max, aoVerTodos }) {
+  const todas = colunasBrutas.filter(Boolean);   // coluna escondida (ex.: valores para pesagem) chega como false
+  const escondidas = usePreferencia(id ? `colunas.${id}` : '_', []);
+  const [escolher, setEscolher] = useState(false);
+  // a 1ª coluna (o que identifica a linha) nunca some
+  const colunas = id ? todas.filter((c, i) => i === 0 || !escondidas.includes(String(c.titulo))) : todas;
   const [ord, setOrd] = useState(ordemInicial || null);
   const lista = useMemo(() => {
     if (!ord) return linhas;
@@ -345,7 +351,11 @@ export function Tabela({ colunas: colunasBrutas, linhas, aoClicar, vazio, rodape
   }, [linhas, ord]);
   const mostrar = max ? lista.slice(0, max) : lista;
   if (!linhas.length) return html`<${Vazio} texto=${vazio || 'Nenhum registro encontrado.'} />`;
-  return html`<div class="tabela-rolagem">
+  const barra = id && html`<div class="tabela-barra">
+    <button type="button" class="btn btn-sec btn-peq" onClick=${() => setEscolher(true)} aria-haspopup="dialog">
+      <span aria-hidden="true">☰</span> Colunas${colunas.length < todas.length ? ` (${colunas.length} de ${todas.length})` : ''}</button>
+    ${escolher && html`<${EscolherColunas} id=${id} todas=${todas} escondidas=${escondidas} aoFechar=${() => setEscolher(false)} />`}</div>`;
+  return html`${barra}<div class="tabela-rolagem">
     <table class="tabela">
       <thead><tr>
         ${colunas.map((c) => { const ativa = ord && ord.chave === c.chave;
@@ -360,16 +370,36 @@ export function Tabela({ colunas: colunasBrutas, linhas, aoClicar, vazio, rodape
           onClick=${aoClicar ? () => aoClicar(l) : null} tabindex=${aoClicar ? '0' : null}
           onKeyDown=${aoClicar ? (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) { e.preventDefault(); aoClicar(l); } } : null}>
           ${colunas.map((c) => { const v = c.render ? c.render(l) : l[c.chave];
-            return html`<td class=${(c.num ? 'n ' : '') + (c.classe || '') + (celulaVazia(v) ? ' vazia' : '')} data-rotulo=${c.titulo}>
+            const dica = typeof v === 'string' || typeof v === 'number' ? String(v) : c.valor ? String(c.valor(l) ?? '') : null;
+            return html`<td class=${(c.num ? 'n ' : '') + (c.classe || '') + (celulaVazia(v) ? ' vazia' : '')} data-rotulo=${c.titulo} title=${dica || null}>
             <span class="td-v">${v}</span></td>`; })}
         </tr>`)}
       </tbody>
       ${rodape && html`<tfoot>${rodape}</tfoot>`}
+      ${totais && (() => {   // { rotulo, <chave da coluna>: conteúdo }: o total fica sempre embaixo da sua coluna
+        const k = Math.max(1, colunas.findIndex((c) => totais[c.chave] !== undefined));
+        return html`<tfoot><tr><td colspan=${k}><b>${totais.rotulo}</b></td>
+          ${colunas.slice(k).map((c) => (totais[c.chave] !== undefined ? html`<td class="n"><b>${totais[c.chave]}</b></td>` : html`<td></td>`))}</tr></tfoot>`;
+      })()}
     </table>
     ${max && lista.length > max && (aoVerTodos
       ? html`<p class="nota">Mostrando ${max} de ${lista.length}. <button type="button" class="btn-link" onClick=${aoVerTodos}>Ver todos (${lista.length})</button></p>`
       : html`<p class="nota">Mostrando ${max} de ${lista.length}. Use os filtros ou exporte para ver tudo.</p>`)}
   </div>`;
+}
+
+// janela "Colunas": marcar/desmarcar quais colunas aparecem (salva na hora, no perfil da pessoa)
+function EscolherColunas({ id, todas, escondidas, aoFechar }) {
+  const chavePref = `colunas.${id}`;
+  const alternar = (t) => { const s = new Set(escondidas); if (s.has(t)) s.delete(t); else s.add(t); salvarPreferencia(chavePref, s.size ? [...s] : null); };
+  return html`<${Modal} titulo="Colunas desta lista" aoFechar=${aoFechar} semProtecao
+    rodape=${html`<button class="btn btn-sec" onClick=${() => salvarPreferencia(chavePref, null)}>Voltar ao padrão</button><span class="espaco"></span>
+      <button class="btn btn-pri" onClick=${aoFechar}>Pronto</button>`}>
+    <p class="nota">Desmarque o que você não usa. Fica salvo no seu usuário (vale em qualquer aparelho) e o Excel e o PDF seguem a mesma escolha.</p>
+    <div class="colunas-lista">${todas.map((c, i) => html`<label class="check colunas-item" key=${String(c.titulo) + i}>
+      <input type="checkbox" checked=${i === 0 || !escondidas.includes(String(c.titulo))} disabled=${i === 0} onChange=${() => alternar(String(c.titulo))} />
+      ${c.titulo || '(sem título)'}${i === 0 ? html` <small>(sempre aparece)</small>` : ''}</label>`)}</div>
+  </${Modal}>`;
 }
 
 // Executa uma ação no banco mostrando "salvando…" e erros amigáveis

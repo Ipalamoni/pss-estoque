@@ -154,7 +154,7 @@ export function TelaFinanceiro() {
 
   return html`
     <${Cabecalho} titulo="Financeiro · pedidos a pagar" sub="Pedidos de compra, previsão de pagamento e situação da entrega">
-      <${Exportar} titulo="Financeiro - pedidos a pagar" filtros=${filtrosTxt} arquivo=${`financeiro-pedidos-${hoje}`}
+      <${Exportar} tabela="financeiro.telafinanceiro" titulo="Financeiro - pedidos a pagar" filtros=${filtrosTxt} arquivo=${`financeiro-pedidos-${hoje}`}
         colunas=${colPdf} linhas=${linhas} abas=${abas} totais=${['', '', '', 'TOTAL', moeda(total), '', '', '', '', '', '']} />
     </${Cabecalho}>
     <div class="cartoes">
@@ -180,23 +180,25 @@ export function TelaFinanceiro() {
       </select>
       <button class="btn btn-sec btn-peq" onClick=${limpar}>Limpar filtros</button>
     </${Filtros}>
-    <${Tabela} linhas=${linhas} aoClicar=${(p) => setAberto(p.id)} ordemInicial=${{ chave: 'pgto', dir: 1 }}
+    <${Tabela} id="financeiro.telafinanceiro" linhas=${linhas} aoClicar=${(p) => setAberto(p.id)} ordemInicial=${{ chave: 'pgto', dir: 1 }}
       classeLinha=${(p) => (p.alertaEntrega || p.alertaCancelado ? 'linha-alerta' : '')}
       colunas=${[
         { chave: 'id', titulo: 'Pedido', render: (p) => html`<b>${numeroPedido(p.id)}</b>` },
-        { chave: 'data_pedido', titulo: 'Data do pedido', render: (p) => html`${data(p.data_pedido)}<br /><small>${perfil(p.comprador_id)?.nome || ''}</small>` },
-        { chave: 'forn', titulo: 'Fornecedor', valor: (p) => p.r.fornecedor?.nome, render: (p) => html`${p.r.fornecedor?.nome}${p.condicao_pagamento ? html`<br /><small>${p.condicao_pagamento}</small>` : ''}` },
+        { chave: 'data_pedido', titulo: 'Data do pedido', render: (p) => html`${data(p.data_pedido)}` }, { chave: 'comprador', titulo: 'Comprador', render: (p) => html`${perfil(p.comprador_id)?.nome || ''}` },
+        { chave: 'forn', titulo: 'Fornecedor', valor: (p) => p.r.fornecedor?.nome, render: (p) => html`${p.r.fornecedor?.nome}` }, { chave: 'cond', titulo: 'Condição de pagamento', render: (p) => (p.condicao_pagamento ? html`${p.condicao_pagamento}` : '–') },
         { chave: 'valor', titulo: 'Valor', num: true, valor: (p) => p.r.valor, render: (p) => (p.status === 'cancelado' ? html`<s>${moeda(p.r.valor)}</s>` : moeda(p.r.valor)) },
         { chave: 'pgto', titulo: 'Previsão de pagamento', valor: (p) => (p.status === 'cancelado' ? '9999' : p.previsao_pagamento || '0000'),
-          render: (p) => html`<b>${data(p.previsao_pagamento)}</b><br /><${PrazoPagamento} p=${p} />
-            ${podeFazer('data_pagamento') && p.status !== 'cancelado' && html`<br /><button class="btn-link" onClick=${(e) => { e.stopPropagation(); setAjustar(p.id); }}>ajustar data</button>`}` },
-        { chave: 'ent', titulo: 'Entrega', valor: (p) => p.ent.id, render: (p) => html`<${Etiqueta} cor=${p.ent.cor}>${p.ent.rotulo}</${Etiqueta}><br /><${PrazoEntrega} p=${p} />` },
+          render: (p) => html`<b>${data(p.previsao_pagamento)}</b>
+            ${podeFazer('data_pagamento') && p.status !== 'cancelado' && html` <button class="btn-link" onClick=${(e) => { e.stopPropagation(); setAjustar(p.id); }}>ajustar</button>`}` },
+        { chave: 'prazo_pgto', titulo: 'Prazo do pagamento', ordenar: false, render: (p) => html`<${PrazoPagamento} p=${p} />` },
+        { chave: 'ent', titulo: 'Entrega', valor: (p) => p.ent.id, render: (p) => html`<${Etiqueta} cor=${p.ent.cor}>${p.ent.rotulo}</${Etiqueta}>` },
+        { chave: 'prazo_ent', titulo: 'Prazo da entrega', ordenar: false, render: (p) => html`<${PrazoEntrega} p=${p} />` },
         { chave: 'fin', titulo: 'Lançado no sistema?', valor: (p) => (p.fin_lancado ? 1 : 0), render: (p) => html`<label class=${'flag-fin' + (p.fin_lancado ? ' ok' : '')} onClick=${(e) => e.stopPropagation()}>
             <input type="checkbox" checked=${!!p.fin_lancado} disabled=${!marca || ocupado} onChange=${(e) => alternar(p, e)} />
             ${p.fin_lancado ? 'Lançado' : 'Pendente'}</label>
             ${p.alertaCancelado && html`<br /><${Etiqueta} cor="vermelho">cancelado: estornar</${Etiqueta}>`}` },
       ]}
-      rodape=${linhas.length > 1 && html`<tr><td colspan="3">${pl(linhas.length, 'pedido', 'pedidos')} (sem os cancelados no total)</td><td class="n"><b>${moeda(total)}</b></td><td colspan="3"></td></tr>`} />
+      totais=${linhas.length > 1 && { rotulo: `${pl(linhas.length, 'pedido', 'pedidos')} (sem os cancelados no total)`, valor: moeda(total) }} />
     ${!marca && html`<p class="nota">Só o financeiro (ou o administrador) marca "lançado no sistema".</p>`}
     ${pedidoAberto && html`<${PedidoDetalhe} pedido=${pedidoAberto} aoFechar=${() => setAberto(null)} aoEditar=${() => avisar('Para alterar o pedido, abra em Pedidos de compra.', 'aviso')} />`}
     ${pedidoAjustar && html`<${AjustarPagamento} pedido=${pedidoAjustar} aoFechar=${() => setAjustar(null)} />`}`;

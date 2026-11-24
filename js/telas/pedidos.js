@@ -96,7 +96,7 @@ export function TelaPedidos() {
 
   return html`
     <${Cabecalho} titulo="Pedidos de compra" sub="Pedidos feitos, o que falta chegar e o que já chegou">
-      <${Exportar} titulo="Pedidos de compra" filtros=${pl(linhas.length, 'pedido', 'pedidos')} arquivo=${`pedidos-${hojeISO()}`} colunas=${colExp} linhas=${linhas}
+      <${Exportar} tabela="pedidos.telapedidos" titulo="Pedidos de compra" filtros=${pl(linhas.length, 'pedido', 'pedidos')} arquivo=${`pedidos-${hojeISO()}`} colunas=${colExp} linhas=${linhas}
         abas=${abasPedidos} totais=${['', '', '', '', '', '', 'TOTAL', moeda(total), '', '', '', '']} />
       <button class="btn btn-sec" onClick=${() => setUltimas(true)}>Últimas compras</button>
       ${podeFazer('pedido') && html`<button class="btn btn-pri" onClick=${() => setEditando({})}><${Icone} nome="mais" tam=${18} /> Novo pedido</button>`}
@@ -121,7 +121,7 @@ export function TelaPedidos() {
       <div class="filtro-escolher"><${Escolher} itens=${dados.fornecedores} valor=${forn} aoMudar=${setForn} rotuloDe=${(f) => f.nome} placeholder="Fornecedor (todos)" /></div>
       ${forn && html`<button class="btn btn-sec" onClick=${() => setForn(null)}>Limpar fornecedor</button>`}
     </${Filtros}>
-    <${Tabela} linhas=${linhas} aoClicar=${(p) => setAberto(p.id)} ordemInicial=${{ chave: 'id', dir: -1 }}
+    <${Tabela} id="pedidos.telapedidos" linhas=${linhas} aoClicar=${(p) => setAberto(p.id)} ordemInicial=${{ chave: 'id', dir: -1 }}
       colunas=${[
         { chave: 'id', titulo: 'Pedido', render: (p) => html`<b>${numeroPedido(p.id)}</b>` },
         { chave: 'data_pedido', titulo: 'Data', render: (p) => data(p.data_pedido) },
@@ -133,7 +133,7 @@ export function TelaPedidos() {
         { chave: 'rp', titulo: 'Recebido por', valor: (p) => p.r.recebidoPor?.nome, render: (p) => p.r.recebidoPor?.nome || '–' },
         { chave: 'status', titulo: 'Situação', valor: (p) => (p.r.divPendente ? 0 : 1) + p.status, render: (p) => html`<${SituacaoPedido} pedido=${p} r=${p.r} />` },
       ]}
-      rodape=${linhas.length > 1 && html`<tr><td colspan="5">${pl(linhas.length, 'pedido', 'pedidos')}</td><td class="n"><b>${moeda(total)}</b></td><td colspan="3"></td></tr>`} />
+      totais=${linhas.length > 1 && { rotulo: pl(linhas.length, 'pedido', 'pedidos'), valor: moeda(total) }} />
     ${pedidoAberto && html`<${PedidoDetalhe} pedido=${pedidoAberto} aoFechar=${() => setAberto(null)}
       aoEditar=${() => { setEditando(pedidoAberto); setAberto(null); }} />`}
     ${editando && html`<${FormPedido} pedido=${editando} aoFechar=${(id) => { setEditando(null); if (id) setAberto(id); }} />`}
@@ -232,8 +232,9 @@ export function PedidoDetalhe({ pedido, aoFechar, aoEditar }) {
     ${pedido.observacao && html`<p class="nota"><b>Obs.:</b> ${pedido.observacao}</p>`}
     ${pedido.motivo_cancelamento && html`<p class="nota"><b>Motivo do cancelamento/encerramento:</b> ${pedido.motivo_cancelamento}</p>`}
     <${Tabela} linhas=${r.itens} colunas=${[
-      { chave: 'p', titulo: 'Produto', valor: (i) => dados.mapa.produto.get(i.produto_id)?.descricao,
-        render: (i) => { const p = dados.mapa.produto.get(i.produto_id); return html`<b>${p?.descricao}</b><br /><small>${p?.codigo}</small>`; } },
+      { chave: 'cod', titulo: 'Código', valor: (i) => dados.mapa.produto.get(i.produto_id)?.codigo, render: (i) => dados.mapa.produto.get(i.produto_id)?.codigo },
+      { chave: 'p', titulo: 'Produto', valor: (i) => dados.mapa.produto.get(i.produto_id)?.descricao, classe: 'col-desc',
+        render: (i) => html`<b>${dados.mapa.produto.get(i.produto_id)?.descricao}</b>` },
       { chave: 'quantidade', titulo: 'Pedido', num: true, render: (i) => qu(i.quantidade, i.unidade) },
       { chave: 'preco_unitario', titulo: 'Preço unit.', num: true, render: (i) => moeda(i.preco_unitario) },
       { chave: 'valor_total', titulo: 'Total', num: true, render: (i) => moeda(i.valor_total) },
@@ -459,9 +460,9 @@ export function UltimasCompras({ aoFechar, produtoInicial, fornecedorInicial }) 
     </div>
     <${Tabela} linhas=${linhas} chave="chave" max=${300} vazio="Nenhuma compra encontrada."
       colunas=${[
-        { chave: 'data', titulo: 'Data', render: (x) => html`${data(x.data)}<br /><small>${numeroPedido(x.pedido.id)}</small>` },
+        { chave: 'data', titulo: 'Data', render: (x) => html`${data(x.data)}` }, { chave: 'ped', titulo: 'Pedido', render: (x) => html`${numeroPedido(x.pedido.id)}` },
         { chave: 'forn', titulo: 'Fornecedor', valor: (x) => x.forn?.nome, render: (x) => x.forn?.nome },
-        { chave: 'prod', titulo: 'Produto', valor: (x) => x.pr?.descricao, render: (x) => html`<b>${x.pr?.descricao}</b><br /><small>${x.pr?.codigo}</small>` },
+        { chave: 'cod', titulo: 'Código', valor: (x) => x.pr?.codigo, render: (x) => x.pr?.codigo }, { chave: 'prod', titulo: 'Produto', valor: (x) => x.pr?.descricao, render: (x) => html`<b>${x.pr?.descricao}</b>` },
         { chave: 'quantidade', titulo: 'Qtd', num: true, valor: (x) => Number(x.quantidade), render: (x) => qu(x.quantidade, x.unidade) },
         { chave: 'preco_unitario', titulo: 'Preço unit.', num: true, valor: (x) => Number(x.preco_unitario), render: (x) => html`<b>${moeda(x.preco_unitario)}</b>/${x.unidade}` },
         { chave: 'precoBase', titulo: 'Por unid. estoque', num: true, valor: (x) => x.precoBase ?? 0, render: (x) => (x.precoBase === null ? '–' : `${moeda(x.precoBase)}/${x.pr?.unidade_estoque}`) },

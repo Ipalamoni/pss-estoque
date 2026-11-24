@@ -11,7 +11,7 @@ const v = (x, c = 2) => (x === null || x === undefined ? '–' : num(x, c));
 export function TelaEstoque() {
   const { dados, estadoRota, setEstadoRota, ir, papeis } = useApp();
   const vv = veValores(papeis);   // pesagem/padeiro: sem custo nem valor
-  const [cats, setCats] = useState(() => new Set(estadoRota?.categoria ? [estadoRota.categoria] : Object.keys(CATEGORIAS)));
+  const [cats, setCats] = useState(() => new Set(estadoRota?.categoria ? [estadoRota.categoria] : ['materia_prima', 'embalagem']));   // padrão: matéria-prima e embalagem (o resto quase não se usa)
   const [status, setStatus] = useState(estadoRota?.status || '');
   const [busca, setBusca] = useState('');
   const [completo, setCompleto] = useState(window.innerWidth > 760);
@@ -50,9 +50,9 @@ export function TelaEstoque() {
     { chave: 'classificacao', titulo: 'Classif.', render: (p) => (p.classificacao ? html`<${Etiqueta} cor="azul">${p.classificacao}</${Etiqueta}>` : '–'), exp: (p) => p.classificacao },
     completo && { chave: 'categoria', titulo: 'Categoria', render: (p) => CATEGORIAS[p.categoria], exp: (p) => CATEGORIAS[p.categoria] },
     { chave: 'saldo', titulo: 'Saldo (unid. padrão)', num: true, render: (p) => html`${qtd(p.saldo)} <small>${plural(p.unidade_estoque, p.saldo)}</small>`, exp: (p) => p.saldo, txt: (p) => `${qu(p.saldo, p.unidade_estoque)}` },
-    { chave: 'saldo_compra', titulo: 'Saldo (embalagem do fornecedor)', num: true, render: (p) => (p.unidade_compra ? html`${num(p.saldo_compra, 2)} <small>${plural(p.unidade_compra, p.saldo_compra)}</small>
-        <br /><small class="mudo">1 ${p.unidade_compra} = ${qu(Number(p.fator_compra), p.unidade_estoque)}</small>` : '–'),
+    { chave: 'saldo_compra', titulo: 'Saldo (embalagem do fornecedor)', num: true, render: (p) => (p.unidade_compra ? html`${num(p.saldo_compra, 2)} <small>${plural(p.unidade_compra, p.saldo_compra)}</small>` : '–'),
       exp: (p) => (p.unidade_compra ? Math.round(p.saldo_compra * 100) / 100 : ''), txt: (p) => (p.unidade_compra ? `${qu(p.saldo_compra, p.unidade_compra, 2)} (1 = ${qu(Number(p.fator_compra), p.unidade_estoque)})` : '') },
+    { chave: 'conversao', titulo: 'Conversão', valor: (p) => (p.unidade_compra ? Number(p.fator_compra) : 0), render: (p) => (p.unidade_compra ? `1 ${p.unidade_compra} = ${qu(Number(p.fator_compra), p.unidade_estoque)}` : '–'), exp: (p) => (p.unidade_compra ? `1 ${p.unidade_compra} = ${qu(Number(p.fator_compra), p.unidade_estoque)}` : '') },
     vv && completo && { chave: 'custo_medio', titulo: 'Custo médio', num: true, render: (p) => moeda(p.custo_medio), exp: (p) => p.custo_medio, txt: (p) => moeda(p.custo_medio) },
     vv && { chave: 'valor', titulo: 'Valor total', num: true, render: (p) => moeda(p.valor), exp: (p) => Math.round(p.valor * 100) / 100, txt: (p) => moeda(p.valor) },
     completo && { chave: 'media_dia', titulo: 'Consumo/dia', num: true, render: (p) => v(p.media_dia), exp: (p) => p.media_dia, txt: (p) => v(p.media_dia) },
@@ -91,9 +91,9 @@ export function TelaEstoque() {
 
   return html`
     <${Cabecalho} titulo="Posição de estoque" sub=${`Atualizado em ${dataHora(dados.carregadoEm)} · consumo médio dos últimos ${params.janela_consumo_dias || 90} dias`}>
-      ${agrupar ? html`<${Exportar} titulo="Estoque por grupo e classificação" filtros=${dataHora(new Date())} arquivo=${`estoque-por-classificacao-${hojeISO()}`}
+      ${agrupar ? html`<${Exportar} tabela="estoque.telaestoque" titulo="Estoque por grupo e classificação" filtros=${dataHora(new Date())} arquivo=${`estoque-por-classificacao-${hojeISO()}`}
           colunas=${colsGrupo} linhas=${grupos2} totais=${['TOTAL', '', '', '', '', moeda(valorTotal), '', '', '', '']} />`
-        : html`<${Exportar} titulo="Posição de estoque" filtros=${`${pl(linhas.length, 'item', 'itens')} · ${dataHora(new Date())}`} arquivo=${`posicao-estoque-${hojeISO()}`}
+        : html`<${Exportar} tabela="estoque.telaestoque" titulo="Posição de estoque" filtros=${`${pl(linhas.length, 'item', 'itens')} · ${dataHora(new Date())}`} arquivo=${`posicao-estoque-${hojeISO()}`}
           colunas=${colsExp} linhas=${linhas} abas=${abasExcel} pdf=${pdfEstoque} />`}
     </${Cabecalho}>
     <${Filtros} ativos=${[status, grupo, classif, cats.size < Object.keys(CATEGORIAS).length, completo].filter(Boolean).length} fixo=${html`<${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Buscar produto" />`}>
@@ -113,12 +113,12 @@ export function TelaEstoque() {
       <button class=${!agrupar ? 'ativo' : ''} onClick=${() => setAgrupar(false)}>Por produto</button>
       <button class=${agrupar ? 'ativo' : ''} onClick=${() => setAgrupar(true)}>Por grupo</button>
     </div>
-    ${agrupar ? html`<${Tabela} linhas=${grupos2} chave="k" ordemInicial=${{ chave: 'grupo', dir: 1 }}
+    ${agrupar ? html`<${Tabela} id="estoque.telaestoque" linhas=${grupos2} chave="k" ordemInicial=${{ chave: 'grupo', dir: 1 }}
         aoClicar=${(g) => { setGrupo(g.grupo === '(sem grupo)' ? '' : g.grupo); setClassif(g.classificacao); setAgrupar(false); }}
         colunas=${[
           { chave: 'grupo', titulo: 'Grupo', valor: (g) => `${g.grupo} ${g.classificacao}`, render: (g) => html`<b>${g.grupo}</b>` },
           { chave: 'classificacao', titulo: 'Classificação', render: (g) => (g.classificacao ? html`<${Etiqueta} cor="azul">${g.classificacao}</${Etiqueta}>` : '–') },
-          { chave: 'n', titulo: 'Produtos / marcas', valor: (g) => g.itens.length, render: (g) => html`${pl(g.itens.length, 'produto', 'produtos')}<br /><small>${g.itens.map((p) => p.marca || p.codigo).join(', ')}</small>` },
+          { chave: 'n', titulo: 'Produtos / marcas', valor: (g) => g.itens.length, render: (g) => html`${pl(g.itens.length, 'produto', 'produtos')}` }, { chave: 'marcas', titulo: 'Marcas', render: (g) => html`${g.itens.map((p) => p.marca || p.codigo).join(', ')}` },
           { chave: 'saldo', titulo: 'Saldo total', num: true, render: (g) => html`<b>${qu(g.saldo, g.unidade)}</b>` },
           vv && { chave: 'valor', titulo: 'Valor', num: true, render: (g) => moeda(g.valor) },
           { chave: 'media', titulo: 'Consumo/dia', num: true, render: (g) => v(g.media) },
@@ -127,8 +127,8 @@ export function TelaEstoque() {
           { chave: 'pior', titulo: 'Pior situação', render: (g) => html`<${Etiqueta} cor=${STATUS_ESTOQUE[g.statusPior].cor}>${STATUS_ESTOQUE[g.statusPior].rotulo}</${Etiqueta}>` },
         ]} />
         <p class="nota">Toque numa linha para ver os produtos (marcas) daquele grupo e classificação.</p>`
-    : html`<${Tabela} linhas=${linhas} colunas=${colunas} aoClicar=${setAberto} ordemInicial=${{ chave: 'status_ordem', dir: 1 }}
-      rodape=${html`<tr><td colspan=${colunas.findIndex((c) => c.chave === 'valor')}>${pl(linhas.length, "item", "itens")}</td><td class="n"><b>${moeda(valorTotal)}</b></td><td colspan=${colunas.length}></td></tr>`} />`}
+    : html`<${Tabela} id="estoque.telaestoque-2" linhas=${linhas} colunas=${colunas} aoClicar=${setAberto} ordemInicial=${{ chave: 'status_ordem', dir: 1 }}
+      totais=${{ rotulo: pl(linhas.length, 'item', 'itens'), valor: moeda(valorTotal) }} />`}
     <details class="legenda">
       <summary>Como ler esta tela</summary>
       <ul>
