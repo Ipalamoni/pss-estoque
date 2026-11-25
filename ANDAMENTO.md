@@ -55,8 +55,9 @@ Arquivo público: sem nomes de pessoas, senhas, tokens ou dados da empresa.
 ## Supabase: plano e infraestrutura (25/11/2026)
 - Organização "Ithalo" no plano **Pro** (US$ 25/mês + ~US$ 10 do 2º projeto ≈ US$ 35/mês; cartão final 9420;
   limite de gastos LIGADO). Projetos: estoque-pss e pss-vendas. Backup diário automático (7 dias), sem pausa.
-- estoque-pss trocado de Nano para **Micro** (1 GB; mesmo preço no Pro). pss-vendas: trocar também (Project
-  Settings › Infrastructure › Scaling › Micro) — link que funciona: supabase.com/dashboard/project/_/settings/infrastructure
+- estoque-pss e pss-vendas trocados de Nano para **Micro** (1 GB; mesmo preço no Pro), os dois CONCLUÍDOS em
+  25/11/2026. Caminho: Project Settings › Infrastructure › Scaling — link que funciona:
+  supabase.com/dashboard/project/_/settings/infrastructure
 - Uso medido: banco 18 MB, CPU ~2%, memória ~14%. Folga para anos; atenção só se anexos (fotos) ficarem no banco
   (mover para o Storage do Supabase quando crescerem).
 - Postgres tem atualização disponível (17.12): NÃO fazer sem preparar (backup, horário sem uso).
