@@ -15,6 +15,13 @@ Arquivo público: sem nomes de pessoas, senhas, tokens ou dados da empresa.
   válido, nada de banco (nem estoque nem vendas). Token novo: supabase.com/dashboard/account/tokens › Generate new
   token › permissões: só **Database = Read-write** (resto None) › copiar o código `sbp_...` › colar SÓ o código no
   formulário seguro (sem "Bearer", sem espaço). Testar com `select 1` nos dois projetos antes de seguir.
+- **25/11/2026 (2ª conversa):** repositório pss-vendas adicionado à sessão. O dono salvou um token novo, mas o Supabase
+  continuou respondendo "Invalid access token" nos dois projetos; o dono adiou o backup do vendas ("depois damos
+  continuidade"). Descobertas para o backup do vendas: login pelo Supabase Auth (`usuario@pss-vendas.app`, perfil
+  `dir`/`ger`/`vend` + `arquivo`/`colab`/`regiao` nos metadados do usuário); os DADOS ficam no Storage, bucket
+  `dados` (`dir/dados.json.gz`, `ger/<arquivo>.json.gz`, `vend/<arquivo>.json.gz`): o backup tem que baixar esses
+  arquivos. O PROGRAMA QUE GERA E ENVIA esses arquivos NÃO está no repositório: perguntar ao dono onde roda
+  (computador dele?) e incluí-lo no zip. Ainda falta gravar o CLAUDE.md do pss-vendas com a regra de backup.
 - Pergunta aberta ao dono: padeiro criar a própria senha no 1º acesso do tablet (proposta feita, aguardando "pode fazer").
 
 ## Situação atual (24/11/2026)
