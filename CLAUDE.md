@@ -1,11 +1,12 @@
 # Projeto Artas (Artas Indústria · piloto na Pães São Sebastião): premissas permanentes de trabalho
 
 ## NOME DO PROJETO (decisão do dono, 25/11/2026)
-- O sistema se chama **Projeto Artas** (marca Artas Indústria). Quando o dono disser "Artas", é ESTE projeto.
+- O sistema se chama **Artas** (marca **Artas Indústria**: esta versão é a feita para INDÚSTRIA). Enquanto está em
+  desenvolvimento, o trabalho é chamado de **Projeto Artas**. Quando o dono disser "Artas", é ESTE projeto.
 - **PSS = Pães São Sebastião**: é a EMPRESA onde o Artas está sendo implantado como PILOTO (cliente), não o nome do
   sistema. "PSS Estoque" era só um apelido do começo, quando o sistema ainda não tinha nome e só tinha o estoque.
 - `pss-estoque` e `pss-vendas` são apenas os nomes técnicos dos repositórios (o endereço do site depende deles; não
-  renomear sem planejar). Em textos, telas e conversas, chamar de **Projeto Artas** (módulos: estoque/compras,
+  renomear sem planejar). Nas telas, o nome é **Artas Indústria**; nas conversas, **Projeto Artas** (módulos: estoque/compras,
   produção, manutenção de veículos; vendas é o sistema de indicadores de vendas, em repositório separado).
 
 Identidade visual: marca **Artas Indústria**, símbolo "Silos" (A formado por 3 colunas). Componente `js/marca.js`

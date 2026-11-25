@@ -1,6 +1,6 @@
 # Andamento do Projeto Artas (ler no início de toda conversa nova e atualizar no fim de cada entrega)
 
-Nome: o sistema é o **Projeto Artas**; PSS (Pães São Sebastião) é a empresa do piloto; `pss-estoque` é só o nome
+Nome: o sistema é o **Artas** (Artas Indústria, versão para indústria; em desenvolvimento = Projeto Artas); PSS (Pães São Sebastião) é a empresa do piloto; `pss-estoque` é só o nome
 técnico do repositório (decisão do dono, 25/11/2026).
 
 Arquivo público: sem nomes de pessoas, senhas, tokens ou dados da empresa.
