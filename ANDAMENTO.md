@@ -25,9 +25,13 @@ Arquivo público: sem nomes de pessoas, senhas, tokens ou dados da empresa.
 - Pergunta aberta ao dono: padeiro criar a própria senha no 1º acesso do tablet (proposta feita, aguardando "pode fazer").
 
 ## Situação atual (24/11/2026)
-- Sistema publicado: https://ipalamoni.github.io/pss-estoque/ (versão do app 2.23.0).
+- Sistema publicado: https://ipalamoni.github.io/pss-estoque/ (versão do app 2.23.1).
 - Banco de produção (Supabase `kuttfnmjvzgzebjpjvvy`, "estoque-pss"): versão **2.23.0**, todas as
   conferências OK. Não mexer no projeto Supabase `pss-vendas`.
+- v2.23.1 (25/11/2026, só tela): frota: notas ANTES da data de início (01/11/2026) podem ser apontadas e ter a placa
+  resolvida se o responsável quiser (aba "Antes de 01/11 (opcional)" em Apontar despesas; seção opcional em Placas a
+  resolver), SEM gerar aviso amarelo. Celular: avisos compactos lado a lado (2 por linha, sem ícone abaixo de 440 px).
+  Início: corrigido estouro de largura no computador (duas colunas com minmax(0, 1fr)).
 - v2.23.0 (24/11/2026, banco + tela): frota com data de início do apontamento 01/11/2026 (notas e placas anteriores
   não pedem ação; placa antiga desconhecida = despesa geral) e dados da frota protegidos contra a limpeza de testes.
 - v2.22.0 (24/11/2026, só tela): Painel da frota com "Caminhões por tipo" (média por veículo, por mês e por conta de

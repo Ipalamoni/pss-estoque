@@ -205,33 +205,37 @@ export function TelaFrotaApontar() {
   if (!f) return carregandoOuErro('Apontar despesas', erro);
   const ini = inicioApontamento(dados);
   const pend = f.servicos.filter((s) => pedeApontamento(s, ini));
-  const base = aba === 'pendentes' ? pend : f.servicos.filter((s) => s.apontado);
+  // notas ANTES da data de início: apontar é opcional (não geram aviso), mas quem quiser pode completar
+  const antigas = f.servicos.filter((s) => !s.apontado && String(s.entrada) < ini);
+  const base = aba === 'pendentes' ? pend : aba === 'antigas' ? antigas : f.servicos.filter((s) => s.apontado);
+  const paraApontar = aba !== 'feitas';
   const lista = base.filter((s) => casaVarios(veics, s.veiculoId || (s.geral ? 'geral' : 'desconhecida')) && s.grupos.some((g) => casaVarios(grupos, g))
     && contem(`${s.veiculo?.placa || s.placa_arquivo} ${placaBonita(s.veiculo?.placa || s.placa_arquivo)} ${nomeVeiculo(s.veiculo)} ${s.fornecedor} ${s.titulo} ${s.obsFinanceiro} ${s.observacao || ''}`, busca))
-    .sort((a, b) => (aba === 'pendentes' ? String(b.entrada).localeCompare(String(a.entrada)) : String(b.apontado_em).localeCompare(String(a.apontado_em))));
+    .sort((a, b) => (paraApontar ? String(b.entrada).localeCompare(String(a.entrada)) : String(b.apontado_em).localeCompare(String(a.apontado_em))));
   const opVeic = [{ valor: 'geral', rotulo: 'Geral da frota (sem veículo)' }, { valor: 'desconhecida', rotulo: 'Placa não cadastrada' },
     ...f.veiculos.map((v) => ({ valor: v.id, rotulo: `${placaBonita(v.placa)} · ${nomeVeiculo(v)}` }))];
   const alternar = (id) => setMarcados((m) => { const n = new Set(m); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const sel = lista.filter((s) => marcados.has(s.id));
   const mostrar = lista.slice(0, max);
   return html`
-    <${Cabecalho} titulo="Apontar despesas" sub=${`Notas com entrada a partir de ${data(ini)} precisam do tipo de manutenção (pelo menos um). Observação e km são opcionais.`} />
-    <${Abas} abas=${[{ id: 'pendentes', titulo: `Para apontar (${pend.length})` }, { id: 'feitas', titulo: 'Já apontadas' }]} ativa=${aba} aoMudar=${(a) => { setAba(a); setMarcados(new Set()); setMax(60); }} />
+    <${Cabecalho} titulo="Apontar despesas" sub=${`Notas com entrada a partir de ${data(ini)} precisam do tipo de manutenção (pelo menos um); as de antes podem ser apontadas se quiser. Observação e km são opcionais.`} />
+    <${Abas} abas=${[{ id: 'pendentes', titulo: `Para apontar (${pend.length})` }, { id: 'antigas', titulo: `Antes de ${data(ini).slice(0, 5)} (opcional)` }, { id: 'feitas', titulo: 'Já apontadas' }]} ativa=${aba} aoMudar=${(a) => { setAba(a); setMarcados(new Set()); setMax(60); }} />
     <${Filtros} ativos=${[veics.length, grupos.length].filter(Boolean).length} fixo=${html`<${Busca} valor=${busca} aoMudar=${setBusca} placeholder="Placa, fornecedor, nº da nota ou observação" />`}
       acoes=${html`<span class="nota">${pl(lista.length, 'nota', 'notas')} · ${moeda(lista.reduce((t, s) => t + s.total, 0))}</span>
-        ${aba === 'pendentes' && lista.length > 0 && html`<button class="btn btn-pri btn-peq" onClick=${() => setApontar({ fila: lista, i: 0 })}>Apontar em sequência</button>`}
+        ${paraApontar && lista.length > 0 && html`<button class="btn btn-pri btn-peq" onClick=${() => setApontar({ fila: lista, i: 0 })}>Apontar em sequência</button>`}
         <button class=${'btn btn-sec btn-peq' + (varios ? ' ativo' : '')} aria-pressed=${varios} onClick=${() => { setVarios(!varios); setMarcados(new Set()); }}>${varios ? 'Cancelar seleção' : 'Selecionar várias'}</button>`}>
       <${MultiEscolha} todos="Todos os veículos" rotulo="Veículos" valor=${veics} aoMudar=${setVeics} opcoes=${opVeic} />
       <${MultiEscolha} todos="Todas as contas" rotulo="Contas" valor=${grupos} aoMudar=${setGrupos} opcoes=${GRUPOS.map((g) => ({ valor: g.id, rotulo: g.rotulo }))} />
     </${Filtros}>
+    ${aba === 'antigas' && html`<p class="nota">Notas com entrada antes de ${data(ini)}. Apontar estas é <b>opcional</b>: elas não geram aviso. Se quiser completar o histórico, aponte normalmente.</p>`}
     ${varios && html`<div class="barra-lote" role="region" aria-label="Notas selecionadas">
       <label class="check"><input type="checkbox" checked=${sel.length === mostrar.length && mostrar.length > 0} onChange=${(e) => setMarcados(e.target.checked ? new Set(mostrar.map((s) => s.id)) : new Set())} /> marcar as ${mostrar.length} da tela</label>
       <span><b>${pl(sel.length, 'nota selecionada', 'notas selecionadas')}</b> · ${moeda(sel.reduce((t, s) => t + s.total, 0))}</span>
       <button class="btn btn-pri" disabled=${!sel.length} onClick=${() => setEmLote(sel)}>Apontar selecionadas</button></div>`}
-    ${!lista.length ? html`<${Vazio} texto=${aba === 'pendentes' ? (pend.length ? 'Nenhuma nota com estes filtros.' : '✓ Tudo apontado. Quando chegarem notas novas, elas aparecem aqui.') : 'Nenhuma nota apontada ainda.'} />`
+    ${!lista.length ? html`<${Vazio} texto=${aba === 'pendentes' ? (pend.length ? 'Nenhuma nota com estes filtros.' : '✓ Tudo apontado. Quando chegarem notas novas, elas aparecem aqui.') : aba === 'antigas' ? (antigas.length ? 'Nenhuma nota com estes filtros.' : `✓ Todas as notas antes de ${data(ini)} já estão apontadas.`) : 'Nenhuma nota apontada ainda.'} />`
       : html`<ul class="lista-notas">${mostrar.map((s) => html`<li key=${s.id} class=${'nota-item' + (marcados.has(s.id) ? ' marcada' : '')}>
         ${varios && html`<input type="checkbox" class="nota-check" aria-label=${`Selecionar nota ${s.titulo}`} checked=${marcados.has(s.id)} onChange=${() => alternar(s.id)} />`}
-        <button type="button" class="nota-corpo" onClick=${() => (varios ? alternar(s.id) : setApontar({ fila: aba === 'pendentes' ? lista : [s], i: aba === 'pendentes' ? lista.indexOf(s) : 0 }))}>
+        <button type="button" class="nota-corpo" onClick=${() => (varios ? alternar(s.id) : setApontar({ fila: paraApontar ? lista : [s], i: paraApontar ? lista.indexOf(s) : 0 }))}>
           <span class="nota-placa"><${Placa} s=${s} /><small>${s.veiculo ? nomeVeiculo(s.veiculo) : ''}</small></span>
           <span class="nota-meio"><b>${s.fornecedor}</b><small>${data(s.entrada)} · ${pl(s.parcelas, 'parcela', 'parcelas')} · título ${s.titulo}</small>
             <span>${s.grupos.map((g) => html`<${EtqGrupo} grupo=${g} /> `)}${s.partes.length > 1 ? html`<${Etiqueta} cor="roxo">dividida em ${s.partes.length} veículos</${Etiqueta}> ` : ''}${s.apontado ? html`<${TagsLidas} ids=${s.tags} f=${f} />` : ''}</span>
@@ -253,26 +257,24 @@ export function TelaFrotaPlacas() {
   const [escolha, setEscolha] = useState({});
   const [ocupado, executar] = useAcao();
   if (!f) return carregandoOuErro('Placas a resolver', erro);
-  const porPlaca = new Map();
   const ini = inicioApontamento(dados);
-  for (const s of f.servicos.filter((x) => placaPendente(x, ini))) {   // placas de notas antes da data de início: despesa geral
-    if (!porPlaca.has(s.placa_arquivo)) porPlaca.set(s.placa_arquivo, { placa: s.placa_arquivo, notas: [], total: 0 });
-    const p = porPlaca.get(s.placa_arquivo); p.notas.push(s); p.total += s.total;
-  }
-  const lista = [...porPlaca.values()].sort((a, b) => b.total - a.total).map((p) => ({ ...p, sugestoes: sugestoesPlaca(p.placa, f.veiculos) }));
+  const agrupar = (servicos) => {
+    const porPlaca = new Map();
+    for (const s of servicos) {
+      if (!porPlaca.has(s.placa_arquivo)) porPlaca.set(s.placa_arquivo, { placa: s.placa_arquivo, notas: [], total: 0 });
+      const p = porPlaca.get(s.placa_arquivo); p.notas.push(s); p.total += s.total;
+    }
+    return [...porPlaca.values()].sort((a, b) => b.total - a.total).map((p) => ({ ...p, sugestoes: sugestoesPlaca(p.placa, f.veiculos) }));
+  };
+  const lista = agrupar(f.servicos.filter((x) => placaPendente(x, ini)));
+  // placas de notas ANTES da data de início: ficam como despesa geral; resolver é opcional (sem aviso)
+  const pendentes = new Set(lista.map((p) => p.placa));
+  const antigas = agrupar(f.servicos.filter((x) => x.desconhecida && String(x.entrada) < ini && !pendentes.has(x.placa_arquivo)));
   const corrigir = async (placa, vid) => {
     const v = f.mapa.veiculo.get(vid);
     await executar(() => api.rpc('frota_corrigir_placa', { p_placa: placa, p_veiculo_id: vid }), `${placaBonita(placa)} agora é ${placaBonita(v.placa)}: as notas foram ligadas ao veículo.`);
   };
-  const correcoes = f.apelidos.map((a) => ({ ...a, v: f.mapa.veiculo.get(a.veiculo_id) }));
-  const expCorr = [{ titulo: 'Placa digitada no financeiro', valor: (a) => placaBonita(a.placa) }, { titulo: 'Placa certa', valor: (a) => placaBonita(a.v?.placa) },
-    { titulo: 'Veículo', valor: (a) => nomeVeiculo(a.v), largura: 28 }, { titulo: 'Corrigido em', valor: (a) => dataHora(a.criado_em) }];
-  return html`
-    <${Cabecalho} titulo="Placas a resolver" sub=${`Placas de notas a partir de ${data(ini)} que não estão no cadastro (veículo novo ou erro de digitação). As de antes ficam como despesa geral.`} />
-    ${!lista.length ? html`<${Vazio} texto="✓ Nenhuma placa para resolver. Todas as despesas estão ligadas a um veículo (ou são despesas gerais)." />`
-      : html`<p class="nota">${pl(lista.length, 'placa', 'placas')} · ${pl(lista.reduce((t, p) => t + p.notas.length, 0), 'nota', 'notas')} · ${moeda(lista.reduce((t, p) => t + p.total, 0))}.
-        Ao corrigir, o sistema lembra para sempre: as próximas notas com a mesma placa errada já entram no veículo certo.</p>
-      <div class="placas-grade">${lista.map((p) => html`<article class="placa-card" key=${p.placa}>
+  const cartao = (p) => html`<article class="placa-card" key=${p.placa}>
         <div class="pc-topo"><${Placa} placa=${p.placa} grande /><div><b>${moeda(p.total)}</b><small>${pl(p.notas.length, 'nota', 'notas')} · ${[...new Set(p.notas.map((s) => s.fornecedor))].slice(0, 2).join(', ')}</small></div></div>
         ${p.notas[0].obsFinanceiro && html`<p class="pc-obs">“${p.notas[0].obsFinanceiro}”</p>`}
         ${p.sugestoes.map((v) => html`<div class="pc-sugestao" key=${v.id}><span>Parecida com <${Placa} placa=${v.placa} /> <small>${nomeVeiculo(v)}</small>. É essa?</span>
@@ -281,7 +283,20 @@ export function TelaFrotaPlacas() {
             rotuloDe=${(v) => `${placaBonita(v.placa)} · ${nomeVeiculo(v)}`} placeholder=${p.sugestoes.length ? 'Não: é outra placa do cadastro…' : 'É uma placa do cadastro? Digite…'} />
           <button class="btn btn-sec" disabled=${ocupado || !escolha[p.placa]} onClick=${() => corrigir(p.placa, escolha[p.placa])}>Corrigir</button></div>
         <button class="btn btn-sec btn-bloco" onClick=${() => setCadastrar({ placa: p.placa })}><${Icone} nome="mais" tam=${16} /> É um veículo novo: cadastrar ${placaBonita(p.placa)}</button>
-      </article>`)}</div>`}
+      </article>`;
+  const correcoes = f.apelidos.map((a) => ({ ...a, v: f.mapa.veiculo.get(a.veiculo_id) }));
+  const expCorr = [{ titulo: 'Placa digitada no financeiro', valor: (a) => placaBonita(a.placa) }, { titulo: 'Placa certa', valor: (a) => placaBonita(a.v?.placa) },
+    { titulo: 'Veículo', valor: (a) => nomeVeiculo(a.v), largura: 28 }, { titulo: 'Corrigido em', valor: (a) => dataHora(a.criado_em) }];
+  return html`
+    <${Cabecalho} titulo="Placas a resolver" sub=${`Placas de notas a partir de ${data(ini)} que não estão no cadastro (veículo novo ou erro de digitação). As de antes contam como despesa geral; resolvê-las é opcional (mais abaixo).`} />
+    ${!lista.length ? html`<${Vazio} texto="✓ Nenhuma placa para resolver. Todas as despesas estão ligadas a um veículo (ou são despesas gerais)." />`
+      : html`<p class="nota">${pl(lista.length, 'placa', 'placas')} · ${pl(lista.reduce((t, p) => t + p.notas.length, 0), 'nota', 'notas')} · ${moeda(lista.reduce((t, p) => t + p.total, 0))}.
+        Ao corrigir, o sistema lembra para sempre: as próximas notas com a mesma placa errada já entram no veículo certo.</p>
+      <div class="placas-grade">${lista.map(cartao)}</div>`}
+    ${antigas.length > 0 && html`<details class="painel fr-antigas">
+      <summary><b>Placas de notas antes de ${data(ini)} (${antigas.length})</b> · opcional</summary>
+      <p class="nota">Estas notas são de antes da data de início e contam como despesa geral. Resolver é <b>opcional</b> e não gera aviso; se resolver, as notas passam para o veículo certo.</p>
+      <div class="placas-grade">${antigas.map(cartao)}</div></details>`}
     <section class="painel"><div class="painel-topo"><h2>Correções já feitas (${correcoes.length})</h2>
       <${Exportar} tabela="frota.correcoes" titulo="Placas digitadas erradas no contas a pagar" filtros="para corrigir na origem" arquivo="placas-erradas-contas-a-pagar" colunas=${expCorr} linhas=${correcoes} /></div>
       <p class="nota">Mande esta lista para o contas a pagar corrigir as placas na origem. Aqui no sistema elas já estão resolvidas.</p>

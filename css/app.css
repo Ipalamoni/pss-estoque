@@ -197,7 +197,7 @@ fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
 .cartao { border-bottom: 3px solid var(--cor-clara); } .cartao.c-laranja .cartao-valor { color: var(--laranja); }
 .painel { background: var(--cartao); border: 1px solid var(--borda); border-radius: var(--raio); padding: 14px; box-shadow: var(--sombra); margin-bottom: 14px; }
 .painel-topo { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
-.duas-colunas { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.duas-colunas { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; }
 .atalhos { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-bottom: 14px; }
 .atalho { border-bottom: 3px solid var(--destaque) !important; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; min-height: 74px; background: var(--cartao);
   border: 1px solid var(--borda); border-radius: var(--raio); font: inherit; font-weight: 600; color: var(--cor); cursor: pointer; box-shadow: var(--sombra); text-align: center; padding: 10px; }
@@ -1756,6 +1756,8 @@ table.so-leitor { display: block; left: 0; top: 0; }   /* tabela só para leitor
 .fr-div-tabela tbody th small { color: var(--texto-2); font-weight: 600; }
 .fr-div-tabela i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
 .fr-ver { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin: 4px 0 10px; }
+.fr-antigas > summary { cursor: pointer; padding: 6px 0; min-height: 44px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.fr-antigas[open] > summary { margin-bottom: 6px; }
 .fr-ver > span { font-weight: 600; color: var(--texto-2); }
 /* divisão da nota entre veículos */
 .fr-dividir { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; margin: 4px 0 12px; padding: 10px 12px; border: 1px dashed var(--borda-entrada); border-radius: var(--raio); }
@@ -1770,8 +1772,18 @@ table.so-leitor { display: block; left: 0; top: 0; }   /* tabela só para leitor
   .fr-numeros b { font-size: 1.05rem; overflow-wrap: normal; white-space: nowrap; }
   .fr-div-tabela { font-size: .84rem; } .fr-div-tabela th, .fr-div-tabela td { padding: 5px 3px; }
   .fr-parte-linha { grid-template-columns: 1fr 1fr; } .fr-parte-linha > :first-child { grid-column: 1 / -1; }
-  .aviso-chip { flex: 1 1 100%; justify-content: space-between; border-radius: 12px; }
-  .aviso-chip > span { flex: 1; }
+  /* celular: avisos LADO A LADO (2 por linha); só descem quando não cabem */
+  .avisos-linha { gap: 6px; }
+  .aviso-chip { flex: 1 1 150px; min-width: 0; justify-content: space-between; gap: 6px; border-radius: 12px; padding: 3px 3px 3px 8px; font-size: .84rem; line-height: 1.2; min-height: 44px; }
+  .aviso-chip > .icone { width: 16px; height: 16px; }
+  .aviso-chip > span { flex: 1; min-width: 0; }
+  .aviso-chip .btn { min-height: 38px; padding: 0 10px; flex-shrink: 0; }
+}
+@media (max-width: 440px) {
+  /* celular estreito: o texto do aviso já diz o que é; o ícone sai para caber lado a lado */
+  .aviso-chip > .icone { display: none; }
+  .aviso-chip { padding-left: 10px; font-size: .82rem; }
+  .aviso-chip .btn { padding: 0 9px; }
 }
 /* histórico do veículo: valor em vermelho, conta e dados da nota em azul, placa em negrito maior */
 .lt-valor { color: var(--vermelho); font-size: 1.08rem; }
