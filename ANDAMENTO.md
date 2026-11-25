@@ -2,6 +2,21 @@
 
 Arquivo público: sem nomes de pessoas, senhas, tokens ou dados da empresa.
 
+## ⚠ RETOMAR AQUI (25/11/2026, conversa encerrada por tamanho)
+- **Backup do ESTOQUE (sistema inteiro) v2.23.0: FEITO**, restauração testada (43 conferências OK, 6170 registros,
+  frota incluída) e entregue ao dono (`backup_artas_v2.23.0_2026-11-25.zip`). Ele guarda no Drive.
+- **Backup do VENDAS: PENDENTE.** Repositório `Ipalamoni/pss-vendas` (site estático de 9 arquivos: index.html,
+  grupos.js, config.js, sw.js, manifest.json, ícones; SEM arquivos do banco no repositório). Projeto Supabase
+  `puxrntuvawwvaqtbtxle`. O banco (estrutura + funções + RLS + dados) precisa ser extraído pela Management API.
+  Fazer pacote no MESMO padrão do estoque (prompt de reconstrução, guia do dono, especificação, conferência SHA-256,
+  dados privados só no zip) e gravar a regra de backup num CLAUDE.md do pss-vendas.
+- **TOKEN DO SUPABASE INVÁLIDO:** o segredo de rede "Supabase token claude-pss-v29" (api.supabase.com) foi trocado
+  por um token novo que o Supabase recusa ("Invalid access token") nos dois projetos. Enquanto não houver token
+  válido, nada de banco (nem estoque nem vendas). Token novo: supabase.com/dashboard/account/tokens › Generate new
+  token › permissões: só **Database = Read-write** (resto None) › copiar o código `sbp_...` › colar SÓ o código no
+  formulário seguro (sem "Bearer", sem espaço). Testar com `select 1` nos dois projetos antes de seguir.
+- Pergunta aberta ao dono: padeiro criar a própria senha no 1º acesso do tablet (proposta feita, aguardando "pode fazer").
+
 ## Situação atual (24/11/2026)
 - Sistema publicado: https://ipalamoni.github.io/pss-estoque/ (versão do app 2.23.0).
 - Banco de produção (Supabase `kuttfnmjvzgzebjpjvvy`, "estoque-pss"): versão **2.23.0**, todas as
