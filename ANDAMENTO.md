@@ -22,6 +22,10 @@ Arquivo público: sem nomes de pessoas, senhas, tokens ou dados da empresa.
   `dados` (`dir/dados.json.gz`, `ger/<arquivo>.json.gz`, `vend/<arquivo>.json.gz`): o backup tem que baixar esses
   arquivos. O PROGRAMA QUE GERA E ENVIA esses arquivos NÃO está no repositório: perguntar ao dono onde roda
   (computador dele?) e incluí-lo no zip. Ainda falta gravar o CLAUDE.md do pss-vendas com a regra de backup.
+- **Criar usuário só com o papel "frota" dá "Marque pelo menos um papel"**: a função admin-usuarios publicada no
+  Supabase é antiga (o repositório já está certo). O dono foi orientado a publicar pelo painel (Edge Functions ›
+  admin-usuarios › Code › colar index.ts › Deploy) ou a gerar token com Edge Functions = Read-write.
+- Documento de passagem para o projeto novo "Artas" no Claude Code: `CONTEXTO_PROJETO.md` (25/11/2026).
 - Pergunta aberta ao dono: padeiro criar a própria senha no 1º acesso do tablet (proposta feita, aguardando "pode fazer").
 
 ## Situação atual (24/11/2026)
