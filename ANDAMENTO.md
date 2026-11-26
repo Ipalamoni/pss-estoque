@@ -31,9 +31,11 @@ Arquivo público: sem nomes de pessoas, senhas, tokens ou dados da empresa.
 - Pergunta aberta ao dono: padeiro criar a própria senha no 1º acesso do tablet (proposta feita, aguardando "pode fazer").
 
 ## Situação atual (24/11/2026)
-- Sistema publicado: https://ipalamoni.github.io/pss-estoque/ (versão do app 2.24.0).
+- Sistema publicado: https://ipalamoni.github.io/pss-estoque/ (versão do app 2.24.1).
 - Banco de produção (Supabase `kuttfnmjvzgzebjpjvvy`, "estoque-pss"): versão **2.24.0**, todas as
   conferências OK. Não mexer no projeto Supabase `pss-vendas`.
+- v2.24.1 (26/11/2026, só tela): nomes dos grupos do menu lateral em destaque (faixa grafite da marca, texto
+  branco; escolha do dono entre 4 alternativas). Menu recolhido: linha grafite entre os grupos. Sem mudança no banco.
 - v2.24.0 (26/11/2026, banco + tela): INTEGRAÇÃO COM O ERP, etapa 1 (trazer os pedidos de venda em aberto).
   Banco `banco/atualizar-banco-v2.24.sql`: papel `integracao` (robô; NÃO conta como usuário ativo, só executa
   `erp_receber_pedidos`), tabelas `erp_pedidos_itens` (espelho: 1 linha por pedido × produto; saiu do ERP = removido_em)
