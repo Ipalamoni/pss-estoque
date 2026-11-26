@@ -1799,13 +1799,13 @@ table.so-leitor { display: block; left: 0; top: 0; }   /* tabela só para leitor
 html[data-tema="escuro"] .tabela tbody tr.linha-sel td { background: #1d3328; }
 /* v2.24.1 · nomes dos grupos do menu lateral em destaque (pedido do dono): faixa grafite da marca Artas,
    texto branco. Cor própria: não se confunde com o verde da tela aberta nem com o laranja dos avisos. */
-:root { --grupo-fundo: #3d3d3a; --grupo-hover: #2b2b29; }
-html[data-tema="escuro"] { --grupo-fundo: #3a3f44; --grupo-hover: #4a5056; }
-.menu-grupo { flex-shrink: 0; background: var(--grupo-fundo); color: #fff; border-radius: 8px; font-weight: 800; min-height: 34px;
+:root { --grupo-fundo: #e8e8e4; --grupo-hover: #dcdcd7; --grupo-texto: #3d3d3a; --grupo-linha: #b4b4ae; }   /* v2.25.1: tema claro mais suave (grafite claro) */
+html[data-tema="escuro"] { --grupo-fundo: #3a3f44; --grupo-hover: #4a5056; --grupo-texto: #fff; --grupo-linha: #3a3f44; }
+.menu-grupo { flex-shrink: 0; background: var(--grupo-fundo); color: var(--grupo-texto); border-radius: 8px; font-weight: 800; min-height: 34px;
   padding: 7px 8px 6px 10px; margin: 10px 2px 3px; }
-.menu-grupo:hover { background: var(--grupo-hover); color: #fff; }
+.menu-grupo:hover { background: var(--grupo-hover); color: var(--grupo-texto); }
 @media (min-width: 861px) {
-  .menu.recolhido .menu-grupo { min-height: 0; height: 3px; flex-shrink: 0; margin: 8px 8px; border-radius: 2px; background: var(--grupo-fundo); }
+  .menu.recolhido .menu-grupo { min-height: 0; height: 3px; flex-shrink: 0; margin: 8px 8px; border-radius: 2px; background: var(--grupo-linha); }
 }
 @media (max-width: 860px) {
   .menu.recolhido .menu-grupo { background: var(--grupo-fundo); padding: 10px 10px 8px; margin: 10px 2px 3px; pointer-events: auto; cursor: pointer; }

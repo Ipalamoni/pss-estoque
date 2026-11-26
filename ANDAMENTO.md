@@ -31,7 +31,7 @@ Arquivo público: sem nomes de pessoas, senhas, tokens ou dados da empresa.
 - Pergunta aberta ao dono: padeiro criar a própria senha no 1º acesso do tablet (proposta feita, aguardando "pode fazer").
 
 ## Situação atual (24/11/2026)
-- Sistema publicado: https://ipalamoni.github.io/pss-estoque/ (versão do app 2.25.0).
+- Sistema publicado: https://ipalamoni.github.io/pss-estoque/ (versão do app 2.25.1).
 - Banco de produção (Supabase `kuttfnmjvzgzebjpjvvy`, "estoque-pss"): versão **2.24.0**, todas as
   conferências OK. Não mexer no projeto Supabase `pss-vendas`.
 - Robô do ERP (26/11/2026): 1º teste no servidor trouxe TODOS os pedidos não cancelados (13.115 em 90 dias).
@@ -45,6 +45,8 @@ Arquivo público: sem nomes de pessoas, senhas, tokens ou dados da empresa.
   NÃO mover). Teste: 3,97 s, 394 pedidos em aberto, 64 produtos, 167.803 pacotes. Usuário `integracao` criado
   (senha temporária no config.ini do servidor). Tarefa do Windows "Artas" a cada 30 min. Próximo: dono conferir os
   pedidos mais antigos (fim de outubro) e desenhar a comparação com a produção (cadastro do produto acabado).
+- v2.25.1 (26/11/2026, só tela): grupos do menu no tema CLARO em grafite claro (fundo #e8e8e4, texto grafite;
+  escolha do dono entre 5 opções). Tema escuro sem mudança.
 - v2.25.0 (26/11/2026, banco + tela; APLICADA EM PRODUÇÃO): módulo PREVISÃO (grupo novo no menu, por enquanto
   só admin), 1ª tela "Pedidos em aberto" (`js/telas/pedidos-erp.js`, rota `#pedidos-erp`): tabelão dos itens dos
   pedidos do ERP com busca (pedido/cliente/produto), período da venda, situação (em aberto / saiu do ERP), produto,
