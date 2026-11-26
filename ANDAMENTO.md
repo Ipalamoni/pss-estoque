@@ -41,6 +41,10 @@ Arquivo público: sem nomes de pessoas, senhas, tokens ou dados da empresa.
   1.0.2 (pedido do dono: nada de "robô" no servidor, para não chamar atenção): pasta `C:\Artas`, `artas.ps1`,
   `artas.log`, tarefa do Windows "Artas", login sugerido `integracao`. Pasta no repositório: `integracao/artas-erp/`.
   App 2.24.2: papel exibido como "Integração (ERP: só entrega pedidos)".
+  ✅ 26/11/2026 16:18: LIGADO. Servidor SERVIDORS7 (usuário Windows do dono, pasta "Arquivos Ithalo nao apague\Artas\Artas";
+  NÃO mover). Teste: 3,97 s, 394 pedidos em aberto, 64 produtos, 167.803 pacotes. Usuário `integracao` criado
+  (senha temporária no config.ini do servidor). Tarefa do Windows "Artas" a cada 30 min. Próximo: dono conferir os
+  pedidos mais antigos (fim de outubro) e desenhar a comparação com a produção (cadastro do produto acabado).
 - v2.24.1 (26/11/2026, só tela): nomes dos grupos do menu lateral em destaque (faixa grafite da marca, texto
   branco; escolha do dono entre 4 alternativas). Menu recolhido: linha grafite entre os grupos. Sem mudança no banco.
 - v2.24.0 (26/11/2026, banco + tela): INTEGRAÇÃO COM O ERP, etapa 1 (trazer os pedidos de venda em aberto).
