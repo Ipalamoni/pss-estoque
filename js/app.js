@@ -69,6 +69,7 @@ const TelaFinalizar = preguicosa(() => import('./telas/finalizar.js'), 'TelaFina
 const TelaPainelProducao = preguicosa(() => import('./telas/painel-producao.js'), 'TelaPainelProducao');
 const TelaCadastrosProducao = preguicosa(() => import('./telas/cadastros-producao.js'), 'TelaCadastrosProducao');
 const TelaHistoricoProducao = preguicosa(() => import('./telas/historico-producao.js'), 'TelaHistoricoProducao');
+const TelaPedidosErp = preguicosa(() => import('./telas/pedidos-erp.js'), 'TelaPedidosErp');
 
 const CFG = window.CONFIG || {};
 const TODOS = Object.keys(PAPEIS).filter((p) => !['financeiro', 'faturamento', 'padeiro', 'frota', 'integracao'].includes(p));   // frota: só o módulo de veículos   // financeiro: só pedidos/pagamentos e previsão; faturamento: só previsão; padeiro: só a produção
@@ -83,6 +84,8 @@ const MENU = [
   { id: 'financeiro', titulo: 'Pedidos a pagar', papeis: ['admin', 'financeiro', 'diretoria'], tela: TelaFinanceiro },
   { id: 'previsao', titulo: 'Programado × produzido', papeis: ['admin', 'engenharia', 'diretoria', 'financeiro', 'faturamento', 'gestor_producao'], tela: TelaPrevisao, aoVivo: true },
   { id: 'painel', titulo: 'Painel de Estoque e Compras', papeis: ['admin', 'diretoria', 'comprador', 'almoxarifado', 'engenharia', 'gestor_producao'], tela: TelaPainel },
+  { grupo: 'Previsão', papeis: ['admin'] },   // módulo em construção: por enquanto só o administrador
+  { id: 'pedidos-erp', titulo: 'Pedidos em aberto', papeis: ['admin'], tela: TelaPedidosErp },
   { grupo: 'Produção' },
   { id: 'maceiras', titulo: 'Produção Masseiras', papeis: ['admin', 'padeiro', 'engenharia', 'diretoria', 'gestor_producao'], tela: TelaMaceiras, aoVivo: true },
   { id: 'programacao', titulo: 'Programação e pesagem', papeis: ['admin', 'engenharia', 'pesagem', 'diretoria', 'gestor_producao'], tela: TelaProgramacao, aoVivo: true },

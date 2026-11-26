@@ -123,7 +123,7 @@ export const PERMISSOES = {
   consumo: ['admin', 'engenharia', 'almoxarifado', 'padeiro', 'pesagem', 'gestor_producao'],
   locais: ['admin'],
   frota: ['admin', 'frota'],
-  pedidos_erp: ['admin', 'engenharia', 'diretoria', 'financeiro', 'faturamento', 'gestor_producao'],
+  pedidos_erp: ['admin'],   // v2.25: só o administrador enquanto o módulo Previsão é construído
   integracao_erp: ['admin', 'integracao'],
 };
 // o usuário opera este local? (administrador opera todos)

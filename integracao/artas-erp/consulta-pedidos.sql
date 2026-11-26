@@ -3,7 +3,7 @@
 --   · em aberto = não cancelado E sem liberação de faturamento (DTLIBFATURAMENTO vazio)
 -- Ajustes do Artas:
 --   · período: de hoje menos 30 dias até hoje mais 30 dias (o Artas troca @DESDE@ e @ATE@; ver config.ini)
---   · só as colunas que a produção usa (sem CNPJ, valores, custos e impostos)
+--   · só as colunas que a previsão usa: pedido, cliente, produto, pacotes e valor do item (sem CNPJ, custos e impostos)
 -- Não altere os nomes depois de "AS": o Artas espera exatamente estes nomes.
 SELECT
     PROC.DTVDA        AS DATA_VENDA,
@@ -24,6 +24,8 @@ SELECT
     PROC.CODSUBGRUPO  AS SUBGRUPO_CODIGO,
     PROC.NOMESUBGRUPO AS SUBGRUPO_NOME,
     PROC.QTDE         AS QUANTIDADE,
+    PROC.VRUNITARIO   AS VALOR_UNITARIO,
+    PROC.VRTOTAL      AS VALOR_TOTAL,
     PROC.CODFUNC      AS FUNCIONARIO_CODIGO,
     PROC.NOMEFUNC     AS FUNCIONARIO_NOME,
     PROC.CODCOLA      AS COLABORADOR_CODIGO,
