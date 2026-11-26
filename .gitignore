@@ -1,3 +1,8 @@
 __pycache__/
 *.pyc
 .ref_banco.cjs
+
+# robô do ERP: arquivos locais do servidor (senha e dados) nunca vão para o GitHub
+integracao/robo-erp/config.ini
+integracao/robo-erp/teste_pedidos.csv
+integracao/robo-erp/robo.log*

@@ -71,7 +71,7 @@ const TelaCadastrosProducao = preguicosa(() => import('./telas/cadastros-produca
 const TelaHistoricoProducao = preguicosa(() => import('./telas/historico-producao.js'), 'TelaHistoricoProducao');
 
 const CFG = window.CONFIG || {};
-const TODOS = Object.keys(PAPEIS).filter((p) => !['financeiro', 'faturamento', 'padeiro', 'frota'].includes(p));   // frota: só o módulo de veículos   // financeiro: só pedidos/pagamentos e previsão; faturamento: só previsão; padeiro: só a produção
+const TODOS = Object.keys(PAPEIS).filter((p) => !['financeiro', 'faturamento', 'padeiro', 'frota', 'integracao'].includes(p));   // frota: só o módulo de veículos   // financeiro: só pedidos/pagamentos e previsão; faturamento: só previsão; padeiro: só a produção
 const GESTAO = ['admin', 'diretoria', 'engenharia', 'gestor_producao'];
 
 // Menu: quem vê cada tela (as gravações são conferidas de novo no banco)

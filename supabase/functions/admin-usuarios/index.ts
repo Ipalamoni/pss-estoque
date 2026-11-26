@@ -32,7 +32,8 @@ const PAPEIS = [
   'faturamento',
   'padeiro',          // tablet da Produção Masseiras
   'gestor_producao',  // gerente/gestor da produção: muda ordem e masseira, corrige
-  'frota'             // manutenção de veículos (frota)
+  'frota',            // manutenção de veículos (frota)
+  'integracao'        // robô do ERP: só entrega os pedidos (não é usuário do sistema)
 ];
 function cabecalhos(origem) {
   const ok = origem && ORIGENS.includes(origem) ? origem : ORIGENS[0];

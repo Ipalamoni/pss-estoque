@@ -32,9 +32,18 @@ Arquivo público: sem nomes de pessoas, senhas, tokens ou dados da empresa.
 - Pergunta aberta ao dono: padeiro criar a própria senha no 1º acesso do tablet (proposta feita, aguardando "pode fazer").
 
 ## Situação atual (24/11/2026)
-- Sistema publicado: https://ipalamoni.github.io/pss-estoque/ (versão do app 2.23.1).
+- Sistema publicado: https://ipalamoni.github.io/pss-estoque/ (versão do app 2.24.0).
 - Banco de produção (Supabase `kuttfnmjvzgzebjpjvvy`, "estoque-pss"): versão **2.23.0**, todas as
   conferências OK. Não mexer no projeto Supabase `pss-vendas`.
+- v2.24.0 (26/11/2026, banco + tela): INTEGRAÇÃO COM O ERP, etapa 1 (trazer os pedidos de venda em aberto).
+  Banco `banco/atualizar-banco-v2.24.sql`: papel `integracao` (robô; NÃO conta como usuário ativo, só executa
+  `erp_receber_pedidos`), tabelas `erp_pedidos_itens` (espelho: 1 linha por pedido × produto; saiu do ERP = removido_em)
+  e `erp_sincronizacoes` (cada envio, tempo e erros); leitura `pode('pedidos_erp')` = admin, engenharia, diretoria,
+  financeiro, faturamento, gestor da produção. Lista vazia não apaga nada (proteção). Testado: 32/32 (espelho,
+  validações e ataques). Robô em `integracao/robo-erp/` (PowerShell + ODBC `ITHALO_PSS_CONSULTOR`, só leitura,
+  a cada 30 min, modos teste/enviar, LEIA-ME com o passo a passo). O robô NÃO pôde ser executado na sessão (sem
+  PowerShell aqui): o 1º teste é o `rodar-teste.bat` no servidor. Próxima etapa: cadastro de PRODUTO ACABADO
+  (código do ERP + receita + pacotes por receita) e a coluna Pedidos em "Programado × produzido" (desenhar com o dono).
 - v2.23.1 (25/11/2026, só tela): frota: notas ANTES da data de início (01/11/2026) podem ser apontadas e ter a placa
   resolvida se o responsável quiser (aba "Antes de 01/11 (opcional)" em Apontar despesas; seção opcional em Placas a
   resolver), SEM gerar aviso amarelo. Celular: avisos compactos lado a lado (2 por linha, sem ícone abaixo de 440 px).

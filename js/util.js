@@ -15,6 +15,7 @@ export const PAPEIS = {
   padeiro: 'Padeiro (tablet da Produção Masseiras)',
   gestor_producao: 'Gestor da produção (ordem, masseiras e correções)',
   frota: 'Manutenção de veículos (frota)',
+  integracao: 'Integração (robô do ERP: só entrega pedidos)',
 };
 
 export const CATEGORIAS = {
@@ -122,6 +123,8 @@ export const PERMISSOES = {
   consumo: ['admin', 'engenharia', 'almoxarifado', 'padeiro', 'pesagem', 'gestor_producao'],
   locais: ['admin'],
   frota: ['admin', 'frota'],
+  pedidos_erp: ['admin', 'engenharia', 'diretoria', 'financeiro', 'faturamento', 'gestor_producao'],
+  integracao_erp: ['admin', 'integracao'],
 };
 // o usuário opera este local? (administrador opera todos)
 // Quem RECEBE no local (aba "A receber" e sininho). Pesagem e masseiras são setores da produção:
