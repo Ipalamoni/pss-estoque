@@ -1,5 +1,7 @@
 -- Projeto Artas · consulta dos PEDIDOS DE VENDA EM ABERTO no ERP (Firebird) · SOMENTE LEITURA
--- Base: SELECT fornecida pelo técnico do ERP (mesma origem da análise 915), com dois ajustes:
+-- Base: SELECT fornecida pelo técnico do ERP (origem da análise 915 + regra de faturamento da análise 846):
+--   · em aberto = não cancelado E sem liberação de faturamento (DTLIBFATURAMENTO vazio)
+-- Ajustes do Artas:
 --   · período: de hoje menos 60 dias até hoje mais 30 dias (o robô troca @DESDE@ e @ATE@; ver config.ini)
 --   · só as colunas que a produção usa (sem CNPJ, valores, custos e impostos)
 -- Não altere os nomes depois de "AS": o Artas espera exatamente estes nomes.
@@ -28,6 +30,7 @@ SELECT
     PROC.NOMECOLA     AS COLABORADOR_NOME
 FROM SP_BI_ANALISEDEDADOS(CAST('@DESDE@' AS DATE), CAST('@ATE@' AS DATE), 0, 0, 'N') PROC
 WHERE PROC.CANCELADA = 'N'
+  AND PROC.DTLIBFATURAMENTO IS NULL
   AND EXISTS (
         SELECT 1
         FROM CONS029 p
