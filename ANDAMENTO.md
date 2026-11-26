@@ -103,8 +103,14 @@ Arquivo público: sem nomes de pessoas, senhas, tokens ou dados da empresa.
   no fim, lembrar o dono de revogar o token em supabase.com/dashboard/account/tokens.
 
 ## Pendências do sistema
-- [ ] **Limpeza dos dados de teste**: só quando o dono disser "finalizei os testes". Os dados atuais
-      são de teste (códigos com prefixo "T"); manter os cadastros reais sem "T" feitos pelo dono.
+- [x] **Limpeza dos dados de teste: FEITA em 26/11/2026** (a pedido do dono, script rodado por ele no SQL Editor).
+      Apagados: fichas técnicas (23), masseiras (4), padeiros (8), produtos de teste (86: códigos T-/MIS-T e
+      2 avulsos), movimentos (364), recebimentos, estoque por local, programações/produções/bateladas,
+      requisições e transferências. Ficaram: usuários (8), fornecedores (8), os 2 produtos cadastrados pelo
+      comprador, frota inteira (58 veículos, 1549 despesas), locais. Saldo de todos os produtos = 0.
+      Cópia de tudo que foi apagado no esquema `backup_zerar_base` (só no banco; pode ser removido depois que
+      o sistema estiver rodando com dados reais). Próximo passo do dono: cadastrar masseiras e padeiros reais
+      e fazer o inventário inicial.
       ⚠ NÃO APAGAR NADA DA MANUTENÇÃO DE VEÍCULOS (tabelas frota_*): veículos, despesas importadas, apontamentos,
       divisões, correções de placa e tipos são REAIS e ficam (decisão do dono, 24/11/2026; o banco também bloqueia).
 - [ ] Subtítulo embaixo do nome da masseira: item 4 de um pedido ficou cortado. O dono vai conferir na tela e responder.
