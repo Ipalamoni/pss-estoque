@@ -12,7 +12,7 @@ O robô lê no ERP (Firebird) os **pedidos de venda em aberto** e envia para o A
 | Arquivo | Para que serve |
 |---|---|
 | `artas-robo.ps1` | O robô (script do PowerShell, já vem no Windows) |
-| `consulta-pedidos.sql` | A consulta dos pedidos (do técnico do ERP, com período de 60 dias atrás a 30 dias à frente) |
+| `consulta-pedidos.sql` | A consulta dos pedidos (do técnico do ERP, com período de 30 dias atrás a 30 dias à frente) |
 | `config.exemplo.ini` | Modelo da configuração. Vira `config.ini` com a senha do robô |
 | `rodar-teste.bat` | **Teste:** lê o ERP e gera `teste_pedidos.csv`. Não envia nada |
 | `rodar-envio.bat` | **Envio:** lê o ERP e envia ao Artas (é o que o agendamento roda) |

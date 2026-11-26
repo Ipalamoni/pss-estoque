@@ -36,7 +36,8 @@ Arquivo público: sem nomes de pessoas, senhas, tokens ou dados da empresa.
   conferências OK. Não mexer no projeto Supabase `pss-vendas`.
 - Robô do ERP (26/11/2026): 1º teste no servidor trouxe TODOS os pedidos não cancelados (13.115 em 90 dias).
   O técnico mandou a regra de "em aberto" (análise 846): `DTLIBFATURAMENTO IS NULL`. Já está no
-  `consulta-pedidos.sql`. Falta o dono rodar o teste de novo e conferir a quantidade de pedidos.
+  `consulta-pedidos.sql`. A pedido do dono, o período passou para hoje −30 a +30 dias (robô 1.0.1).
+  Falta o dono rodar o teste de novo e conferir a quantidade de pedidos.
 - v2.24.1 (26/11/2026, só tela): nomes dos grupos do menu lateral em destaque (faixa grafite da marca, texto
   branco; escolha do dono entre 4 alternativas). Menu recolhido: linha grafite entre os grupos. Sem mudança no banco.
 - v2.24.0 (26/11/2026, banco + tela): INTEGRAÇÃO COM O ERP, etapa 1 (trazer os pedidos de venda em aberto).

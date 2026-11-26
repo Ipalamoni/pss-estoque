@@ -16,7 +16,7 @@
 param([ValidateSet('teste', 'enviar')][string]$Modo = 'teste')
 
 $ErrorActionPreference = 'Stop'
-$VERSAO = '1.0.0'
+$VERSAO = '1.0.1'
 $PASTA = Split-Path -Parent $MyInvocation.MyCommand.Path
 $LOG = Join-Path $PASTA 'robo.log'
 $INV = [Globalization.CultureInfo]::InvariantCulture
@@ -51,7 +51,7 @@ foreach ($k in @('supabase_url', 'chave_publicavel', 'dominio_login', 'usuario',
     if (-not $cfg[$k]) { Sair 2 "ERRO: no config.ini falta preencher '$k'." }
 }
 if ($Modo -eq 'enviar' -and -not $cfg['senha']) { Sair 2 "ERRO: no config.ini falta a senha do usuário-robô (linha 'senha =')." }
-$diasAtras = 60; if ($cfg['dias_atras']) { $diasAtras = [int]$cfg['dias_atras'] }
+$diasAtras = 30; if ($cfg['dias_atras']) { $diasAtras = [int]$cfg['dias_atras'] }
 $diasFrente = 30; if ($cfg['dias_frente']) { $diasFrente = [int]$cfg['dias_frente'] }
 $limite = 300; if ($cfg['tempo_limite']) { $limite = [int]$cfg['tempo_limite'] }
 $url = $cfg['supabase_url'].TrimEnd('/')
