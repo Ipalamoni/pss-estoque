@@ -25,21 +25,21 @@ Arquivo público: sem nomes de pessoas, senhas, tokens ou dados da empresa.
   `dados` (`dir/dados.json.gz`, `ger/<arquivo>.json.gz`, `vend/<arquivo>.json.gz`): o backup tem que baixar esses
   arquivos. O PROGRAMA QUE GERA E ENVIA esses arquivos NÃO está no repositório: perguntar ao dono onde roda
   (computador dele?) e incluí-lo no zip. Ainda falta gravar o CLAUDE.md do pss-vendas com a regra de backup.
-- **Criar usuário só com o papel "frota" dá "Marque pelo menos um papel"**: a função admin-usuarios publicada no
-  Supabase é antiga (o repositório já está certo). O dono foi orientado a publicar pelo painel (Edge Functions ›
-  admin-usuarios › Code › colar index.ts › Deploy) ou a gerar token com Edge Functions = Read-write.
+- RESOLVIDO (26/11/2026): criar usuário só com o papel "frota" dava "Marque pelo menos um papel"; a função
+  admin-usuarios foi republicada (versão 3).
 - Documento de passagem para o projeto novo "Artas" no Claude Code: `CONTEXTO_PROJETO.md` (25/11/2026).
 - Pergunta aberta ao dono: padeiro criar a própria senha no 1º acesso do tablet (proposta feita, aguardando "pode fazer").
 
 ## Situação atual (24/11/2026)
 - Sistema publicado: https://ipalamoni.github.io/pss-estoque/ (versão do app 2.24.0).
-- Banco de produção (Supabase `kuttfnmjvzgzebjpjvvy`, "estoque-pss"): versão **2.23.0**, todas as
+- Banco de produção (Supabase `kuttfnmjvzgzebjpjvvy`, "estoque-pss"): versão **2.24.0**, todas as
   conferências OK. Não mexer no projeto Supabase `pss-vendas`.
 - v2.24.0 (26/11/2026, banco + tela): INTEGRAÇÃO COM O ERP, etapa 1 (trazer os pedidos de venda em aberto).
   Banco `banco/atualizar-banco-v2.24.sql`: papel `integracao` (robô; NÃO conta como usuário ativo, só executa
   `erp_receber_pedidos`), tabelas `erp_pedidos_itens` (espelho: 1 linha por pedido × produto; saiu do ERP = removido_em)
   e `erp_sincronizacoes` (cada envio, tempo e erros); leitura `pode('pedidos_erp')` = admin, engenharia, diretoria,
-  financeiro, faturamento, gestor da produção. Lista vazia não apaga nada (proteção). Testado: 32/32 (espelho,
+  financeiro, faturamento, gestor da produção. Lista vazia não apaga nada (proteção). **APLICADO EM PRODUÇÃO em
+  26/11/2026** (7 conferências OK) e função admin-usuarios republicada (versão 3: aceita frota e integracao). Testado: 32/32 (espelho,
   validações e ataques). Robô em `integracao/robo-erp/` (PowerShell + ODBC `ITHALO_PSS_CONSULTOR`, só leitura,
   a cada 30 min, modos teste/enviar, LEIA-ME com o passo a passo). O robô NÃO pôde ser executado na sessão (sem
   PowerShell aqui): o 1º teste é o `rodar-teste.bat` no servidor. Próxima etapa: cadastro de PRODUTO ACABADO
@@ -108,6 +108,11 @@ Arquivo público: sem nomes de pessoas, senhas, tokens ou dados da empresa.
 - Token do Supabase fica nos **Segredos de rede** do ambiente `pss-estoque` (host api.supabase.com,
   cabeçalho Authorization, prefixo Bearer). Para trocar: setinha ↻ "Substituir segredo".
 - Antes de pedir o token, mandar o passo a passo linha a linha (regra do CLAUDE.md).
+- ⚠ CAUSA dos tokens "inválidos" (resolvido 26/11/2026): no segredo de rede o campo **Prefixo** ficava VAZIO.
+  Ao substituir o segredo: Nome do cabeçalho `Authorization`, Prefixo `Bearer`, Valor = `sbp_...`.
+  O formulário seguro do chat fechava sozinho; o caminho que funcionou: ambiente pss-estoque › Editar ›
+  Segredos de rede › Substituir segredo. Token atual "claude-artas" (30 dias, Database + Edge Functions
+  Read-write) vale só para o projeto estoque-pss (no pss-vendas: sem permissão).
 - Aplicar via Management API (`POST /v1/projects/{ref}/database/query`), mostrar a CONFERÊNCIA e,
   no fim, lembrar o dono de revogar o token em supabase.com/dashboard/account/tokens.
 
