@@ -44,6 +44,13 @@ não técnico), GUIA_DO_DONO.md (tela a tela), ESPECIFICACAO_DO_SISTEMA.md e CON
    `js/demo/banco-demo.sql` (o backup monta o banco completo a partir dos dois). Dados e nomes de pessoas NUNCA vão para
    o repositório (é público): só para dentro do zip.
 
+## LIMPEZA · quando o dono disser "zerar a base de testes" (ou "repetir a limpeza dos testes")
+Procedimento e scripts (L1 conferir, L1b quem cadastrou, L2 zerar, L3 voltar atrás) no documento do Projeto
+`claude/limpeza-dados-teste.md` (privado: tem nomes; NUNCA copiar os scripts para este repositório público).
+Ler o documento inteiro, conferir as regras com o dono, testar no banco de demonstração (PostgreSQL local com
+`js/demo/banco-demo.sql`) e só rodar o L2 com o OK dele depois da conferência L1/L1b. A frota nunca é tocada.
+Feita pela 1ª vez em 26/11/2026. Se já houver dados reais, avisar que a limpeza os apagaria e ajustar antes.
+
 ## 1. Segurança máxima (prioridade número 1)
 - Nunca colocar segredo no código: chave `service_role`, senhas, tokens. Só a chave **publicável** do Supabase pode ficar no `config.js`.
 - Toda regra de acesso vale **no banco** (RLS + funções `security definer` com checagem de papel). A tela só esconde botões; quem protege é o banco.
