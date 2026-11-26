@@ -10,13 +10,15 @@
 #   -Modo enviar  lê o ERP e envia ao Artas (é o que o agendamento do Windows roda a cada 30 min)
 #
 # Arquivos desta pasta: config.ini (senha, NÃO compartilhar), consulta-pedidos.sql, artas.log
+# 2º destino (opcional, desde a 1.1.0): se existir config-vendas.ini nesta pasta, os MESMOS dados também vão para o
+#   sistema de vendas (outro Supabase). O ERP é lido uma vez só; o envio ao Artas vem primeiro e não depende do vendas.
 # Códigos de saída: 0 ok · 2 configuração · 3 conexão ODBC não encontrada (tente o PowerShell 32 bits)
 #                   4 erro no ERP · 5 erro no Artas
 # =====================================================================
 param([ValidateSet('teste', 'enviar')][string]$Modo = 'teste')
 
 $ErrorActionPreference = 'Stop'
-$VERSAO = '1.0.2'
+$VERSAO = '1.1.0'
 $PASTA = Split-Path -Parent $MyInvocation.MyCommand.Path
 $LOG = Join-Path $PASTA 'artas.log'
 $INV = [Globalization.CultureInfo]::InvariantCulture
@@ -54,7 +56,6 @@ if ($Modo -eq 'enviar' -and -not $cfg['senha']) { Sair 2 "ERRO: no config.ini fa
 $diasAtras = 30; if ($cfg['dias_atras']) { $diasAtras = [int]$cfg['dias_atras'] }
 $diasFrente = 30; if ($cfg['dias_frente']) { $diasFrente = [int]$cfg['dias_frente'] }
 $limite = 300; if ($cfg['tempo_limite']) { $limite = [int]$cfg['tempo_limite'] }
-$url = $cfg['supabase_url'].TrimEnd('/')
 $desde = (Get-Date).Date.AddDays(-$diasAtras).ToString('yyyy-MM-dd')
 $ate = (Get-Date).Date.AddDays($diasFrente).ToString('yyyy-MM-dd')
 
@@ -75,24 +76,49 @@ function Mensagem-Erro($erro) {
     return $m
 }
 
-function Chamar-Artas([string]$caminho, $corpo, [string]$token) {
-    $cab = @{ 'apikey' = $cfg['chave_publicavel'] }
+function Chamar-Artas([string]$caminho, $corpo, [string]$token, $destino = $cfg) {
+    $cab = @{ 'apikey' = $destino['chave_publicavel'] }
     if ($token) { $cab['Authorization'] = 'Bearer ' + $token }
     $json = $corpo | ConvertTo-Json -Depth 6 -Compress
     $bytes = [Text.Encoding]::UTF8.GetBytes($json)
-    return Invoke-RestMethod -Method Post -Uri ($url + $caminho) -Headers $cab -ContentType 'application/json; charset=utf-8' -Body $bytes -TimeoutSec 120
+    return Invoke-RestMethod -Method Post -Uri ($destino['supabase_url'].TrimEnd('/') + $caminho) -Headers $cab -ContentType 'application/json; charset=utf-8' -Body $bytes -TimeoutSec 120
 }
 
-function Entrar-Artas {
-    $login = $cfg['usuario'].ToLower() + '@' + $cfg['dominio_login']
-    $r = Chamar-Artas '/auth/v1/token?grant_type=password' @{ email = $login; password = $cfg['senha'] } $null
-    if (-not $r.access_token) { throw 'O Artas não devolveu a sessão de integração.' }
+function Entrar-Artas($destino = $cfg) {
+    $login = $destino['usuario'].ToLower() + '@' + $destino['dominio_login']
+    $r = Chamar-Artas '/auth/v1/token?grant_type=password' @{ email = $login; password = $destino['senha'] } $null $destino
+    if (-not $r.access_token) { throw 'O sistema não devolveu a sessão de integração.' }
     return $r.access_token
 }
 
-function Enviar-Artas($pacote) {
-    $token = Entrar-Artas
-    return Chamar-Artas '/rest/v1/rpc/erp_receber_pedidos' @{ p = $pacote } $token
+function Enviar-Artas($pacote, $destino = $cfg) {
+    $token = Entrar-Artas $destino
+    return Chamar-Artas '/rest/v1/rpc/erp_receber_pedidos' @{ p = $pacote } $token $destino
+}
+
+# 2º destino opcional: sistema de vendas (config-vendas.ini, mesmo formato: supabase_url, chave_publicavel,
+# dominio_login, usuario, senha). Se o arquivo não existir, nada muda.
+$vendas = $null
+$arqVendas = Join-Path $PASTA 'config-vendas.ini'
+if (Test-Path $arqVendas) {
+    $vendas = @{}
+    foreach ($l in (Get-Content $arqVendas -Encoding UTF8)) {
+        $t = $l.Trim()
+        if ($t -eq '' -or $t.StartsWith(';') -or $t.StartsWith('#') -or $t.StartsWith('[')) { continue }
+        $i = $t.IndexOf('=')
+        if ($i -gt 0) { $vendas[$t.Substring(0, $i).Trim().ToLower()] = $t.Substring($i + 1).Trim() }
+    }
+    foreach ($k in @('supabase_url', 'chave_publicavel', 'dominio_login', 'usuario', 'senha')) {
+        if (-not $vendas[$k]) { Log "AVISO: no config-vendas.ini falta preencher '$k'; o envio ao vendas fica desligado."; $vendas = $null; break }
+    }
+}
+
+function Enviar-Vendas($pacote) {   # nunca derruba o envio ao Artas: só registra no log
+    if (-not $vendas -or $Modo -ne 'enviar') { return }
+    try {
+        $rv = Enviar-Artas $pacote $vendas
+        if ($pacote.ContainsKey('linhas')) { Log ("Enviado ao VENDAS · " + $rv.linhas + " linhas · novas " + $rv.novas + " · alteradas " + $rv.alteradas + " · saíram " + $rv.removidas) }
+    } catch { Log ('ERRO ao enviar ao VENDAS: ' + (Mensagem-Erro $_)) }
 }
 
 # ---------------------------------------------------------------------
@@ -144,6 +170,8 @@ try {
             $null = Enviar-Artas @{ maquina = $env:COMPUTERNAME; versao_robo = $VERSAO; desde = $desde; ate = $ate
                                    segundos = [math]::Round($relogio.Elapsed.TotalSeconds, 2); erro = $msg.Substring(0, [math]::Min(1900, $msg.Length)) }
         } catch { Log ('Também não consegui avisar o Artas: ' + (Mensagem-Erro $_)) }
+        Enviar-Vendas @{ maquina = $env:COMPUTERNAME; versao_robo = $VERSAO; desde = $desde; ate = $ate
+                        segundos = [math]::Round($relogio.Elapsed.TotalSeconds, 2); erro = $msg.Substring(0, [math]::Min(1900, $msg.Length)) }
     }
     Sair 4 ''
 } finally {
@@ -183,12 +211,17 @@ if ($Modo -eq 'teste') {
 # ---------------------------------------------------------------------
 # 4b) modo ENVIAR
 # ---------------------------------------------------------------------
+$pacoteFinal = @{ maquina = $env:COMPUTERNAME; versao_robo = $VERSAO; desde = $desde; ate = $ate; segundos = $seg
+                  linhas = [object[]]$linhas.ToArray() }
+$codigo = 0
 try {
-    $r = Enviar-Artas @{ maquina = $env:COMPUTERNAME; versao_robo = $VERSAO; desde = $desde; ate = $ate; segundos = $seg
-                        linhas = [object[]]$linhas.ToArray() }
+    $r = Enviar-Artas $pacoteFinal
     $extra = ''
     if ($r.protecao_lista_vazia) { $extra = ' · ATENÇÃO: consulta vazia, o Artas manteve a lista anterior' }
-    Sair 0 ("Enviado ao Artas · " + $r.linhas + " linhas · novas " + $r.novas + " · alteradas " + $r.alteradas + " · saíram " + $r.removidas + $extra)
+    Log ("Enviado ao Artas · " + $r.linhas + " linhas · novas " + $r.novas + " · alteradas " + $r.alteradas + " · saíram " + $r.removidas + $extra)
 } catch {
-    Sair 5 ('ERRO ao enviar ao Artas: ' + (Mensagem-Erro $_))
+    Log ('ERRO ao enviar ao Artas: ' + (Mensagem-Erro $_))
+    $codigo = 5
 }
+Enviar-Vendas $pacoteFinal
+Sair $codigo ''

@@ -45,6 +45,13 @@ Arquivo público: sem nomes de pessoas, senhas, tokens ou dados da empresa.
   NÃO mover). Teste: 3,97 s, 394 pedidos em aberto, 64 produtos, 167.803 pacotes. Usuário `integracao` criado
   (senha temporária no config.ini do servidor). Tarefa do Windows "Artas" a cada 30 min. Próximo: dono conferir os
   pedidos mais antigos (fim de outubro) e desenhar a comparação com a produção (cadastro do produto acabado).
+- Integração ERP programa 1.1.0 (26/11/2026, só o programa do servidor; site sem mudança): 2º destino OPCIONAL
+  `config-vendas.ini` (sistema de VENDAS, Supabase puxrntuvawwvaqtbtxle): o ERP é lido uma vez e o mesmo pacote vai
+  para a RPC `erp_receber_pedidos` do vendas DEPOIS do Artas; falha no vendas só vai para o log. Sem o arquivo, nada
+  muda. Pacote de instruções entregue ao dono para a conversa do vendas (lá: criar tabelas/RPC, usuário de integração,
+  e devolver ao dono o zip da pasta com `config-vendas.ini` + `consulta-pedidos.sql` com valores, SEM o config.ini).
+  Esta conversa não tem acesso ao banco do vendas (o token só abre o projeto do Artas). Programa não testado em
+  PowerShell aqui (sem PowerShell no ambiente): conferir no 1º `rodar-envio.bat` as linhas "Enviado ao Artas/VENDAS".
 - v2.25.1 (26/11/2026, só tela): grupos do menu no tema CLARO em grafite claro (fundo #e8e8e4, texto grafite;
   escolha do dono entre 5 opções). Tema escuro sem mudança.
 - v2.25.0 (26/11/2026, banco + tela; APLICADA EM PRODUÇÃO): módulo PREVISÃO (grupo novo no menu, por enquanto

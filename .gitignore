@@ -6,3 +6,4 @@ __pycache__/
 integracao/artas-erp/config.ini
 integracao/artas-erp/teste_pedidos.csv
 integracao/artas-erp/artas.log*
+integracao/artas-erp/config-vendas.ini

@@ -15,6 +15,8 @@ O Artas lê no ERP (Firebird) os **pedidos de venda em aberto** e os envia para 
 | `consulta-pedidos.sql` | A consulta dos pedidos em aberto (do técnico do ERP), de 30 dias atrás até 30 dias à frente |
 | `config.ini` | Configuração. Para o envio, recebe a senha do usuário de integração |
 | `config.exemplo.ini` | Cópia de reserva da configuração, sem senha |
+| `config-vendas.ini` | **Opcional (versão 1.1.0):** se existir, os mesmos pedidos vão também para o sistema de vendas. Tem a senha do usuário de integração do vendas |
+| `config-vendas.exemplo.ini` | Modelo do `config-vendas.ini`, sem senha |
 | `rodar-teste.bat` | **Teste:** lê o ERP e gera `teste_pedidos.csv`. Não envia nada |
 | `rodar-envio.bat` | **Envio:** lê o ERP e envia ao Artas (é o que o agendamento roda) |
 | `instalar-agendamento.bat` | Cria a tarefa "Artas" no Windows, que roda o envio a cada 30 minutos |
@@ -48,6 +50,11 @@ Extraia o zip em `C:\`. Vai ficar a pasta `C:\Artas` com os arquivos dentro.
 3. Dê dois cliques em `rodar-envio.bat` uma vez e veja se termina com "Enviado ao Artas".
 4. Para deixar automático, clique com o botão direito em `instalar-agendamento.bat` e escolha **Executar como administrador**.
    O Windows vai pedir **a sua senha do Windows**. Pronto: a cada 30 minutos o envio roda sozinho.
+
+## Enviar também para o sistema de vendas (opcional)
+- O ERP é lido **uma vez só** e os mesmos dados vão para os dois sistemas: primeiro o Artas, depois o vendas.
+- Se o envio ao vendas falhar, o Artas recebe normalmente. O erro fica só registrado no `artas.log` ("ERRO ao enviar ao VENDAS").
+- Para ligar: colocar nesta pasta o `config-vendas.ini` com a senha. Para desligar: apagar esse arquivo.
 
 ## Problemas comuns
 
