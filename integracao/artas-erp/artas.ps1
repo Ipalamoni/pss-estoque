@@ -1,5 +1,5 @@
 ﻿# =====================================================================
-# Projeto Artas · ROBÔ DE PEDIDOS DO ERP (Windows PowerShell 5.1 ou mais novo)
+# Projeto Artas · INTEGRAÇÃO DE PEDIDOS DO ERP (Windows PowerShell 5.1 ou mais novo)
 #
 # O que faz: lê no ERP (Firebird, pela conexão ODBC que já existe) os pedidos de venda em aberto
 # e envia para o Artas. SÓ LEITURA no ERP: a consulta roda numa transação que é desfeita no fim
@@ -9,16 +9,16 @@
 #   -Modo teste   lê o ERP e salva teste_pedidos.csv nesta pasta (NÃO envia nada ao Artas)
 #   -Modo enviar  lê o ERP e envia ao Artas (é o que o agendamento do Windows roda a cada 30 min)
 #
-# Arquivos desta pasta: config.ini (senha do robô, NÃO compartilhar), consulta-pedidos.sql, robo.log
+# Arquivos desta pasta: config.ini (senha, NÃO compartilhar), consulta-pedidos.sql, artas.log
 # Códigos de saída: 0 ok · 2 configuração · 3 conexão ODBC não encontrada (tente o PowerShell 32 bits)
 #                   4 erro no ERP · 5 erro no Artas
 # =====================================================================
 param([ValidateSet('teste', 'enviar')][string]$Modo = 'teste')
 
 $ErrorActionPreference = 'Stop'
-$VERSAO = '1.0.1'
+$VERSAO = '1.0.2'
 $PASTA = Split-Path -Parent $MyInvocation.MyCommand.Path
-$LOG = Join-Path $PASTA 'robo.log'
+$LOG = Join-Path $PASTA 'artas.log'
 $INV = [Globalization.CultureInfo]::InvariantCulture
 
 function Log([string]$texto) {
@@ -50,7 +50,7 @@ foreach ($l in (Get-Content $arqConfig -Encoding UTF8)) {
 foreach ($k in @('supabase_url', 'chave_publicavel', 'dominio_login', 'usuario', 'odbc')) {
     if (-not $cfg[$k]) { Sair 2 "ERRO: no config.ini falta preencher '$k'." }
 }
-if ($Modo -eq 'enviar' -and -not $cfg['senha']) { Sair 2 "ERRO: no config.ini falta a senha do usuário-robô (linha 'senha =')." }
+if ($Modo -eq 'enviar' -and -not $cfg['senha']) { Sair 2 "ERRO: no config.ini falta a senha do usuário de integração (linha 'senha =')." }
 $diasAtras = 30; if ($cfg['dias_atras']) { $diasAtras = [int]$cfg['dias_atras'] }
 $diasFrente = 30; if ($cfg['dias_frente']) { $diasFrente = [int]$cfg['dias_frente'] }
 $limite = 300; if ($cfg['tempo_limite']) { $limite = [int]$cfg['tempo_limite'] }
@@ -65,7 +65,7 @@ $sql = (Get-Content $arqSql -Raw -Encoding UTF8).Replace('@DESDE@', $desde).Repl
 $sql = (($sql -split "`r?`n") | Where-Object { -not $_.TrimStart().StartsWith('--') }) -join "`r`n"
 
 # ---------------------------------------------------------------------
-# 2) Artas: entrar com o usuário-robô e enviar
+# 2) Artas: entrar com o usuário de integração e enviar
 # ---------------------------------------------------------------------
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
@@ -86,7 +86,7 @@ function Chamar-Artas([string]$caminho, $corpo, [string]$token) {
 function Entrar-Artas {
     $login = $cfg['usuario'].ToLower() + '@' + $cfg['dominio_login']
     $r = Chamar-Artas '/auth/v1/token?grant_type=password' @{ email = $login; password = $cfg['senha'] } $null
-    if (-not $r.access_token) { throw 'O Artas não devolveu a sessão do robô.' }
+    if (-not $r.access_token) { throw 'O Artas não devolveu a sessão de integração.' }
     return $r.access_token
 }
 
@@ -98,7 +98,7 @@ function Enviar-Artas($pacote) {
 # ---------------------------------------------------------------------
 # 3) ERP: ler os pedidos (somente leitura)
 # ---------------------------------------------------------------------
-Log ("Início · robô " + $VERSAO + " · pedidos de " + $desde + " a " + $ate + " · PowerShell " + [IntPtr]::Size * 8 + " bits")
+Log ("Início · Artas " + $VERSAO + " · pedidos de " + $desde + " a " + $ate + " · PowerShell " + [IntPtr]::Size * 8 + " bits")
 $linhas = New-Object System.Collections.Generic.List[object]
 $relogio = [Diagnostics.Stopwatch]::StartNew()
 $con = $null
@@ -139,7 +139,7 @@ try {
     $relogio.Stop()
     $msg = 'ERRO ao ler o ERP: ' + $_.Exception.Message
     Log $msg
-    if ($Modo -eq 'enviar') {   # avisa o Artas que o robô está com problema
+    if ($Modo -eq 'enviar') {   # avisa o Artas que a integração está com problema
         try {
             $null = Enviar-Artas @{ maquina = $env:COMPUTERNAME; versao_robo = $VERSAO; desde = $desde; ate = $ate
                                    segundos = [math]::Round($relogio.Elapsed.TotalSeconds, 2); erro = $msg.Substring(0, [math]::Min(1900, $msg.Length)) }

@@ -31,13 +31,16 @@ Arquivo público: sem nomes de pessoas, senhas, tokens ou dados da empresa.
 - Pergunta aberta ao dono: padeiro criar a própria senha no 1º acesso do tablet (proposta feita, aguardando "pode fazer").
 
 ## Situação atual (24/11/2026)
-- Sistema publicado: https://ipalamoni.github.io/pss-estoque/ (versão do app 2.24.1).
+- Sistema publicado: https://ipalamoni.github.io/pss-estoque/ (versão do app 2.24.2).
 - Banco de produção (Supabase `kuttfnmjvzgzebjpjvvy`, "estoque-pss"): versão **2.24.0**, todas as
   conferências OK. Não mexer no projeto Supabase `pss-vendas`.
 - Robô do ERP (26/11/2026): 1º teste no servidor trouxe TODOS os pedidos não cancelados (13.115 em 90 dias).
   O técnico mandou a regra de "em aberto" (análise 846): `DTLIBFATURAMENTO IS NULL`. Já está no
   `consulta-pedidos.sql`. A pedido do dono, o período passou para hoje −30 a +30 dias (robô 1.0.1).
   Falta o dono rodar o teste de novo e conferir a quantidade de pedidos.
+  1.0.2 (pedido do dono: nada de "robô" no servidor, para não chamar atenção): pasta `C:\Artas`, `artas.ps1`,
+  `artas.log`, tarefa do Windows "Artas", login sugerido `integracao`. Pasta no repositório: `integracao/artas-erp/`.
+  App 2.24.2: papel exibido como "Integração (ERP: só entrega pedidos)".
 - v2.24.1 (26/11/2026, só tela): nomes dos grupos do menu lateral em destaque (faixa grafite da marca, texto
   branco; escolha do dono entre 4 alternativas). Menu recolhido: linha grafite entre os grupos. Sem mudança no banco.
 - v2.24.0 (26/11/2026, banco + tela): INTEGRAÇÃO COM O ERP, etapa 1 (trazer os pedidos de venda em aberto).
@@ -46,7 +49,7 @@ Arquivo público: sem nomes de pessoas, senhas, tokens ou dados da empresa.
   e `erp_sincronizacoes` (cada envio, tempo e erros); leitura `pode('pedidos_erp')` = admin, engenharia, diretoria,
   financeiro, faturamento, gestor da produção. Lista vazia não apaga nada (proteção). **APLICADO EM PRODUÇÃO em
   26/11/2026** (7 conferências OK) e função admin-usuarios republicada (versão 3: aceita frota e integracao). Testado: 32/32 (espelho,
-  validações e ataques). Robô em `integracao/robo-erp/` (PowerShell + ODBC `ITHALO_PSS_CONSULTOR`, só leitura,
+  validações e ataques). Integração em `integracao/artas-erp/` (PowerShell + ODBC `ITHALO_PSS_CONSULTOR`, só leitura,
   a cada 30 min, modos teste/enviar, LEIA-ME com o passo a passo). O robô NÃO pôde ser executado na sessão (sem
   PowerShell aqui): o 1º teste é o `rodar-teste.bat` no servidor. Próxima etapa: cadastro de PRODUTO ACABADO
   (código do ERP + receita + pacotes por receita) e a coluna Pedidos em "Programado × produzido" (desenhar com o dono).

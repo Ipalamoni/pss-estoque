@@ -15,7 +15,7 @@ export const PAPEIS = {
   padeiro: 'Padeiro (tablet da Produção Masseiras)',
   gestor_producao: 'Gestor da produção (ordem, masseiras e correções)',
   frota: 'Manutenção de veículos (frota)',
-  integracao: 'Integração (robô do ERP: só entrega pedidos)',
+  integracao: 'Integração (ERP: só entrega pedidos)',
 };
 
 export const CATEGORIAS = {
