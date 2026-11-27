@@ -130,6 +130,30 @@ const TABELAS_OPERACAO = ['movimentos', 'estoque_local', 'transferencias', 'requ
 const TABELAS_BASE = ['pedidos', 'pedido_itens', 'recebimentos', 'produtos', 'fornecedores', 'fichas_tecnicas', 'ficha_itens', 'parametros',
   'perfis', 'locais', 'unidades', 'maceiras', 'operadores', 'linhas_producao'];
 const TABELAS_AO_VIVO = [...TABELAS_OPERACAO, ...TABELAS_BASE];
+
+// DESEMPENHO (v2.26.1): CARGA SOB MEDIDA. Cada pessoa só busca (e só acompanha em tempo real) os blocos de dados
+// que as telas dela usam. Ex.: o tablet do padeiro não busca pedidos de compra, recebimentos, fornecedores nem o
+// consumo médio. Vale pelos papéis de quem ENTROU (no "ver como" o administrador continua com tudo).
+// A segurança continua no banco: isto só evita buscar o que a pessoa não vai usar.
+const BLOCOS = {
+  compras: ['pedidos', 'painel', 'relatorios', 'receber', 'financeiro', 'movimentos', 'fornecedores', 'produtos', 'custos'],   // pedidos, itens, recebimentos
+  consumo: ['estoque', 'painel', 'pedidos', 'produtos', 'configuracoes', 'inventario', 'programacao', 'saidas', 'saidas-producao', 'relatorios'],   // consumo médio (a conta mais pesada)
+  requisicoes: ['requisicoes', 'transferencias', 'estoque-local'],
+  frota: ['frota', 'frota-apontar', 'frota-placas'],
+};
+export function blocosDoUsuario(papeisReais) {
+  const telas = new Set(MENU.filter((m) => m.id && m.papeis.some((x) => (papeisReais || []).includes(x))).map((m) => m.id));
+  const tem = (b) => BLOCOS[b].some((id) => telas.has(id));
+  const papel = (x) => (papeisReais || []).includes(x);
+  const b = { compras: tem('compras') || papel('comprador') || papel('financeiro'), consumo: tem('consumo'), requisicoes: tem('requisicoes'), frota: tem('frota') };
+  b.fornecedores = b.compras || b.consumo;   // o consumo médio usa o prazo de entrega do fornecedor
+  return b;
+}
+const TODOS_BLOCOS = { compras: true, consumo: true, requisicoes: true, frota: true, fornecedores: true };
+export function tabelasDoUsuario(b) {
+  const fora = new Set([...(b.compras ? [] : ['pedidos', 'pedido_itens', 'recebimentos']), ...(b.fornecedores ? [] : ['fornecedores']), ...(b.requisicoes ? [] : ['requisicoes'])]);
+  return TABELAS_AO_VIVO.filter((t) => !fora.has(t));
+}
 // conferência periódica (só com a aba visível): telas "ao vivo" a cada 30 s, as demais a cada 90 s;
 // a carga completa (pedidos, recebimentos, cadastros) a cada 3 min; consumo médio (estatística pesada) a cada 15 min
 const CICLO_VIVO_MS = 30000, CICLO_OUTRAS_MS = 90000, CICLO_COMPLETO_MS = 180000, CICLO_STATS_MS = 900000;
@@ -150,12 +174,14 @@ async function porIds(tabela, campo, ids, seguro) {
 async function carregarDados(anterior, opcoes = {}) {
   const seguro = (pr) => pr.catch(() => []);   // papéis restritos (financeiro/faturamento) não leem tudo
   const leve = !!(opcoes.leve && anterior);
+  const b = opcoes.blocos || TODOS_BLOCOS;
+  const vazio = () => Promise.resolve([]);
   const desde = opcoes.desde || anterior?.historicoDesde || hojeMenos(HISTORICO_DIAS);
   const ini = new Date(desde + 'T00:00:00').toISOString();
   const operacao = () => Promise.all([
     api.listar('produtos'), seguro(api.listar('estoque_local')),
     seguro(api.listar('transferencias', { em: { situacao: ['separada', 'enviada'] } })),
-    seguro(api.listar('requisicoes', { em: { situacao: ['pendente', 'parcial'] } })),
+    b.requisicoes ? seguro(api.listar('requisicoes', { em: { situacao: ['pendente', 'parcial'] } })) : vazio(),
     Promise.all([api.listar('programacoes', { campoData: 'data', desde }), api.listar('programacoes', { eq: { situacao: 'ativa' }, nulo: ['finalizada_em'] })]).then((x) => unir(...x)),
     // avisos de mudança na programação ainda não vistos no tablet (últimos 2 dias)
     seguro(api.listar('avisos_producao', { nulo: ['ciente_em'], campoData: 'criado_em', desde: new Date(Date.now() - 2 * 864e5).toISOString() })),
@@ -163,7 +189,7 @@ async function carregarDados(anterior, opcoes = {}) {
     seguro(api.listar('bateladas', { eq: { situacao: 'em_producao' } })),
     seguro(api.listar('sininho_vistos', { campoData: 'visto_em', desde: new Date(Date.now() - 30 * 864e5).toISOString() })),
     // manutenção de veículos: quantas notas esperam apontamento e placas a resolver (nulo para quem não tem a frota)
-    api.rpc('frota_pendencias').catch(() => null),
+    b.frota ? api.rpc('frota_pendencias').catch(() => null) : Promise.resolve(null),
   ]);
   // DESEMPENHO: a parte da operação começa junto com o resto (antes esperava tudo terminar);
   // a carga completa vai em 2 rodadas paralelas (antes eram 4 em sequência)
@@ -174,8 +200,8 @@ async function carregarDados(anterior, opcoes = {}) {
     base = anterior;
   } else {
     const [parametros, fornecedores, fichas, fichaItens, pedidos, perfis, unidades, locais, linhas, maceiras, operadores] = await Promise.all([
-      api.listar('parametros'), api.listar('fornecedores'), api.listar('fichas_tecnicas'), api.listar('ficha_itens'),
-      Promise.all([api.listar('pedidos', { campoData: 'data_pedido', desde }), api.listar('pedidos', { em: { status: ['aberto', 'parcial'] } })]).then((x) => unir(...x)),
+      api.listar('parametros'), b.fornecedores ? api.listar('fornecedores') : vazio(), api.listar('fichas_tecnicas'), api.listar('ficha_itens'),
+      b.compras ? Promise.all([api.listar('pedidos', { campoData: 'data_pedido', desde }), api.listar('pedidos', { em: { status: ['aberto', 'parcial'] } })]).then((x) => unir(...x)) : vazio(),
       api.listar('perfis'),
       seguro(api.listar('unidades')), seguro(api.listar('locais')), seguro(api.listar('linhas_producao')),
       seguro(api.listar('maceiras')), seguro(api.listar('operadores')),
@@ -184,10 +210,10 @@ async function carregarDados(anterior, opcoes = {}) {
     const ids = pedidos.map((p) => p.id);
     const statsVelhas = anterior && !opcoes.renovarStats ? anterior.stats : null;
     const [pedidoItens, recebimentos, stats] = await Promise.all([
-      porIds('pedido_itens', 'pedido_id', ids, seguro),
-      Promise.all([api.listar('recebimentos', { desde: ini }), porIds('recebimentos', 'pedido_id', ids, seguro),
-        seguro(api.listar('recebimentos', { eq: { divergencia: true }, nulo: ['ciente_por'] }))]).then((x) => unir(...x)),
-      statsVelhas ? Promise.resolve(statsVelhas) : api.rpc('estatisticas_estoque', { p_janela: Number(params.janela_consumo_dias || 90) }),
+      b.compras ? porIds('pedido_itens', 'pedido_id', ids, seguro) : vazio(),
+      b.compras ? Promise.all([api.listar('recebimentos', { desde: ini }), porIds('recebimentos', 'pedido_id', ids, seguro),
+        seguro(api.listar('recebimentos', { eq: { divergencia: true }, nulo: ['ciente_por'] }))]).then((x) => unir(...x)) : vazio(),
+      !b.consumo ? vazio() : statsVelhas ? Promise.resolve(statsVelhas) : api.rpc('estatisticas_estoque', { p_janela: Number(params.janela_consumo_dias || 90) }),
     ]);
     base = { parametros, params, fornecedores, fichas, fichaItens, pedidos, pedidoItens, perfis, recebimentos, stats, unidades, locais, linhas, maceiras, operadores,
       statsEm: statsVelhas ? anterior.statsEm : Date.now(), completoEm: Date.now() };
@@ -587,6 +613,8 @@ function App() {
 
   const dadosRef = useRef(null);
   dadosRef.current = dados;
+  const blocosRef = useRef(TODOS_BLOCOS);
+  blocosRef.current = usuario ? blocosDoUsuario(usuario.papeis) : TODOS_BLOCOS;
   // FILA ÚNICA DE ATUALIZAÇÃO (desempenho e consistência): nunca roda duas cargas ao mesmo tempo
   // (em rede lenta, uma resposta velha podia sobrescrever uma nova). Pedidos que chegam durante uma
   // carga são juntados numa só carga seguinte, do nível mais alto pedido.
@@ -610,7 +638,7 @@ function App() {
       if (!ant) nivel = 3;
       else if (nivel === 2 && Date.now() - (ant.statsEm || 0) > CICLO_STATS_MS) nivel = 3;
       try {
-        const novo = await carregarDados(ant, { leve: nivel === 1, renovarStats: nivel === 3, desde });
+        const novo = await carregarDados(ant, { leve: nivel === 1, renovarStats: nivel === 3, desde, blocos: blocosRef.current });
         dadosRef.current = novo; setDados(novo);
       } catch (e) {
         if (avisarErro || !ant) avisar(mensagemErro(e), 'erro');
@@ -642,9 +670,11 @@ function App() {
   useEffect(() => {
     if (!usuario || !api.aoMudar) return undefined;
     let t = null; let nivelAviso = 0;
-    const desligar = api.aoMudar(TABELAS_AO_VIVO, (tabelas, carga) => {
+    const blocos = blocosDoUsuario(usuario.papeis);
+    const desligar = api.aoMudar(tabelasDoUsuario(blocos), (tabelas, carga) => {
       const lista = Array.isArray(tabelas) ? tabelas : [tabelas];
-      const base = lista.some((x) => x === '*' || TABELAS_BASE.includes(x)) || (lista.includes('movimentos') && carga?.new?.tipo === 'entrada');
+      // entrada de mercadoria muda o pedido: carga completa só para quem acompanha os pedidos
+      const base = lista.some((x) => x === '*' || TABELAS_BASE.includes(x)) || (blocos.compras && lista.includes('movimentos') && carga?.new?.tipo === 'entrada');
       nivelAviso = Math.max(nivelAviso, base ? 2 : 1);
       clearTimeout(t);
       t = setTimeout(() => { const nv = nivelAviso; nivelAviso = 0; if (!document.hidden) carregar(nv); else pendenteAoVoltar.current = Math.max(pendenteAoVoltar.current, nv); }, 1200);

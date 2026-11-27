@@ -31,7 +31,7 @@ Arquivo público: sem nomes de pessoas, senhas, tokens ou dados da empresa.
 - Pergunta aberta ao dono: padeiro criar a própria senha no 1º acesso do tablet (proposta feita, aguardando "pode fazer").
 
 ## Situação atual (24/11/2026)
-- Sistema publicado: https://ipalamoni.github.io/pss-estoque/ (versão do app 2.26.0).
+- Sistema publicado: https://ipalamoni.github.io/pss-estoque/ (versão do app 2.26.1).
 - Banco de produção (Supabase `kuttfnmjvzgzebjpjvvy`, "estoque-pss"): versão **2.24.0**, todas as
   conferências OK. Não mexer no projeto Supabase `pss-vendas`.
 - Robô do ERP (26/11/2026): 1º teste no servidor trouxe TODOS os pedidos não cancelados (13.115 em 90 dias).
@@ -45,14 +45,22 @@ Arquivo público: sem nomes de pessoas, senhas, tokens ou dados da empresa.
   NÃO mover). Teste: 3,97 s, 394 pedidos em aberto, 64 produtos, 167.803 pacotes. Usuário `integracao` criado
   (senha temporária no config.ini do servidor). Tarefa do Windows "Artas" a cada 30 min. Próximo: dono conferir os
   pedidos mais antigos (fim de outubro) e desenhar a comparação com a produção (cadastro do produto acabado).
+- v2.26.1 (27/11/2026, só app): DESEMPENHO, itens 1, 2 e 4 aprovados pelo dono (o 3, conferência espaçada,
+  NÃO foi feito por decisão do dono: a conferência de 30 s/90 s é a rede de segurança do tempo real).
+  1) CARGA SOB MEDIDA (`blocosDoUsuario` em app.js, pelos papéis de quem ENTROU; no "ver como" o admin segue com
+  tudo): blocos compras (pedidos/itens/recebimentos), consumo (estatisticas_estoque), requisições, frota e
+  fornecedores só para quem tem tela que usa. Padeiro e faturamento não buscam compras, consumo nem requisições;
+  financeiro não busca o consumo. 2) TEMPO REAL só das tabelas desses blocos (`tabelasDoUsuario`: 18 em vez de 23
+  para padeiro/faturamento); entrada de mercadoria só força carga completa para quem acompanha pedidos.
+  4) Início não carrega mais o código das telas de pedidos/financeiro/produção (`js/resumos.js` com resumoPedido,
+  entregaFin, linhasFinanceiro, AvisoFinalizar; re-exportados nos arquivos antigos); o resumo da previsão é
+  baixado só por quem tem o cartão. Testado: 13 perfis da demonstração (todas as telas de cada um abrem, sem erro),
+  Início em 1280/800/390 nos dois temas. Ao criar tela nova que use pedidos/consumo/requisições: incluir o id dela
+  em `BLOCOS` (app.js).
 - v2.26.0 (27/11/2026, banco + app; APLICADA EM PRODUÇÃO, conferências OK): DESEMPENHO. O consumo médio
   (`estatisticas_estoque`) lê só a janela do cálculo (90 dias) em vez de todo o histórico de movimentos; resultado
   idêntico (testado no PGlite com movimentos antigos, recentes e correções). A tela "Pedidos em aberto" entrou na
-  lista do que fica guardado no aparelho (sw.js). PROPOSTO E AGUARDANDO OK DO DONO (revisão de desempenho):
-  1) carga de dados sob medida por papel (padeiro/frota/faturamento não buscam pedidos, recebimentos, fornecedores,
-  consumo médio); 2) tempo real só das tabelas que as telas da pessoa usam; 3) conferência periódica espaçada
-  (2/5 min) enquanto o tempo real estiver conectado, voltando a 30 s se cair; 5) Início sem carregar o código de
-  pedidos/produção/financeiro para quem não tem esses cartões; 6b) sem pré-carregar telas no modo economia de dados.
+  lista do que fica guardado no aparelho (sw.js).
 - Integração ERP programa 1.1.0 (26/11/2026, só o programa do servidor; site sem mudança): 2º destino OPCIONAL
   `config-vendas.ini` (sistema de VENDAS, Supabase puxrntuvawwvaqtbtxle): o ERP é lido uma vez e o mesmo pacote vai
   para a RPC `erp_receber_pedidos` do vendas DEPOIS do Artas; falha no vendas só vai para o log. Sem o arquivo, nada

@@ -9,6 +9,8 @@ import { Exportar } from '../exportar.js';
 import { UltimaAlteracao, HistoricoAuditoria } from '../historico.js';
 import { Icone } from '../icones.js';
 import { ResumoPrevisao } from './previsao.js';
+import { AvisoFinalizar } from '../resumos.js';
+export { AvisoFinalizar };   // (mudou para resumos.js)
 import { useFluxo, ETAPAS, localTipo, saldoLocal, useEventos, LinhaTempo } from '../producao-util.js';
 import { QuadroMaceiras } from './quadro-maceiras.js';
 import { OrdemPesagem, AvisoPesagem } from './ordem-pesagem.js';
@@ -214,12 +216,6 @@ function ProgramacaoDia({ dia, setDia, engenharia, pesagem }) {
 }
 
 // Lembrete da engenharia: produções de dias anteriores ainda não finalizadas
-export function AvisoFinalizar({ progs, aoAbrir }) {
-  const dias = [...new Set(progs.map((p) => p.data))].sort();
-  return html`<div class="aviso-faixa"><span>⚠ Existem <b>${pl(progs.length, 'produção iniciada', 'produções iniciadas')}</b> em dias anteriores pendentes de finalização (${dias.map((d) => data(d).slice(0, 5)).join(', ')}). Confira com a pesagem e finalize.</span>
-    <button class="btn btn-destaque btn-peq" onClick=${() => aoAbrir(dias[0])}>Ver ${data(dias[0]).slice(0, 5)}</button></div>`;
-}
-
 // Programar rápido: só o código (ou nome) da receita e a quantidade
 function ProgramarRapido({ dia, aoAlterar }) {
   const { dados, recarregar, api } = useApp();

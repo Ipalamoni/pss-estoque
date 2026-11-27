@@ -1,12 +1,23 @@
 // Tela inicial: atalhos por perfil, indicadores e alertas
-import { html, useState, useApp, Cartao, Tabela, Etiqueta, Cabecalho } from '../ui.js';
+import { html, useState, useEffect, useApp, Carregando, Cartao, Tabela, Etiqueta, Cabecalho } from '../ui.js';
 import { STATUS_ESTOQUE } from '../calc.js';
 import { veValores, moeda, num, qtdDupla, numeroPedido, data, hojeISO, diasEntre, somarDias, pl, qu, acessoAmplo, pode, operaLocal, ehGestao } from '../util.js';
-import { linhasFinanceiro } from './financeiro.js';
-import { ResumoPrevisao } from './previsao.js';
-import { resumoPedido } from './pedidos.js';
+import { linhasFinanceiro, AvisoFinalizar } from '../resumos.js';
 import { Icone } from '../icones.js';
-import { AvisoFinalizar } from './producao.js';
+
+// DESEMPENHO (v2.26.1): o resumo da previsão (e o código da tela de previsão) só é baixado para quem tem esse cartão
+let ResumoCarregado = null; let resumoPromessa = null;
+function ResumoPrevisao(props) {
+  const [, forcar] = useState(0);
+  useEffect(() => {
+    if (ResumoCarregado) return undefined;
+    let vivo = true;
+    resumoPromessa = resumoPromessa || import('./previsao.js').then((m) => { ResumoCarregado = m.ResumoPrevisao; }).catch(() => { resumoPromessa = null; });
+    resumoPromessa.then(() => { if (vivo) forcar(1); });
+    return () => { vivo = false; };
+  }, []);
+  return ResumoCarregado ? html`<${ResumoCarregado} ...${props} />` : html`<${Carregando} />`;
+}
 
 export function TelaInicio() {
   const { papeis } = useApp();

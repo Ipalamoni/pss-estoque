@@ -5,33 +5,11 @@
 //  - comprador ou financeiro ajustam a previsão de pagamento (com motivo)
 // =====================================================================
 import { html, useState, useMemo, useEffect, useApp, Tabela, Cartao, Cabecalho, Etiqueta, Busca, useAcao, avisar, useHistorico, Filtros, MultiEscolha, casaVarios } from '../ui.js';
-import { STATUS_PEDIDO, numeroPedido, data, dataHora, hojeISO, somarDias, diasEntre, diaLocal, moeda, pl, contem, nomeUsuario, formatarDoc } from '../util.js';
-import { resumoPedido, PedidoDetalhe, AjustarPagamento } from './pedidos.js';
+import { STATUS_PEDIDO, numeroPedido, data, dataHora, hojeISO, somarDias, moeda, pl, contem, nomeUsuario, formatarDoc } from '../util.js';
+import { PedidoDetalhe, AjustarPagamento } from './pedidos.js';
+import { entregaFin, linhasFinanceiro } from '../resumos.js';
+export { entregaFin, linhasFinanceiro };   // (mudou para resumos.js)
 import { Exportar } from '../exportar.js';
-
-// Situação da entrega, do jeito que o financeiro precisa
-export function entregaFin(p) {
-  if (p.status === 'cancelado') return { id: 'cancelado', rotulo: 'Cancelado', cor: 'cinza' };
-  if (p.status === 'recebido' || p.status === 'encerrado') return { id: 'recebido', rotulo: 'Recebido', cor: 'verde' };
-  if (p.status === 'parcial') return { id: 'parcial', rotulo: 'Parcial', cor: 'laranja' };
-  return { id: 'pendente', rotulo: 'Pendente', cor: 'azul' };
-}
-
-// Linhas do financeiro (usadas também no Início)
-export function linhasFinanceiro(dados) {
-  const hoje = hojeISO();
-  return dados.pedidos.map((p) => {
-    const r = resumoPedido(p, dados);
-    const ent = entregaFin(p);
-    const diasPgto = p.previsao_pagamento ? diasEntre(hoje, p.previsao_pagamento) : null;
-    const aberto = ent.id === 'pendente' || ent.id === 'parcial';
-    return { ...p, r, ent, diasPgto, criadoDia: p.criado_em ? diaLocal(p.criado_em) : p.data_pedido,
-      // pagamento vence até hoje e a mercadoria ainda não chegou toda → falar com o comprador
-      alertaEntrega: aberto && diasPgto !== null && diasPgto <= 0,
-      // pedido cancelado que já foi lançado → precisa estornar no sistema
-      alertaCancelado: p.status === 'cancelado' && p.fin_lancado };
-  });
-}
 
 const RAPIDOS = {
   todos: { t: 'Todos' },

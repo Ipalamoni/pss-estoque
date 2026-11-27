@@ -1,30 +1,14 @@
 // Pedidos de compra: lista, cadastro, detalhe, divergências, PDF / Excel / impressão
 import { html, useRascunho, confirmarDescarte, useState, useMemo, useEffect, useApp, Tabela, Modal, Campo, Numero, Escolher, QtdUnidade, Busca, Etiqueta, Cabecalho, useAcao, confirmar, avisar, n, useHistorico, Filtros, MultiEscolha, casaVarios } from '../ui.js';
-import { STATUS_PEDIDO, numeroPedido, data, dataHora, hojeISO, somarDias, diasEntre, moeda, qtd, num, contem, fator, qu, pl, plural, nomeUsuario, mensagemErro } from '../util.js';
+import { STATUS_PEDIDO, numeroPedido, data, dataHora, hojeISO, somarDias, moeda, qtd, num, contem, fator, qu, pl, plural, nomeUsuario, mensagemErro } from '../util.js';
 import { pdfPedido, pdfTabela, salvarPDF, imprimirPDF, excel, pdfBlob, compartilhar } from '../export.js';
 import { Exportar } from '../exportar.js';
 import { HistoricoAuditoria } from '../historico.js';
 import { Icone } from '../icones.js';
+import { resumoPedido } from '../resumos.js';
+export { resumoPedido };   // (mudou para resumos.js: o Início usa sem carregar esta tela inteira)
 
 export const COR_STATUS = { aberto: 'azul', parcial: 'laranja', recebido: 'verde', cancelado: 'cinza', encerrado: 'cinza' };
-
-export function resumoPedido(pedido, dados) {
-  // pelo índice montado na carga (antes varria todos os itens/recebimentos para cada pedido)
-  const itens = dados.mapa?.itensPedido ? (dados.mapa.itensPedido.get(pedido.id) || []) : dados.pedidoItens.filter((i) => i.pedido_id === pedido.id);
-  const recebimentos = (dados.mapa?.recPedido ? (dados.mapa.recPedido.get(pedido.id) || []) : (dados.recebimentos || []).filter((r) => r.pedido_id === pedido.id))
-    .slice().sort((a, b) => b.id - a.id);
-  const valor = itens.reduce((s, i) => s + Number(i.valor_total), 0);
-  const base = itens.reduce((s, i) => s + Number(i.quantidade_base), 0);
-  const rec = itens.reduce((s, i) => s + Math.min(Number(i.qtd_recebida_base), Number(i.quantidade_base)), 0);
-  const hoje = hojeISO();
-  const pendente = pedido.status === 'aberto' || pedido.status === 'parcial';
-  const dias = pendente && pedido.previsao_entrega ? diasEntre(hoje, pedido.previsao_entrega) : null;
-  const divergentes = recebimentos.filter((r) => r.divergencia);
-  return { itens, recebimentos, valor, perc: base ? (rec / base) * 100 : 0, dias, pendente, atrasado: dias !== null && dias < 0,
-    fornecedor: dados.mapa.fornecedor.get(pedido.fornecedor_id),
-    divergencia: divergentes.length > 0, divPendente: divergentes.some((r) => !r.ciente_por),
-    recebidoPor: recebimentos[0] ? dados.mapa.perfil.get(recebimentos[0].usuario_id) : null };
-}
 
 export function PrazoEtiqueta({ r }) {
   if (!r.pendente) return '–';
