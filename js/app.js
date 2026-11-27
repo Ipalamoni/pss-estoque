@@ -70,6 +70,7 @@ const TelaPainelProducao = preguicosa(() => import('./telas/painel-producao.js')
 const TelaCadastrosProducao = preguicosa(() => import('./telas/cadastros-producao.js'), 'TelaCadastrosProducao');
 const TelaHistoricoProducao = preguicosa(() => import('./telas/historico-producao.js'), 'TelaHistoricoProducao');
 const TelaPedidosErp = preguicosa(() => import('./telas/pedidos-erp.js'), 'TelaPedidosErp');
+const TelaProdutosComerciais = preguicosa(() => import('./telas/produtos-comerciais.js'), 'TelaProdutosComerciais');
 
 const CFG = window.CONFIG || {};
 const TODOS = Object.keys(PAPEIS).filter((p) => !['financeiro', 'faturamento', 'padeiro', 'frota', 'integracao'].includes(p));   // frota: só o módulo de veículos   // financeiro: só pedidos/pagamentos e previsão; faturamento: só previsão; padeiro: só a produção
@@ -109,6 +110,7 @@ const MENU = [
   { id: 'produtos', titulo: 'Produtos', papeis: TODOS, tela: TelaProdutos },
   { id: 'fornecedores', titulo: 'Fornecedores', papeis: ['admin', 'comprador', 'almoxarifado', 'recebimento', 'diretoria'], tela: TelaFornecedores },
   { id: 'fichas', titulo: 'Fichas técnicas', papeis: ['admin', 'engenharia', 'pesagem', 'almoxarifado', 'diretoria'], tela: TelaFichas },
+  { id: 'produtos-comerciais', titulo: 'Produtos comerciais', papeis: ['admin', 'engenharia', 'gestor_producao'], tela: TelaProdutosComerciais },   // v2.27: de-para pão comercial × nome da produção
   { id: 'cadastros-producao', titulo: 'Masseiras e padeiros', papeis: ['admin', 'engenharia', 'diretoria', 'gestor_producao'], tela: TelaCadastrosProducao },
   { grupo: 'Manutenção de veículos', papeis: ['admin', 'frota'] },
   { id: 'frota', titulo: 'Painel da frota', papeis: ['admin', 'frota'], tela: TelaFrotaPainel },

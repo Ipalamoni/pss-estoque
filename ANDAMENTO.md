@@ -31,7 +31,7 @@ Arquivo público: sem nomes de pessoas, senhas, tokens ou dados da empresa.
 - Pergunta aberta ao dono: padeiro criar a própria senha no 1º acesso do tablet (proposta feita, aguardando "pode fazer").
 
 ## Situação atual (24/11/2026)
-- Sistema publicado: https://ipalamoni.github.io/pss-estoque/ (versão do app 2.26.1).
+- Sistema publicado: https://ipalamoni.github.io/pss-estoque/ (versão do app 2.27.0).
 - Banco de produção (Supabase `kuttfnmjvzgzebjpjvvy`, "estoque-pss"): versão **2.24.0**, todas as
   conferências OK. Não mexer no projeto Supabase `pss-vendas`.
 - Robô do ERP (26/11/2026): 1º teste no servidor trouxe TODOS os pedidos não cancelados (13.115 em 90 dias).
@@ -45,6 +45,21 @@ Arquivo público: sem nomes de pessoas, senhas, tokens ou dados da empresa.
   NÃO mover). Teste: 3,97 s, 394 pedidos em aberto, 64 produtos, 167.803 pacotes. Usuário `integracao` criado
   (senha temporária no config.ini do servidor). Tarefa do Windows "Artas" a cada 30 min. Próximo: dono conferir os
   pedidos mais antigos (fim de outubro) e desenhar a comparação com a produção (cadastro do produto acabado).
+- v2.27.0 (27/11/2026, banco + app). ⚠ BANCO AINDA NÃO APLICADO EM PRODUÇÃO: o token da Management API desta
+  conversa deixou de valer ("Invalid access token"); o dono cola `banco/atualizar-banco-v2.27.sql` no SQL Editor.
+  Até lá, só a tela nova dá erro ao abrir (as demais não dependem dela).
+  NOME DA PRODUÇÃO × PRODUTO COMERCIAL (decisão do dono): vários pães comerciais (marcas próprias e terceirizadas)
+  saem da MESMA massa. A ficha técnica = NOME DA PRODUÇÃO (uma por massa, não por marca; rótulo trocado em Fichas
+  técnicas); é o que aparece da programação até finalizar na masseira (o fluxo já usava a ficha, nada mudou nele).
+  Cadastro novo "Produtos comerciais" (Cadastros, `js/telas/produtos-comerciais.js`, tabela `produtos_comerciais`):
+  código e nome do ERP (nome fica COMO NO ERP, sem padronizar: tem marcas), nome da produção (ficha) e peso do pacote
+  (g). Cadastro MANUAL (lançamento, produto que voltou a vender) ou pela sugestão "N produtos vieram do ERP sem
+  cadastro [Cadastrar]" (`produtos_comerciais_do_erp`). Aviso "N produtos comerciais sem nome da produção
+  [Resolver]". Editar: admin e engenharia (`produto_comercial`); ver: + gestor da produção (`produto_comercial_ver`).
+  PRÓXIMAS FASES (contexto do dono, não fazer ainda): pedidos × produção (cobre até qual cliente, pelo de-para e peso)
+  e programação da EMBALAGEM (o que foi finalizado na masseira vira quais pães comerciais). Esta etapa vai até
+  finalizar na masseira. Testado: PGlite com ataques (sem login, sem perfil, padeiro, comprador, diretoria, gestor
+  sem editar) e tela na demonstração (ERP → cadastro, manual, 1280/800/390, dois temas).
 - v2.26.1 (27/11/2026, só app): DESEMPENHO, itens 1, 2 e 4 aprovados pelo dono (o 3, conferência espaçada,
   NÃO foi feito por decisão do dono: a conferência de 30 s/90 s é a rede de segurança do tempo real).
   1) CARGA SOB MEDIDA (`blocosDoUsuario` em app.js, pelos papéis de quem ENTROU; no "ver como" o admin segue com

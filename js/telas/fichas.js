@@ -26,7 +26,7 @@ export function TelaFichas() {
     </${Cabecalho}>
     <${Filtros} acoes=${html`<span class="nota">${pl(linhas.length, 'receita', 'receitas')}</span>
       <${Exportar} titulo="Fichas técnicas" filtros=${pl(linhas.length, 'receita', 'receitas')} arquivo=${`fichas-tecnicas-${hojeISO()}`} linhas=${linhas.flatMap((f) => itensDe(f.id).map((it, i) => ({ f, it, i })))}
-        colunas=${[{ titulo: 'Código', valor: (x) => (x.i === 0 ? x.f.codigo : '') }, { titulo: 'Receita', valor: (x) => (x.i === 0 ? x.f.nome : ''), largura: 28 },
+        colunas=${[{ titulo: 'Código', valor: (x) => (x.i === 0 ? x.f.codigo : '') }, { titulo: 'Nome da produção', valor: (x) => (x.i === 0 ? x.f.nome : ''), largura: 28 },
           { titulo: 'Produto final', valor: (x) => (x.i === 0 ? x.f.produto_final : '') }, { titulo: 'Rende por receita', valor: (x) => (x.i === 0 && x.f.rendimento_qtd ? Number(x.f.rendimento_qtd) : '') },
           { titulo: 'Unid. rendimento', valor: (x) => (x.i === 0 ? x.f.rendimento_unidade || '' : '') },
           { titulo: 'Cód. ingrediente', valor: (x) => dados.mapa.produto.get(x.it.produto_id)?.codigo }, { titulo: 'Ingrediente', valor: (x) => dados.mapa.produto.get(x.it.produto_id)?.descricao, largura: 32 },
@@ -37,7 +37,7 @@ export function TelaFichas() {
     <${Tabela} linhas=${linhas} aoClicar=${setEditando} ordemInicial=${{ chave: 'nome', dir: 1 }}
       colunas=${[
         { chave: 'codigo', titulo: 'Código', render: (f) => html`<b>${f.codigo}</b>` },
-        { chave: 'nome', titulo: 'Receita', render: (f) => html`<b>${f.nome}</b>${!f.ativo && html` <${Etiqueta}>inativa</${Etiqueta}>`}` },
+        { chave: 'nome', titulo: 'Nome da produção', render: (f) => html`<b>${f.nome}</b>${!f.ativo && html` <${Etiqueta}>inativa</${Etiqueta}>`}` },
         { chave: 'produto_final', titulo: 'Produto final' },
         { chave: 'rendimento_qtd', titulo: 'Rende por receita', num: true, valor: (f) => Number(f.rendimento_qtd || 0),
           render: (f) => (f.rendimento_qtd ? `${qtd(f.rendimento_qtd)} ${f.rendimento_unidade || ''}` : html`<${Etiqueta} cor="laranja">preencher</${Etiqueta}>`) },
@@ -108,7 +108,7 @@ function FormFicha({ ficha, itens, aoFechar, somenteLeitura, aoUsar }) {
     <fieldset disabled=${somenteLeitura} class="grade">
       <${Campo} rotulo="Código da receita" ajuda=${ficha.id ? '' : 'Deixe vazio para gerar automático (R001, R002…).'}>
         <input class="entrada" value=${f.codigo} placeholder=${ficha.id ? '' : 'automático'} onInput=${set('codigo')} /></${Campo}>
-      <${Campo} rotulo="Nome da receita" obrigatorio classe="larga"><input class="entrada" value=${f.nome} onInput=${set('nome')} /></${Campo}>
+      <${Campo} rotulo="Nome da produção (a massa: aparece na programação, pesagem e masseiras)" obrigatorio classe="larga"><input class="entrada" value=${f.nome} onInput=${set('nome')} /></${Campo}>
       <${Campo} rotulo="Produto final"><input class="entrada" value=${f.produto_final} onInput=${set('produto_final')} /></${Campo}>
       <${Campo} rotulo="Rende por receita" ajuda="Quanto 1 receita produz. Usado na previsão de produção.">
         <div class="linha-campo"><input class="entrada" inputmode="decimal" placeholder="ex.: 180" value=${f.rendimento_qtd} onInput=${set('rendimento_qtd')} />

@@ -61,6 +61,7 @@ const P = {
   'frota-placas': 'M2 7h20v10H2zM6 12h3M11 12h7M6 4v3M18 4v3',
   'frota-importar': 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12',
   'frota-tipos': 'M3 6h.01M3 12h.01M3 18h.01M8 6h13M8 12h13M8 18h13',
+  'produtos-comerciais': 'M4 7l8-4 8 4v10l-8 4-8-4zM4 7l8 4 8-4M12 11v10',
   'pedidos-erp': 'M6 2h12v20l-3-2-3 2-3-2-3 2zM9 7h6M9 11h6M9 15h4',
   anexo: 'M21.4 11.1l-9.2 9.2a6 6 0 0 1-8.5-8.5l9.2-9.2a4 4 0 0 1 5.7 5.7l-9.2 9.2a2 2 0 0 1-2.8-2.8l8.5-8.5',
 };
