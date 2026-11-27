@@ -5,7 +5,18 @@ técnico do repositório (decisão do dono, 25/11/2026).
 
 Arquivo público: sem nomes de pessoas, senhas, tokens ou dados da empresa.
 
-## ⚠ RETOMAR AQUI (25/11/2026, conversa encerrada por tamanho)
+## ⚠ RETOMAR AQUI (27/11/2026: o dono saiu para uma reunião)
+- **PENDENTE, PRIMEIRA COISA:** aplicar `banco/atualizar-banco-v2.27.sql` (Produtos comerciais) em produção. O app
+  v2.27.0 JÁ está publicado; até aplicar, só a tela "Produtos comerciais" dá erro ao abrir. Dois caminhos:
+  (a) o dono cola o arquivo no SQL Editor (https://supabase.com/dashboard/project/kuttfnmjvzgzebjpjvvy/sql/new),
+  Run, e as 6 linhas da conferência devem dizer OK; ou (b) token novo da Management API (o desta conversa deu
+  "Invalid access token" em 27/11) e o Claude aplica. Depois de aplicado: abrir a tela como admin e conferir
+  (lista vazia, aviso "N produtos vieram do ERP sem cadastro").
+- Feito em 27/11: v2.26.0 (consumo médio só na janela, aplicado), v2.26.1 (carga e tempo real sob medida por
+  papel), v2.27.0 (nome da produção × produto comercial), integração ERP 1.1.0 (2º destino vendas, rodando no
+  servidor desde 26/11 21:42, valores em R$ chegando). Pacote de instruções do VENDAS entregue ao dono.
+
+## Anotações anteriores (25/11/2026)
 - **Backup do ESTOQUE (sistema inteiro) v2.23.0: FEITO**, restauração testada (43 conferências OK, 6170 registros,
   frota incluída) e entregue ao dono (`backup_artas_v2.23.0_2026-11-25.zip`). Ele guarda no Drive.
 - **Backup do VENDAS: PENDENTE.** Repositório `Ipalamoni/pss-vendas` (site estático de 9 arquivos: index.html,
@@ -193,6 +204,8 @@ Arquivo público: sem nomes de pessoas, senhas, tokens ou dados da empresa.
 - [ ] (Opcional) Refatoração: levar os testes para o repositório e consolidar o CSS; só se o dono aprovar.
 
 ## Pendências que dependem do dono
+- [ ] **Aplicar o banco v2.27** (Produtos comerciais): colar `banco/atualizar-banco-v2.27.sql` no SQL Editor e conferir 6 × OK (ou criar token novo para o Claude aplicar).
+- [ ] Conferir no `artas.log` do servidor se aparecem as linhas "Enviado ao VENDAS".
 - [ ] Dar ao engenheiro da produção os papéis "engenharia" + "Gestor da produção".
 - [ ] Preencher tempos e tolerâncias nas Fichas técnicas.
 - [ ] Criar o usuário do tablet da produção.
